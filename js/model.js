@@ -9,8 +9,8 @@ export const COLLECTIES = ['klassen', 'lessen', 'taken', 'sjablonen', 'dagen', '
 export const DAGNAMEN = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'];
 export const MAANDNAMEN = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
 
-export const KLASKLEUREN = ['#123b78', '#5bbba4', '#2f8fcf', '#6f9a3a', '#8a5bb5', '#e0962a', '#3d7f86', '#5a6f9e'];
-// Opleiding: warme tinten rond het fuchsia, zodat ze duidelijk verschilt van school.
+export const KLASKLEUREN = ['#123b78', '#5bbba4', '#2f8fcf', '#6f9a3a', '#8a5bb5', '#e0962a', '#3d7f86', '#5a6f9e', '#ef4f4e', '#c2577f', '#e27aa5'];
+// Opleiding: warme tinten. School mag dezelfde kleuren gebruiken; het onderscheid zit in de stippelrand en 🎓.
 export const VAKKLEUREN = ['#ef4f4e', '#c2577f', '#e0762a', '#a84c9e', '#d4504f', '#b8664a'];
 
 // Mogelijke deadlines van een taak bij een les.

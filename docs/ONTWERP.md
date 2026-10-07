@@ -131,7 +131,8 @@ Afwezigheden beheren, standaardtaken beheren, vaste werkdagen instellen.
   - `#sw` → verschijnt in Saga **én** telt als extra werkdag (evaluatiedag, pedagogische studiedag).
 - De code moet als los woord staan: `#school` of `#sport` tellen niet mee.
 - De code wordt in Saga niet getoond ("Tandarts", niet "Tandarts #s").
-- Een **achterliggende sync** (bv. elk uur) leest de agenda voor de komende 30–60 dagen en neemt enkel afspraken met de code over. Al de rest wordt genegeerd.
+- Een **achterliggende sync** draait **1 keer per dag** ('s nachts, rond 5u) en leest de agenda voor de komende 60 dagen. Enkel afspraken met de code worden overgenomen, al de rest wordt genegeerd.
+- Wie niet wil wachten: knop **"agenda nu vernieuwen"** in de instellingen.
 - Alleen lezen: de planner schrijft nooit in de agenda.
 
 ## 6. Techniek (voorstel)
@@ -141,7 +142,7 @@ Afwezigheden beheren, standaardtaken beheren, vaste werkdagen instellen.
 ┌────────────────────┐   HTTPS   ┌──────────────────────────────┐
 │ Webapp (PWA)       │ ───────▶  │ Google Apps Script           │
 │ - op beginscherm   │ ◀───────  │ - API: data lezen/opslaan    │
-│ - lokale kopie     │   JSON    │ - uurlijkse agenda-sync (#s) │
+│ - lokale kopie     │   JSON    │ - dagelijkse agenda-sync (#s)│
 │   (werkt even      │           │ - data: 1 JSON-bestand       │
 │   offline)         │           │   op Google Drive            │
 └────────────────────┘           └──────────────────────────────┘

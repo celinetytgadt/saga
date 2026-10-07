@@ -1,6 +1,8 @@
-# Takenplanner – ontwerp
+# Saga – ontwerp
 
-> Status: **ontwerp, nog niet goedgekeurd**. Er wordt pas gecodeerd na akkoord.
+> **Saga** is mijn persoonlijke takenplanner (naast Freya voor financiën). Los van De MET, in eigen huisstijl.
+>
+> Status: **ontwerp rond, wacht op akkoord om te starten met fase 1**.
 
 ## 1. Doel
 
@@ -39,7 +41,7 @@ Eén gebruiker. Werkt op gsm en computer, met dezelfde gegevens.
 | `titel` | `Prints facturen` | |
 | `lesId` | `l17` of leeg | leeg = losse taak (stage, vergadering, …) |
 | `werkdag` | `2026-10-12` of leeg | dag waarop **ik** eraan wil werken, leeg = in het bakje "nog in te plannen" |
-| `deadline` | `{ relatief: -1 }` of `{ datum: "2026-10-20" }` | relatief = aantal dagen t.o.v. de lesdatum (schuift mee met de les); absoluut = vaste datum (losse taken) |
+| `deadline` | `{ relatief: -1, nietOpWerkdag: true }` of `{ datum: "2026-10-20" }` | relatief = aantal dagen t.o.v. de lesdatum (schuift mee met de les), eventueel verder terug tot een dag die geen werkdag is; absoluut = vaste datum (losse taken, verbeteren) |
 | `vanaf` | `{ relatief: +3 }` of leeg | optioneel: vroegst mogelijke dag (bv. verbeteren kan pas na indienen) |
 | `klaar` | `false` | |
 | `notitie` | | vrije tekst |
@@ -50,7 +52,7 @@ Wordt automatisch voorgesteld bij het aanmaken van een les (aanvinken wat van to
 | veld | voorbeeld |
 |---|---|
 | `titel` | `Lesvoorbereiding` |
-| `deadline` | `{ relatief: -1 }` |
+| `deadline` | `{ relatief: -1, nietOpWerkdag: true }` |
 | `vanaf` | leeg |
 | `standaardAan` | `true` |
 
@@ -58,12 +60,20 @@ Startset (geldt voor alle klassen):
 
 | standaardtaak | klaar tegen |
 |---|---|
-| Lesvoorbereiding | dag vóór de les (uitzondering: zie open vraag) |
+| Lesvoorbereiding | dag vóór de les; is dat een werkdag, dan de eerste dag daarvoor die géén werkdag is |
 | CR-taak klaarzetten | dag vóór de les |
 | Prints | ochtend van de les zelf |
 | Verbeteren | vanaf indiendatum; deadline wordt voorgesteld als de volgende les van die klas na indienen, maar daarna als **vaste datum** bewaard (niet gekoppeld) en vrij aan te passen |
 
 Een standaardtaak is enkel een **voorstel**: eens aangemaakt is elke taak los aan te passen (titel, deadline) zonder dat andere lessen veranderen. Variaties per klas komen later, op basis van wat in het gebruik opvalt.
+
+### Werkdagen (instelling)
+Dagen waarop ik op school werk en dus geen tijd heb om voor te bereiden.
+
+| veld | voorbeeld | uitleg |
+|---|---|---|
+| `vasteWerkdagen` | `[di, vr]` | in te stellen, wijzigt mogelijk naar `[ma, di]` |
+| extra werkdagen | evaluatiedag, pedagogische studiedag | via de agenda met code `#sw` (zie §5), of manueel aan te duiden op een dag |
 
 ### Afwezigheid (leerlingen weg)
 | veld | voorbeeld | uitleg |
@@ -79,7 +89,7 @@ Een standaardtaak is enkel een **voorstel**: eens aangemaakt is elke taak los aa
 
 ## 3. Regels
 
-1. **Werkdag schuif ik zelf, deadline volgt de les.** Verschuift een les, dan schuiven de relatieve deadlines (en `vanaf`) mee. Werkdagen blijven staan.
+1. **Werkdag schuif ik zelf, deadline volgt de les.** Verschuift een les, dan schuiven de relatieve deadlines (en `vanaf`) mee. Werkdagen blijven staan. Ook als de vaste werkdagen wijzigen of er een extra werkdag bijkomt, worden relatieve deadlines herberekend.
 2. **Waarschuwingen**
    - 🔴 werkdag ligt ná de deadline;
    - 🔴 werkdag ligt vóór `vanaf`;
@@ -93,7 +103,7 @@ Een standaardtaak is enkel een **voorstel**: eens aangemaakt is elke taak los aa
 ### A. 30-dagenoverzicht (hoofdscherm)
 Per dag één blok, ook weekends:
 
-1. 🚫 afwezigheid (balk bovenaan, bv. "BKH3 op uitstap")
+1. 🚫 afwezigheid (balk bovenaan, bv. "BKH3 op uitstap"); werkdagen krijgen een subtiele markering
 2. 🎓 lessen die ik die dag geef (kleur van de klas)
 3. 📅 aangeduide agenda-afspraken
 4. ✏️ taken met deze werkdag (schuifbare blokjes)
@@ -112,11 +122,15 @@ Taken zonder werkdag, gesorteerd op deadline.
 Per klas de lessenreeks in volgorde, lesrooster instellen, lessen toevoegen (manueel, ook meerdere tegelijk door een lijst te plakken).
 
 ### E. Afwezigheden & instellingen
-Afwezigheden beheren, standaardtaken beheren, agenda-code instellen.
+Afwezigheden beheren, standaardtaken beheren, vaste werkdagen instellen.
 
 ## 5. Agenda-koppeling
 
-- Ik duid een afspraak in de gezinsagenda aan met een **code** (voorstel: `#p` in titel of beschrijving). De afspraak blijft gewoon in de gezinsagenda staan.
+- Ik duid een afspraak in de gezinsagenda aan met een **code** in titel of beschrijving. De afspraak blijft gewoon in de gezinsagenda staan.
+  - `#s` → afspraak verschijnt in Saga (tandarts, kapper, uitstap);
+  - `#sw` → verschijnt in Saga **én** telt als extra werkdag (evaluatiedag, pedagogische studiedag).
+- De code moet als los woord staan: `#school` of `#sport` tellen niet mee.
+- De code wordt in Saga niet getoond ("Tandarts", niet "Tandarts #s").
 - Een **achterliggende sync** (bv. elk uur) leest de agenda voor de komende 30–60 dagen en neemt enkel afspraken met de code over. Al de rest wordt genegeerd.
 - Alleen lezen: de planner schrijft nooit in de agenda.
 
@@ -127,7 +141,7 @@ Afwezigheden beheren, standaardtaken beheren, agenda-code instellen.
 ┌────────────────────┐   HTTPS   ┌──────────────────────────────┐
 │ Webapp (PWA)       │ ───────▶  │ Google Apps Script           │
 │ - op beginscherm   │ ◀───────  │ - API: data lezen/opslaan    │
-│ - lokale kopie     │   JSON    │ - uurlijkse agenda-sync (#p) │
+│ - lokale kopie     │   JSON    │ - uurlijkse agenda-sync (#s) │
 │   (werkt even      │           │ - data: 1 JSON-bestand       │
 │   offline)         │           │   op Google Drive            │
 └────────────────────┘           └──────────────────────────────┘
@@ -141,8 +155,8 @@ Afwezigheden beheren, standaardtaken beheren, agenda-code instellen.
 
 | fase | inhoud |
 |---|---|
-| 1 | klassen, lessen, taken, standaardtaken, 30-dagenoverzicht, schuiven (slepen + "verplaats naar"), meeschuivende deadlines, waarschuwingen, bakje, afvinken, opslag op Drive, gsm |
-| 2 | agenda-sync met code, afwezigheden |
+| 1 | klassen, lessen, taken, standaardtaken, vaste werkdagen, 30-dagenoverzicht, schuiven (slepen + "verplaats naar"), meeschuivende deadlines, waarschuwingen, bakje, afvinken, opslag op Drive, gsm |
+| 2 | agenda-sync met code (`#s`, `#sw`), afwezigheden |
 | 3 | lesrooster per klas + reeks opschuiven |
 
 ## 8. Beslist
@@ -150,8 +164,6 @@ Afwezigheden beheren, standaardtaken beheren, agenda-code instellen.
 - Hosting: webapp op GitHub Pages (code openbaar, gegevens niet), opslag op persoonlijke Google Drive.
 - Losse taken: ja. Tijdsinschatting: nee. Weekends: zichtbaar.
 - Lessen worden manueel ingegeven (geen import uit Google Sheets).
-
-## 9. Nog te beslissen
-
-- Naam van de app (persoonsnaam, persoonlijk, los van De MET) → bepaalt ook de agenda-code.
-- Lesvoorbereiding "2 dagen ervoor als ik de dag ervoor werk": hoe weet de app dat?
+- Naam: **Saga**, agenda-codes `#s` en `#sw`.
+- Max. 1 les per dag per klas.
+- Verbeterdeadline: voorstel = volgende les na indienen, bewaard als vaste, aanpasbare datum.

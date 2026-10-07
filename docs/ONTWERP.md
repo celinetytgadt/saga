@@ -61,7 +61,7 @@ Startset (geldt voor alle klassen):
 | Lesvoorbereiding | dag vóór de les (uitzondering: zie open vraag) |
 | CR-taak klaarzetten | dag vóór de les |
 | Prints | ochtend van de les zelf |
-| Verbeteren | afhankelijk van de indiendeadline (zie open vraag) |
+| Verbeteren | vanaf indiendatum; deadline wordt voorgesteld als de volgende les van die klas na indienen, maar daarna als **vaste datum** bewaard (niet gekoppeld) en vrij aan te passen |
 
 Een standaardtaak is enkel een **voorstel**: eens aangemaakt is elke taak los aan te passen (titel, deadline) zonder dat andere lessen veranderen. Variaties per klas komen later, op basis van wat in het gebruik opvalt.
 
@@ -153,6 +153,5 @@ Afwezigheden beheren, standaardtaken beheren, agenda-code instellen.
 
 ## 9. Nog te beslissen
 
-- Naam van de app (persoonlijk, los van De MET) → bepaalt ook de agenda-code.
+- Naam van de app (persoonsnaam, persoonlijk, los van De MET) → bepaalt ook de agenda-code.
 - Lesvoorbereiding "2 dagen ervoor als ik de dag ervoor werk": hoe weet de app dat?
-- Verbeteren: welke deadline (indiendatum + x dagen, of tegen de volgende les)?

@@ -87,6 +87,23 @@ Dagen waarop ik op school werk en dus geen tijd heb om voor te bereiden.
 |---|---|
 | `titel`, `start`, `einde`, `heleDag` | overgenomen uit de agenda, code wordt uit de titel weggelaten |
 
+### Les met meerdere klassen
+Een les heeft `klasIds` (een lijst). BKH3-K2 en BKH3-K3 krijgen zo samen één les met één set taken.
+Krijgt maar één klas les, dan vink je de andere klas uit bij die les; de taken blijven bij de les.
+In het overzicht: "BKH3-K2 + K3" met de kleuren van beide klassen.
+
+### Opleiding (educatieve bachelor)
+| begrip | velden | uitleg |
+|---|---|---|
+| Opleidingsonderdeel (`vakken`) | `naam`, `kleur` | groepeert opdrachten; warme tinten rond het fuchsia |
+| Opdracht (`opdrachten`) | `vakId`, `titel`, `deadline` | einddeadline |
+| Stuk | een taak met `opdrachtId` en `volg` | deadline standaard `{ eind: true }` = volgt de einddeadline; tussendeadline kan |
+
+- **Verdelen:** de stukken die nog geen werkdag hebben worden gelijkmatig verdeeld over de dagen die géén werkdag zijn, van morgen tot de dag vóór de einddeadline. Daarna vrij te verschuiven.
+- **Onderscheid school/opleiding:** opleidingsblokjes hebben de kleur van hun onderdeel, een stippelrand en 🎓; de einddeadline staat als gekleurd label op de dag. Filter *Alles · School · Opleiding* in het overzicht en het bakje.
+- Losse taken krijgen een `domein` (school of opleiding).
+- Hogeschoollessen ('s avonds) komen via de agenda met `#s` (geen werkdag).
+
 ## 3. Regels
 
 1. **Werkdag schuif ik zelf, deadline volgt de les.** Verschuift een les, dan schuiven de relatieve deadlines (en `vanaf`) mee. Werkdagen blijven staan. Ook als de vaste werkdagen wijzigen of er een extra werkdag bijkomt, worden relatieve deadlines herberekend.
@@ -156,7 +173,8 @@ Afwezigheden beheren, standaardtaken beheren, vaste werkdagen instellen.
 
 | fase | inhoud |
 |---|---|
-| 1 | klassen, lessen, taken, standaardtaken, vaste werkdagen, 30-dagenoverzicht, schuiven (slepen + "verplaats naar"), meeschuivende deadlines, waarschuwingen, bakje, afvinken, opslag op Drive, gsm |
+| 1 ✅ | klassen, lessen, taken, standaardtaken, vaste werkdagen, 30-dagenoverzicht, schuiven (slepen + "verplaats naar"), meeschuivende deadlines, waarschuwingen, bakje, afvinken, opslag op Drive, gsm |
+| 1b ✅ | opleiding (onderdelen, opdrachten, stukken, verdelen), filter, lessen met meerdere klassen |
 | 2 | agenda-sync met code (`#s`, `#sw`), afwezigheden |
 | 3 | lesrooster per klas + reeks opschuiven |
 

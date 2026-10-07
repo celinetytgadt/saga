@@ -134,3 +134,69 @@ test('Code.gs gebruikt dezelfde samenvoeg-regels', () => {
     assert.deepEqual(JSON.parse(JSON.stringify(ctx.merge(x, y))), M.merge(x, y));
   }
 });
+
+test('gezamenlijke les: meerdere klassen', () => {
+  const s = basis();
+  s.klassen.k2 = { id: 'k2', naam: 'BKH3-K2', rooster: [2], upd: 1 };
+  s.klassen.k3 = { id: 'k3', naam: 'BKH3-K3', rooster: [2], upd: 1 };
+  s.lessen.l2 = { id: 'l2', klasIds: ['k2', 'k3'], titel: 'Samen', datum: '2026-10-13', upd: 1 };
+  s.lessen.l3 = { id: 'l3', klasIds: ['k2'], titel: 'Enkel K2', datum: '2026-10-20', upd: 1 };
+  assert.deepEqual(M.klassenVanLes(s.lessen.l1), ['k1']); // oud formaat
+  assert.deepEqual(M.lessenVanKlas(s, 'k3').map((l) => l.id), ['l2']);
+  assert.deepEqual(M.lessenVanKlas(s, 'k2').map((l) => l.id), ['l2', 'l3']);
+  assert.equal(M.volgendeLesNa(s, ['k2', 'k3'], '2026-10-13'), '2026-10-20');
+  assert.equal(M.volgendeLesNa(s, ['k3'], '2026-10-13'), '2026-10-20'); // rooster dinsdag
+  M.verwijderKlas(s, 'k3');
+  assert.deepEqual(s.lessen.l2.klasIds, ['k2']);
+  M.verwijderKlas(s, 'k2');
+  assert.equal(s.lessen.l2.del, true);
+});
+
+test('groepsnaam', () => {
+  assert.equal(M.groepNaam(['BKH3-K2', 'BKH3-K3']), 'BKH3-K2 + K3');
+  assert.equal(M.groepNaam(['BKH4']), 'BKH4');
+  assert.equal(M.groepNaam(['BKH4', 'ECO5']), 'BKH4 + ECO5');
+  assert.equal(M.groepNaam(['5 ECO', '5 HUM']), '5 ECO + HUM');
+});
+
+test('opleiding: stukken volgen de einddeadline', () => {
+  const s = basis();
+  s.opdrachten.o1 = { id: 'o1', titel: 'Portfolio', deadline: '2026-11-20', upd: 1 };
+  const stukken = M.maakStukken(s, 'o1', ['Lezen', 'Schrijven', 'Nalezen']);
+  assert.deepEqual(stukken.map((t) => t.volg), [1, 2, 3]);
+  assert.equal(M.domeinVan(stukken[0]), 'opleiding');
+  assert.equal(M.domeinVan({ lesId: 'l1' }), 'school');
+  assert.equal(M.domeinVan({ domein: 'opleiding' }), 'opleiding');
+  assert.equal(M.deadlineVan(s, stukken[0]), '2026-11-20');
+  s.opdrachten.o1.deadline = '2026-11-27';
+  assert.equal(M.deadlineVan(s, stukken[0]), '2026-11-27');
+  assert.equal(M.deadlineSleutel({ eind: true }), 'eind');
+  M.verwijderOpdracht(s, 'o1');
+  assert.equal(M.takenVanOpdracht(s, 'o1').length, 0);
+});
+
+test('stukken verdelen over vrije dagen', () => {
+  const s = basis(); // werkdagen di + vr
+  s.opdrachten.o1 = { id: 'o1', titel: 'Portfolio', deadline: '2026-10-24', upd: 1 };
+  const stukken = M.maakStukken(s, 'o1', ['a', 'b', 'c', 'd']);
+  stukken[1].werkdag = '2026-10-10'; // al ingepland: blijft
+  stukken[3].deadline = { datum: '2026-10-12' }; // tussendeadline
+  const plan = M.verdeelOpdracht(s, 'o1', '2026-10-07');
+  assert.deepEqual(plan.map((p) => p.taak.titel), ['a', 'c', 'd']);
+  for (const p of plan) assert.equal(M.isWerkdag(s, p.datum), false, p.datum);
+  assert.equal(plan[0].datum, '2026-10-08'); // morgen
+  assert.ok(plan[2].datum <= '2026-10-12');
+  assert.ok(plan.every((p) => p.datum < '2026-10-24'));
+  // deadline al voorbij of morgen: alles op de eerstvolgende dag
+  s.opdrachten.o1.deadline = '2026-10-08';
+  assert.ok(M.verdeelOpdracht(s, 'o1', '2026-10-07').every((p) => p.datum === '2026-10-08'));
+});
+
+test('samenvoegen neemt nieuwe collecties vanzelf mee', () => {
+  const a = { taken: {}, instellingen: { upd: 1 } };
+  const b = { vakken: { v1: { id: 'v1', naam: 'Didactiek', upd: 2 } }, nieuw: { x: { id: 'x', upd: 1 } } };
+  const r = M.merge(a, b);
+  assert.equal(r.vakken.v1.naam, 'Didactiek');
+  assert.equal(r.nieuw.x.id, 'x');
+  assert.deepEqual(M.merge(r, { vakken: { v1: { id: 'v1', naam: 'Oud', upd: 1 } } }).vakken.v1.naam, 'Didactiek');
+});

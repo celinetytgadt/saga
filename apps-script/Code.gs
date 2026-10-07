@@ -12,7 +12,8 @@ const MAP_NAAM = 'Saga';
 const BESTAND_NAAM = 'saga-data.json';
 const BACKUPS_HOUDEN = 14;
 
-const COLLECTIES = ['klassen', 'lessen', 'taken', 'sjablonen', 'dagen'];
+// Verhogen bij elke wijziging die de app moet kennen; de app waarschuwt bij een oudere versie.
+const SCRIPT_VERSIE = 2;
 
 /** Eenmalig uitvoeren vanuit de editor: maakt map, bestand en geheime sleutel aan. */
 function installeer() {
@@ -52,7 +53,7 @@ function doPost(e) {
         maakDagelijkseBackup_(bestand);
         bestand.setContent(tekst);
       }
-      return json_({ ok: true, data: samen });
+      return json_({ ok: true, data: samen, scriptVersie: SCRIPT_VERSIE });
     }
     return json_({ ok: false, fout: 'onbekende actie' });
   } finally {
@@ -62,18 +63,29 @@ function doPost(e) {
 
 /**
  * Samenvoegen van twee versies: per object wint de recentste `upd`.
- * Bij gelijke `upd` blijft de versie uit `a`. (Zelfde functie als in js/model.js.)
+ * Bij gelijke `upd` blijft de versie uit `a`. Elke sleutel behalve
+ * `instellingen` is een collectie. (Zelfde functie als in js/model.js.)
  */
+function isCollectie_(v) {
+  return !!v && typeof v === 'object' && !Array.isArray(v);
+}
+
 function merge(a, b) {
   a = a || {};
   b = b || {};
-  const r = Object.assign({}, b, a);
-  COLLECTIES.forEach(function (c) {
-    r[c] = Object.assign({}, a[c] || {});
-    Object.keys(b[c] || {}).forEach(function (id) {
-      const v = b[c][id];
-      const o = r[c][id];
-      if (!o || (v.upd || 0) > (o.upd || 0)) r[c][id] = v;
+  const r = {};
+  const sleutels = Object.keys(a).concat(Object.keys(b).filter(function (k) { return !(k in a); }));
+  sleutels.forEach(function (k) {
+    if (k === 'instellingen') return;
+    if (!isCollectie_(a[k]) && !isCollectie_(b[k])) {
+      r[k] = a[k] !== undefined ? a[k] : b[k];
+      return;
+    }
+    r[k] = Object.assign({}, a[k] || {});
+    Object.keys(b[k] || {}).forEach(function (id) {
+      const v = b[k][id];
+      const o = r[k][id];
+      if (!o || (v.upd || 0) > (o.upd || 0)) r[k][id] = v;
     });
   });
   const ia = a.instellingen;

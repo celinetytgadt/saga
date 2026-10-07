@@ -4,6 +4,7 @@ import { leegeState, merge } from './model.js';
 
 const LS_STATE = 'saga.state.v1';
 const LS_SYNC = 'saga.sync.v1';
+const SCRIPT_VERSIE = 2; // minimaal vereiste versie van apps-script/Code.gs
 
 let state = laadState();
 let syncCfg = laadJson(LS_SYNC) || { url: '', token: '' };
@@ -110,7 +111,11 @@ export async function sync() {
     // Wijzigingen die tijdens het wachten gebeurden zitten al in `state` en zijn recenter.
     state = merge(state, j.data);
     bewaar();
-    zetStatus('ok');
+    if ((j.scriptVersie || 1) < SCRIPT_VERSIE) {
+      zetStatus('fout', 'het Google-script is verouderd. Plak de nieuwe Code.gs en maak een nieuwe versie (zie installatiegids).');
+    } else {
+      zetStatus('ok');
+    }
   } catch (e) {
     zetStatus('fout', e.message || String(e));
   } finally {

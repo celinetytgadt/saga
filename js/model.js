@@ -4,12 +4,14 @@
 // Elk object heeft een `upd` (tijdstempel van laatste wijziging) zodat twee
 // toestellen hun gegevens kunnen samenvoegen. Verwijderen = `del: true`.
 
-export const COLLECTIES = ['klassen', 'lessen', 'taken', 'sjablonen', 'dagen'];
+export const COLLECTIES = ['klassen', 'lessen', 'taken', 'sjablonen', 'dagen', 'vakken', 'opdrachten'];
 
 export const DAGNAMEN = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'];
 export const MAANDNAMEN = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
 
-export const KLASKLEUREN = ['#123b78', '#5bbba4', '#ef4f4e', '#8a5bb5', '#e0962a', '#2f8fcf', '#6f9a3a', '#c2577f'];
+export const KLASKLEUREN = ['#123b78', '#5bbba4', '#2f8fcf', '#6f9a3a', '#8a5bb5', '#e0962a', '#3d7f86', '#5a6f9e'];
+// Opleiding: warme tinten rond het fuchsia, zodat ze duidelijk verschilt van school.
+export const VAKKLEUREN = ['#ef4f4e', '#c2577f', '#e0762a', '#a84c9e', '#d4504f', '#b8664a'];
 
 // Mogelijke deadlines van een taak bij een les.
 export const DEADLINE_KEUZES = [
@@ -19,6 +21,9 @@ export const DEADLINE_KEUZES = [
   { sleutel: 'rel:-2', label: '2 dagen vóór de les', deadline: { rel: -2 } },
   { sleutel: 'rel:-7', label: '1 week vóór de les', deadline: { rel: -7 } },
 ];
+
+// Deadline van een stuk van een opleidingsopdracht.
+export const EIND_KEUZE = { sleutel: 'eind', label: 'einddeadline van de opdracht', deadline: { eind: true } };
 
 // ---------- datums ----------
 
@@ -82,22 +87,32 @@ export function leegeState() {
     taken: {},
     sjablonen: standaardSjablonen(),
     dagen: {},
+    vakken: {},
+    opdrachten: {},
     instellingen: { werkdagen: [2, 5], toonKlaar: false, upd: 0 },
   };
 }
 
 // Samenvoegen van twee versies: per object wint de recentste `upd`.
-// Bij gelijke `upd` blijft de versie uit `a`.
+// Bij gelijke `upd` blijft de versie uit `a`. Elke sleutel behalve
+// `instellingen` is een collectie, zodat nieuwe collecties vanzelf meegaan.
 // (Dezelfde functie staat ook in apps-script/Code.gs.)
+const isCollectie = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+
 export function merge(a, b) {
   a = a || {};
   b = b || {};
-  const r = { ...b, ...a };
-  for (const c of COLLECTIES) {
-    r[c] = { ...(a[c] || {}) };
-    for (const [id, v] of Object.entries(b[c] || {})) {
-      const o = r[c][id];
-      if (!o || (v.upd || 0) > (o.upd || 0)) r[c][id] = v;
+  const r = {};
+  for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    if (k === 'instellingen') continue;
+    if (!isCollectie(a[k]) && !isCollectie(b[k])) {
+      r[k] = a[k] !== undefined ? a[k] : b[k];
+      continue;
+    }
+    r[k] = { ...(a[k] || {}) };
+    for (const [id, v] of Object.entries(b[k] || {})) {
+      const o = r[k][id];
+      if (!o || (v.upd || 0) > (o.upd || 0)) r[k][id] = v;
     }
   }
   const ia = a.instellingen;
@@ -133,6 +148,10 @@ export function isWerkdag(state, datum) {
 function berekenRelatief(state, taak, spec) {
   if (!spec) return null;
   if (spec.datum) return spec.datum;
+  if (spec.eind) {
+    const opd = taak.opdrachtId && state.opdrachten[taak.opdrachtId];
+    return opd && !opd.del ? opd.deadline || null : null;
+  }
   if (typeof spec.rel !== 'number') return null;
   const les = taak.lesId && state.lessen[taak.lesId];
   if (!les || les.del || !les.datum) return null;
@@ -154,6 +173,7 @@ export function vanafVan(state, taak) {
 export function deadlineSleutel(deadline) {
   if (!deadline) return 'geen';
   if (deadline.datum) return 'datum';
+  if (deadline.eind) return 'eind';
   const k = DEADLINE_KEUZES.find(
     (k) => k.deadline.rel === deadline.rel && !!k.deadline.nietOpWerkdag === !!deadline.nietOpWerkdag
   );
@@ -162,12 +182,13 @@ export function deadlineSleutel(deadline) {
 
 export function deadlineUitSleutel(sleutel, datum) {
   if (sleutel === 'datum') return datum ? { datum } : null;
+  if (sleutel === 'eind') return { eind: true };
   const k = DEADLINE_KEUZES.find((k) => k.sleutel === sleutel);
   return k ? { ...k.deadline } : null;
 }
 
 export function deadlineLabel(deadline) {
-  const k = DEADLINE_KEUZES.find((k) => k.sleutel === deadlineSleutel(deadline));
+  const k = [...DEADLINE_KEUZES, EIND_KEUZE].find((k) => k.sleutel === deadlineSleutel(deadline));
   return k ? k.label : '';
 }
 
@@ -185,11 +206,34 @@ export function waarschuwing(state, taak, vandaagDatum = vandaag()) {
   return null;
 }
 
+export function domeinVan(taak) {
+  if (taak.opdrachtId) return 'opleiding';
+  if (taak.lesId) return 'school';
+  return taak.domein || 'school';
+}
+
 // ---------- lessen ----------
+
+// Een les kan bij meerdere klassen horen (bv. BKH3-K2 en BKH3-K3 samen).
+// Oudere lessen hebben nog één `klasId`.
+export function klassenVanLes(les) {
+  if (les.klasIds && les.klasIds.length) return les.klasIds;
+  return les.klasId ? [les.klasId] : [];
+}
+
+// "BKH3-K2" + "BKH3-K3" → "BKH3-K2 + K3"
+export function groepNaam(namen) {
+  if (namen.length < 2) return namen[0] || '';
+  let p = namen[0];
+  for (const n of namen) while (!n.startsWith(p)) p = p.slice(0, -1);
+  const knip = Math.max(p.lastIndexOf('-'), p.lastIndexOf(' '));
+  if (knip <= 0) return namen.join(' + ');
+  return namen[0] + namen.slice(1).map((n) => ' + ' + n.slice(knip + 1)).join('');
+}
 
 export function lessenVanKlas(state, klasId) {
   return lijst(state, 'lessen')
-    .filter((l) => l.klasId === klasId)
+    .filter((l) => klassenVanLes(l).includes(klasId))
     .sort((a, b) => {
       if (a.datum && b.datum && a.datum !== b.datum) return a.datum < b.datum ? -1 : 1;
       if (!!a.datum !== !!b.datum) return a.datum ? -1 : 1;
@@ -201,12 +245,17 @@ export function volgendeVolg(state, klasId) {
   return Math.max(0, ...lessenVanKlas(state, klasId).map((l) => l.volg || 0)) + 1;
 }
 
-// Voorstel voor de verbeterdeadline: de eerste les van die klas na het indienen.
+// Voorstel voor de verbeterdeadline: de eerste les van die klas(sen) na het indienen.
 // Is er (nog) geen, dan de eerstvolgende lesdag volgens het lesrooster, anders +7 dagen.
-export function volgendeLesNa(state, klasId, datum) {
-  const les = lessenVanKlas(state, klasId).find((l) => l.datum && l.datum > datum);
-  if (les) return les.datum;
-  const rooster = state.klassen[klasId]?.rooster || [];
+export function volgendeLesNa(state, klasIds, datum) {
+  klasIds = [].concat(klasIds);
+  const kandidaten = klasIds
+    .flatMap((k) => lessenVanKlas(state, k))
+    .filter((l) => l.datum && l.datum > datum)
+    .map((l) => l.datum)
+    .sort();
+  if (kandidaten.length) return kandidaten[0];
+  const rooster = klasIds.flatMap((k) => state.klassen[k]?.rooster || []);
   for (let i = 1; i <= 7; i++) {
     const d = plusDagen(datum, i);
     if (rooster.includes(weekdag(d))) return d;
@@ -237,7 +286,90 @@ export function maakStandaardTaken(state, les, sjabloonIds) {
     );
 }
 
+// Haalt een klas uit alle lessen; lessen zonder klas verdwijnen (met hun taken).
+export function verwijderKlas(state, klasId) {
+  for (const l of lessenVanKlas(state, klasId)) {
+    const rest = klassenVanLes(l).filter((k) => k !== klasId);
+    if (rest.length) zet(state, 'lessen', { ...l, klasId: undefined, klasIds: rest });
+    else verwijderLes(state, l.id);
+  }
+  wis(state, 'klassen', klasId);
+}
+
 export function verwijderLes(state, lesId) {
   for (const t of takenVanLes(state, lesId)) wis(state, 'taken', t.id);
   wis(state, 'lessen', lesId);
+}
+
+// ---------- opleiding ----------
+
+export function takenVanOpdracht(state, opdrachtId) {
+  return lijst(state, 'taken')
+    .filter((t) => t.opdrachtId === opdrachtId)
+    .sort((a, b) => (a.volg || 0) - (b.volg || 0));
+}
+
+export function opdrachtenVanVak(state, vakId) {
+  return lijst(state, 'opdrachten')
+    .filter((o) => (o.vakId || null) === (vakId || null))
+    .sort((a, b) => (a.deadline || '9999') < (b.deadline || '9999') ? -1 : 1);
+}
+
+export function volgendStuk(state, opdrachtId) {
+  return Math.max(0, ...takenVanOpdracht(state, opdrachtId).map((t) => t.volg || 0)) + 1;
+}
+
+export function maakStukken(state, opdrachtId, titels) {
+  let volg = volgendStuk(state, opdrachtId);
+  return titels.map((titel) =>
+    zet(state, 'taken', {
+      id: nieuwId(),
+      titel,
+      opdrachtId,
+      werkdag: null,
+      deadline: { eind: true },
+      vanaf: null,
+      klaar: false,
+      notitie: '',
+      volg: volg++,
+    })
+  );
+}
+
+export function verwijderOpdracht(state, opdrachtId) {
+  for (const t of takenVanOpdracht(state, opdrachtId)) wis(state, 'taken', t.id);
+  wis(state, 'opdrachten', opdrachtId);
+}
+
+export function verwijderVak(state, vakId) {
+  for (const o of opdrachtenVanVak(state, vakId)) verwijderOpdracht(state, o.id);
+  wis(state, 'vakken', vakId);
+}
+
+// Kiest `aantal` dagen tussen `van` en `tot` (inbegrepen), gelijkmatig gespreid
+// over dagen die geen werkdag zijn, met de vroegste dag eerst.
+export function verdeelDagen(state, aantal, van, tot) {
+  if (!aantal || tot < van) return [];
+  let dagen = [];
+  for (let d = van; d <= tot; d = plusDagen(d, 1)) if (!isWerkdag(state, d)) dagen.push(d);
+  if (!dagen.length) for (let d = van; d <= tot; d = plusDagen(d, 1)) dagen.push(d);
+  return Array.from({ length: aantal }, (_, i) => dagen[Math.floor((i * dagen.length) / aantal)]);
+}
+
+// Voorstel om de nog niet ingeplande stukken van een opdracht te verdelen
+// tussen morgen en de dag vóór de einddeadline. Geeft [{ taak, datum }].
+export function verdeelOpdracht(state, opdrachtId, vandaagDatum = vandaag()) {
+  const opd = state.opdrachten[opdrachtId];
+  if (!opd || opd.del || !opd.deadline) return [];
+  const stukken = takenVanOpdracht(state, opdrachtId).filter((t) => !t.klaar && !t.werkdag);
+  const van = plusDagen(vandaagDatum, 1);
+  let tot = plusDagen(opd.deadline, -1);
+  if (tot < van) tot = opd.deadline < van ? van : opd.deadline;
+  const dagen = verdeelDagen(state, stukken.length, van, tot);
+  return stukken.map((taak, i) => {
+    let datum = dagen[i];
+    const eigen = deadlineVan(state, taak);
+    if (eigen && datum > eigen) datum = eigen < van ? van : eigen;
+    return { taak, datum };
+  });
 }

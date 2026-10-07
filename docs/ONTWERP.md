@@ -2,7 +2,7 @@
 
 > **Saga** is mijn persoonlijke takenplanner (naast Freya voor financiën). Los van De MET, in eigen huisstijl.
 >
-> Status: **ontwerp rond, wacht op akkoord om te starten met fase 1**.
+> Status: **fase 1 gebouwd** (zie README en docs/INSTALLATIE.md). Fase 2 en 3 volgen.
 
 ## 1. Doel
 

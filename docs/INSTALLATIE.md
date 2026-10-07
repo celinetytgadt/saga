@@ -12,12 +12,12 @@ Saga werkt ook zonder stap 2 en 3, maar dan blijven je gegevens op dat ene toest
 
 ## Stap 1 – De app online zetten
 
-1. Ga naar <https://github.com/celinetytgadt/takenplanner>.
+1. Ga naar <https://github.com/celinetytgadt/saga>.
 2. **Settings** (bovenaan) → helemaal onderaan **Danger Zone** → **Change visibility** → **Make public**.
    Alleen de code wordt openbaar. Je planning staat op je Drive en is nergens publiek te zien.
 3. **Settings** → links **Pages**.
 4. Bij **Build and deployment**: Source = **Deploy from a branch**. Kies bij Branch de hoofdbranch (`claude/bold-hypatia-cf67qz`, of `main` als die later bestaat) en map **/ (root)**. Klik **Save**.
-5. Na een minuutje staat bovenaan de link, normaal: **https://celinetytgadt.github.io/takenplanner/**
+5. Na een minuutje staat bovenaan de link, normaal: **https://celinetytgadt.github.io/saga/**
 
 Open die link. Saga werkt nu al, maar enkel op dat toestel.
 

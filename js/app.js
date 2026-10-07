@@ -321,7 +321,7 @@ function viewInstellingen(s) {
         <label>Geheime sleutel<input name="token" type="password" autocomplete="off" value="${esc(sy.token)}"></label>
         <div class="knoppen"><button class="knop primair">Opslaan en synchroniseren</button></div>
       </form>
-      <p class="hint">Hoe je dit instelt: zie <a href="https://github.com/celinetytgadt/takenplanner/blob/HEAD/docs/INSTALLATIE.md" target="_blank" rel="noopener">de installatiegids</a>.</p>
+      <p class="hint">Hoe je dit instelt: zie <a href="https://github.com/celinetytgadt/saga/blob/HEAD/docs/INSTALLATIE.md" target="_blank" rel="noopener">de installatiegids</a>.</p>
     </section>
 
     <section class="kaart">

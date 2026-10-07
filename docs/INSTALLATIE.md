@@ -29,8 +29,10 @@ Open die link. Saga werkt nu al, maar enkel op dat toestel.
    [`apps-script/Code.gs`](../apps-script/Code.gs) erin. Klik op het **diskette-icoon** om te bewaren.
 4. Kies bovenaan in het keuzemenu de functie **installeer** en klik **Uitvoeren**.
    - Google vraagt toestemming: **Toestemming controleren** → kies je account.
-   - Je krijgt "Google heeft deze app niet geverifieerd". Dat is normaal, want het is je eigen script.
-     Klik **Geavanceerd** → **Ga naar Saga (onveilig)** → **Toestaan**.
+   - Je krijgt "Google heeft deze app niet geverifieerd" (Engels: *Google hasn't verified this app*).
+     Dat is normaal: de "ontwikkelaar" die erbij staat ben jij zelf, want het is je eigen script.
+     Klik linksonder **Geavanceerd** (*Advanced*) → **Ga naar Saga (onveilig)** (*Go to Saga (unsafe)*)
+     → **Toestaan** (*Allow*).
 5. Onderaan verschijnt het **uitvoeringslogboek** met je **geheime sleutel** (een lange reeks letters en cijfers).
    Kopieer die, je hebt ze straks nodig. Op je Drive staat nu een map **Saga** met het bestand `saga-data.json`.
 6. Klik rechtsboven **Implementeren** → **Nieuwe implementatie**.

@@ -210,13 +210,13 @@ function groepKaart(s, g, inDag) {
     kleur = vak?.kleur || 'var(--fuchsia)';
     kop = `<div class="groep-kop" role="button" tabindex="0" data-actie="opdracht" data-id="${g.opd.id}">
       <span class="groep-naam">🎓 <b>${esc(g.opd.titel)}</b></span>
-      <span class="groep-info">${vak ? esc(vak.naam) + ' · ' : ''}${g.opd.deadline ? 'tegen ' + M.kortDatum(g.opd.deadline) : ''}</span>
+      <span class="groep-info">${vak ? esc(vak.naam) + ' · ' : ''}${g.opd.deadline ? `<span class="vlag">⚑ ${M.kortDatum(g.opd.deadline)}</span>` : ''}</span>
     </div>`;
   }
   const rijen = g.taken
     .map((t) => {
       const w = M.waarschuwing(s, t);
-      const eigen = !t.lesId && t.deadline?.datum && !t.klaar ? ` <span class="rij-dl">⚑ ${M.kortDatum(t.deadline.datum)}</span>` : '';
+      const eigen = !t.lesId && t.deadline?.datum && !t.klaar ? ` <span class="rij-dl vlag">⚑ ${M.kortDatum(t.deadline.datum)}</span>` : '';
       return `<div class="rij-taak ${w ? w.niveau : ''} ${t.klaar ? 'klaar' : ''}" draggable="true" data-sleep="taak:${t.id}">
         <button class="vink" data-actie="vink" data-id="${t.id}" aria-label="${t.klaar ? 'Markeer als niet klaar' : 'Markeer als klaar'}">${t.klaar ? '✓' : ''}</button>
         <div class="rij-tekst" role="button" tabindex="0" data-actie="taak" data-id="${t.id}">${esc(t.titel)}${eigen}${w ? `<span class="reden">${esc(w.reden)}</span>` : ''}</div>

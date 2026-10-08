@@ -647,6 +647,9 @@ dialog::backdrop { background: rgb(15 23 36 / 45%); }
 .rij-taak.klaar .rij-tekst { text-decoration: line-through; opacity: .6; }
 .rij-taak.klaar > .vink { background: var(--groen); border-color: var(--groen); }
 .rij-dl { white-space: nowrap; }
+.vlag { color: var(--fuchsia); font-weight: 600; white-space: nowrap; }
+:root[data-theme="dark"] .vlag { color: #ff9a99; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vlag { color: #ff9a99; } }
 
 .afspraak {
   font-size: .78rem;

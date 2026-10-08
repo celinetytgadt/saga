@@ -350,7 +350,7 @@ function viewRaster(s) {
   const dagen = M.maandRaster(eerste);
   const idx = indexeer(s);
   return `<div class="overzicht">
-    <aside class="bakje zijbalk" data-drop="bakje">${bakjeInhoud(s)}</aside>
+    <aside class="bakje zijbalk" data-drop="bakje" data-scroll="bakje">${bakjeInhoud(s)}</aside>
     <div class="raster-wrap">
       ${periodeNav(eerste)}
       <div class="raster-kop">${WEEK.map((d) => `<div>${M.DAGNAMEN[d]}</div>`).join('')}</div>
@@ -576,8 +576,34 @@ function viewInstellingen(s) {
 
 // ---------- tekenen ----------
 
+// Wat er na een wijziging opnieuw getekend wordt. Tijdens het slepen wachten we,
+// anders verdwijnt het blokje onder je muis.
+function opWijziging(soort) {
+  if (soort === 'status' && ui.view !== 'instellingen') return tekenStatus();
+  if (ui.sleept) {
+    ui.tekenStraks = true;
+    return;
+  }
+  render();
+}
+
+function tekenStatus() {
+  const sy = getSync();
+  const dot = $('#sync-status');
+  dot.className = `sync-dot sync-${sy.status}`;
+  dot.title = {
+    lokaal: 'Alleen op dit toestel',
+    wacht: 'Wacht op synchronisatie',
+    bezig: 'Synchroniseren…',
+    ok: 'Gesynchroniseerd',
+    fout: `Synchroniseren mislukt: ${sy.melding}`,
+  }[sy.status];
+}
+
 function render() {
   const s = getState();
+  // scrollposities bewaren, zodat de lijsten niet terug naar boven springen
+  const scroll = [...document.querySelectorAll('[data-scroll]')].map((el) => [el.dataset.scroll, el.scrollTop]);
   let view = ui.view;
   if (view === 'bakje' && !mobiel.matches) view = 'dagen';
   const html = {
@@ -589,6 +615,10 @@ function render() {
   }[view]();
   $('#app').innerHTML = html;
   document.body.dataset.view = view;
+  for (const [naam, top] of scroll) {
+    const el = $(`[data-scroll="${naam}"]`);
+    if (el) el.scrollTop = top;
+  }
 
   for (const a of document.querySelectorAll('[data-nav]')) {
     a.classList.toggle('actief', a.dataset.nav === view);
@@ -598,16 +628,7 @@ function render() {
   badge.textContent = aantal;
   badge.hidden = !aantal;
 
-  const sy = getSync();
-  const dot = $('#sync-status');
-  dot.className = `sync-dot sync-${sy.status}`;
-  dot.title = {
-    lokaal: 'Alleen op dit toestel',
-    wacht: 'Wacht op synchronisatie',
-    bezig: 'Synchroniseren…',
-    ok: 'Gesynchroniseerd',
-    fout: `Synchroniseren mislukt: ${sy.melding}`,
-  }[sy.status];
+  tekenStatus();
 
   if ($('#dlg').open && ui.herteken) ui.herteken();
 
@@ -644,8 +665,15 @@ function sluit() {
   dlg.close();
 }
 
+// Enkel sluiten bij een klik die óók buiten het venster begon. Wie tekst selecteert
+// en de muis buiten het venster loslaat, verliest zo zijn invoer niet.
+let begonBuiten = false;
+dlg.addEventListener('pointerdown', (e) => {
+  begonBuiten = e.target === dlg;
+});
 dlg.addEventListener('click', (e) => {
-  if (e.target === dlg) sluit();
+  if (e.target === dlg && begonBuiten) sluit();
+  begonBuiten = false;
 });
 
 dlg.addEventListener('close', () => {
@@ -1486,6 +1514,7 @@ document.addEventListener('dragstart', (e) => {
   const el = e.target.closest?.('[data-sleep]');
   if (!el) return;
   e.dataTransfer.setData('text/plain', el.dataset.sleep);
+  ui.sleept = true;
   e.dataTransfer.effectAllowed = 'move';
   requestAnimationFrame(() => el.classList.add('sleept'));
 });
@@ -1493,6 +1522,11 @@ document.addEventListener('dragstart', (e) => {
 document.addEventListener('dragend', (e) => {
   e.target.closest?.('[data-sleep]')?.classList.remove('sleept');
   markeerZone(null);
+  ui.sleept = false;
+  if (ui.tekenStraks) {
+    ui.tekenStraks = false;
+    render();
+  }
 });
 
 document.addEventListener('dragover', (e) => {
@@ -1521,7 +1555,7 @@ function zetTekst() {
 }
 zetTekst();
 
-abonneer(render);
+abonneer(opWijziging);
 window.addEventListener('hashchange', route);
 mobiel.addEventListener('change', render);
 document.addEventListener('visibilitychange', () => {

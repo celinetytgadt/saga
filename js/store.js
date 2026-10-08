@@ -32,8 +32,9 @@ function bewaar() {
   }
 }
 
-function melden() {
-  for (const f of luisteraars) f();
+// soort: 'data' (de planning veranderde) of 'status' (enkel de synchronisatiestatus).
+function melden(soort = 'data') {
+  for (const f of luisteraars) f(soort);
 }
 
 export function getState() {
@@ -74,6 +75,7 @@ export function zetSyncCfg(url, token) {
 }
 
 function zetStatus(status, melding = '') {
+  const zelfde = syncStatus.status === status && syncStatus.melding === melding;
   syncStatus = { ...syncStatus, status, melding };
   if (status === 'ok') {
     syncStatus.laatste = Date.now();
@@ -83,7 +85,7 @@ function zetStatus(status, melding = '') {
       // niet erg
     }
   }
-  melden();
+  if (!zelfde || status === 'ok') melden('status');
 }
 
 // Technische foutmeldingen omzetten naar iets waar je mee verder kunt.
@@ -142,8 +144,10 @@ export async function sync({ agenda = false } = {}) {
     const j = await antwoord.json();
     if (!j.ok) throw new Error(j.fout || 'onbekende fout');
     // Wijzigingen die tijdens het wachten gebeurden zitten al in `state` en zijn recenter.
+    const voor = JSON.stringify(state);
     state = merge(state, j.data);
     bewaar();
+    if (JSON.stringify(state) !== voor) melden('data');
     syncStatus.agenda = j.agendaInfo || null;
     if ((j.scriptVersie || 1) < SCRIPT_VERSIE) {
       zetStatus('fout', 'je planning is bewaard, maar het Google-script is verouderd. Plak de nieuwe Code.gs, voer "installeer" opnieuw uit en maak een nieuwe versie (zie installatiegids, "Het script bijwerken").');

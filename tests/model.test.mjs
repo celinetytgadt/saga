@@ -244,13 +244,16 @@ test('Code.gs leest enkel afspraken met #s of #sw', () => {
     Utilities: { formatDate: fmt },
     CalendarApp: {
       getDefaultCalendar: () => ({ getTimeZone: () => 'Europe/Brussels' }),
-      getAllCalendars: () => [{ getEvents: () => agenda }],
+      getAllCalendars: () => [{ getName: () => 'Hoofdagenda', getEvents: () => [] }],
+      getCalendarsByName: (n) => (n.toLowerCase() === 'zottekes' ? [{ getName: () => 'Zottekes', getEvents: () => agenda }] : []),
     },
   };
   vm.createContext(ctx);
   vm.runInContext(fs.readFileSync(new URL('../apps-script/Code.gs', import.meta.url), 'utf8'), ctx);
   const oud = { weg_2026: { id: 'weg_2026', titel: 'Oude afspraak', datum: '2026-10-01', upd: 1 } };
-  const r = JSON.parse(JSON.stringify(ctx.leesAgenda_(oud)));
+  const res = JSON.parse(JSON.stringify(ctx.leesAgenda_(oud)));
+  assert.deepEqual([res.info.agendas, res.info.aantal, res.info.fout], [['Zottekes'], 3, null]);
+  const r = res.afspraken;
   const zichtbaar = Object.values(r).filter((a) => !a.del);
   assert.deepEqual(zichtbaar.map((a) => a.titel).sort(), ['Studiedag', 'Tandarts', 'Uitstap']);
   const tandarts = zichtbaar.find((a) => a.titel === 'Tandarts');
@@ -263,6 +266,11 @@ test('Code.gs leest enkel afspraken met #s of #sw', () => {
   assert.deepEqual([uitstap.datum, uitstap.eindDatum], ['2026-10-23', '2026-10-24']);
   assert.equal(r.weg_2026.del, true); // niet meer in de agenda
   // tweede keer inlezen: niets verandert, dus geen nieuwe upd
-  const r2 = JSON.parse(JSON.stringify(ctx.leesAgenda_(r)));
+  const r2 = JSON.parse(JSON.stringify(ctx.leesAgenda_(r))).afspraken;
   assert.equal(r2[tandarts.id].upd, tandarts.upd);
+  // agenda niet gevonden: niets wissen, wel een melding
+  vm.runInContext('AGENDA_NAMEN.splice(0, 1, "Bestaat niet")', ctx);
+  const weg = JSON.parse(JSON.stringify(ctx.leesAgenda_(r)));
+  assert.deepEqual(weg.afspraken, r);
+  assert.match(weg.info.fout, /niet gevonden/);
 });

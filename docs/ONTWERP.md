@@ -108,6 +108,9 @@ In het overzicht: "BKH3-K2 + K3" met de kleuren van beide klassen.
 - Taken worden **gebundeld per les of opdracht**: eerst de les (klas + onderwerp + lesdatum), daaronder klein de taken. Bakje: lessen op datum, opdrachten in de volgorde waarin ze ingegeven zijn, stukken in hun volgorde.
 - **Geen vlaggetjes** voor taken bij een les (de lesdatum zegt genoeg); wel voor losse taken en tussendeadlines. Einddeadline van een opdracht blijft als label.
 - Rustiger lettertype (Open Sans voor tekst, Quicksand voor titels) en een instelbare **tekstgrootte** per toestel.
+- Kalender per **maand**: de eerste rij is altijd de week van de 1e; ‹ › verschuift een maand.
+- Deadlines van de opleiding: groen vlaggetje (school/losse taken: roze-rood).
+- Agenda: enkel de agenda **Zottekes** (instelbaar in `AGENDA_NAMEN` in Code.gs).
 
 ## 3. Regels
 

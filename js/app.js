@@ -30,7 +30,8 @@ function bewaarLokaal(sleutel, waarde) {
 
 const ui = {
   view: 'dagen',
-  weekOffset: 0,
+  maandOffset: 0,
+  naarVandaag: true, // na het tekenen naar vandaag scrollen (gsm)
   filter: lokaal('saga.filter', 'alles'), // alles | school | opleiding
   laatsteKlassen: lokaal('saga.laatsteKlassen', []),
   laatsteVak: null,
@@ -210,13 +211,13 @@ function groepKaart(s, g, inDag) {
     kleur = vak?.kleur || 'var(--fuchsia)';
     kop = `<div class="groep-kop" role="button" tabindex="0" data-actie="opdracht" data-id="${g.opd.id}">
       <span class="groep-naam">🎓 <b>${esc(g.opd.titel)}</b></span>
-      <span class="groep-info">${vak ? esc(vak.naam) + ' · ' : ''}${g.opd.deadline ? `<span class="vlag">⚑ ${M.kortDatum(g.opd.deadline)}</span>` : ''}</span>
+      <span class="groep-info">${vak ? esc(vak.naam) + ' · ' : ''}${g.opd.deadline ? `<span class="vlag opl">⚑ ${M.kortDatum(g.opd.deadline)}</span>` : ''}</span>
     </div>`;
   }
   const rijen = g.taken
     .map((t) => {
       const w = M.waarschuwing(s, t);
-      const eigen = !t.lesId && t.deadline?.datum && !t.klaar ? ` <span class="rij-dl vlag">⚑ ${M.kortDatum(t.deadline.datum)}</span>` : '';
+      const eigen = !t.lesId && t.deadline?.datum && !t.klaar ? ` <span class="rij-dl vlag ${t.opdrachtId ? 'opl' : ''}">⚑ ${M.kortDatum(t.deadline.datum)}</span>` : '';
       return `<div class="rij-taak ${w ? w.niveau : ''} ${t.klaar ? 'klaar' : ''}" draggable="true" data-sleep="taak:${t.id}">
         <button class="vink" data-actie="vink" data-id="${t.id}" aria-label="${t.klaar ? 'Markeer als niet klaar' : 'Markeer als klaar'}">${t.klaar ? '✓' : ''}</button>
         <div class="rij-tekst" role="button" tabindex="0" data-actie="taak" data-id="${t.id}">${esc(t.titel)}${eigen}${w ? `<span class="reden">${esc(w.reden)}</span>` : ''}</div>
@@ -248,7 +249,7 @@ function indexeer(s) {
   return { lessen, taken, deadlines, eindes };
 }
 
-function dagBlok(s, idx, datum, v, raster) {
+function dagBlok(s, idx, datum, v, raster, buiten = false) {
   const werk = M.isWerkdag(s, datum);
   const weekend = [0, 6].includes(M.weekdag(datum));
   const lessen = (idx.lessen[datum] || []).sort(sorteerLessen(s));
@@ -263,6 +264,7 @@ function dagBlok(s, idx, datum, v, raster) {
     werk && 'werkdag',
     weekend && 'weekend',
     datum.endsWith('-01') && 'eerste',
+    buiten && 'buiten',
   ].filter(Boolean);
   return `<section class="${klassen.join(' ')}" data-drop="${datum}">
     <header class="dag-kop">
@@ -276,7 +278,7 @@ function dagBlok(s, idx, datum, v, raster) {
     ${eindes
       .map(
         (o) =>
-          `<div class="einde" role="button" tabindex="0" data-actie="opdracht" data-id="${o.id}" style="--klas:${vakVan(s, o)?.kleur || 'var(--fuchsia)'}">🎓 <b>Deadline</b> ${esc(o.titel)}</div>`
+          `<div class="einde" role="button" tabindex="0" data-actie="opdracht" data-id="${o.id}">⚑ ${esc(o.titel)}</div>`
       )
       .join('')}
     ${lessen.map((l) => lesKaart(s, l)).join('')}
@@ -286,7 +288,7 @@ function dagBlok(s, idx, datum, v, raster) {
         ? `<div class="deadlines">${dls
             .map((t) => {
               const a = anker(s, t);
-              return `<div class="deadline" role="button" tabindex="0" data-actie="taak" data-id="${t.id}">⚑ ${esc(t.titel)}${a.label ? ` · ${esc(a.label)}` : ''}</div>`;
+              return `<div class="deadline ${M.domeinVan(t) === 'opleiding' ? 'opl' : ''}" role="button" tabindex="0" data-actie="taak" data-id="${t.id}">⚑ ${esc(t.titel)}${a.label ? ` · ${esc(a.label)}` : ''}</div>`;
             })
             .join('')}</div>`
         : ''
@@ -331,39 +333,42 @@ function bakjeInhoud(s) {
 
 // ---------- schermen ----------
 
-function periodeNav(van, tot) {
+function periodeNav(eerste) {
   return `<div class="periode-nav">
-    <button class="knop klein" data-actie="week" data-d="-1" aria-label="Week terug">‹</button>
-    <button class="knop klein" data-actie="week" data-d="0">Vandaag</button>
-    <button class="knop klein" data-actie="week" data-d="1" aria-label="Week verder">›</button>
-    <span class="periode">${M.kortDatum(van)} – ${M.kortDatum(tot)}</span>
+    <button class="knop klein" data-actie="maand" data-d="-1" aria-label="Vorige maand">‹</button>
+    <button class="knop klein" data-actie="maand" data-d="0">Vandaag</button>
+    <button class="knop klein" data-actie="maand" data-d="1" aria-label="Volgende maand">›</button>
+    <span class="periode">${M.maandNaam(eerste)}</span>
     ${filterKnoppen()}
   </div>`;
 }
 
 function viewRaster(s) {
   const v = M.vandaag();
-  const start = M.plusDagen(M.maandagVan(v), ui.weekOffset * 7);
-  const dagen = Array.from({ length: 35 }, (_, i) => M.plusDagen(start, i));
+  const eerste = M.eersteVanMaand(v, ui.maandOffset);
+  const laatste = M.laatsteVanMaand(eerste);
+  const dagen = M.maandRaster(eerste);
   const idx = indexeer(s);
   return `<div class="overzicht">
     <aside class="bakje zijbalk" data-drop="bakje">${bakjeInhoud(s)}</aside>
     <div class="raster-wrap">
-      ${periodeNav(dagen[0], dagen[34])}
+      ${periodeNav(eerste)}
       <div class="raster-kop">${WEEK.map((d) => `<div>${M.DAGNAMEN[d]}</div>`).join('')}</div>
-      <div class="raster">${dagen.map((d) => dagBlok(s, idx, d, v, true)).join('')}</div>
+      <div class="raster">${dagen.map((d) => dagBlok(s, idx, d, v, true, d < eerste || d > laatste)).join('')}</div>
     </div>
   </div>`;
 }
 
 function viewLijst(s) {
   const v = M.vandaag();
-  const start = M.plusDagen(v, ui.weekOffset * 7);
-  const dagen = Array.from({ length: 30 }, (_, i) => M.plusDagen(start, i));
+  const eerste = M.eersteVanMaand(v, ui.maandOffset);
+  const laatste = M.laatsteVanMaand(eerste);
+  const dagen = [];
+  for (let d = eerste; d <= laatste; d = M.plusDagen(d, 1)) dagen.push(d);
   const idx = indexeer(s);
   const liggen = blijvenLiggen(s, v).filter(toonTaak).length;
   return `<div class="lijst">
-    ${periodeNav(dagen[0], dagen[29])}
+    ${periodeNav(eerste)}
     ${liggen ? `<a class="melding" href="#/bakje">${liggen} ${liggen === 1 ? 'taak blijft' : 'taken blijven'} liggen →</a>` : ''}
     ${dagen.map((d) => dagBlok(s, idx, d, v, false)).join('')}
   </div>`;
@@ -481,6 +486,14 @@ function deadlineOpties(gekozen, { les = true, datum = true, eind = false } = {}
   return opties.join('');
 }
 
+function agendaStatus(info) {
+  if (!info) return '';
+  const wanneer = new Date(info.tijd);
+  const tijd = `${M.kortDatum(M.isoDatum(wanneer))} om ${wanneer.toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' })}`;
+  if (info.fout) return `<p class="sync-tekst sync-fout">Agenda: ${esc(info.fout)} (${tijd}). Controleer de naam bovenaan in Code.gs (AGENDA_NAMEN).</p>`;
+  return `<p class="sync-tekst">📅 Agenda ${esc(info.agendas.join(', '))} ingelezen op ${tijd}: ${info.aantal} ${info.aantal === 1 ? 'afspraak' : 'afspraken'} met #s of #sw.</p>`;
+}
+
 function viewInstellingen(s) {
   const sy = getSync();
   const statusTekst = {
@@ -543,6 +556,7 @@ function viewInstellingen(s) {
           ${sy.url ? '<button type="button" class="knop" data-actie="agenda">Agenda nu vernieuwen</button>' : ''}
         </div>
       </form>
+      ${agendaStatus(sy.agenda)}
       <p class="hint">Agenda: afspraken met <b>#s</b> in de titel of beschrijving verschijnen in Saga, met <b>#sw</b> tellen ze ook als werkdag. Ze worden elke nacht ingelezen.</p>
       <p class="hint">Hoe je dit instelt: zie <a href="https://github.com/celinetytgadt/saga/blob/HEAD/docs/INSTALLATIE.md" target="_blank" rel="noopener">de installatiegids</a>.</p>
     </section>
@@ -596,13 +610,20 @@ function render() {
   }[sy.status];
 
   if ($('#dlg').open && ui.herteken) ui.herteken();
+
+  if (ui.naarVandaag && view === 'dagen') {
+    ui.naarVandaag = false;
+    const el = mobiel.matches && $('.dag.vandaag');
+    if (el) window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - $('.balk').offsetHeight - 8);
+  }
 }
 
 function route() {
   const v = location.hash.replace('#/', '');
   ui.view = VIEWS.includes(v) ? v : 'dagen';
-  render();
+  ui.naarVandaag = true;
   window.scrollTo(0, 0);
+  render();
 }
 
 // ---------- dialogen ----------
@@ -1353,10 +1374,12 @@ const acties = {
     bewaarLokaal('saga.filter', ui.filter);
     render();
   },
-  week(el) {
+  maand(el) {
     const d = Number(el.dataset.d);
-    ui.weekOffset = d === 0 ? 0 : ui.weekOffset + d;
+    ui.maandOffset = d === 0 ? 0 : ui.maandOffset + d;
+    ui.naarVandaag = d === 0;
     render();
+    if (d !== 0) window.scrollTo(0, 0);
   },
   'klas-bewerk'(el) {
     openKlas(el.dataset.id || null);

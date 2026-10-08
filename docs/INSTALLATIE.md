@@ -83,5 +83,10 @@ Als er een nieuwe versie van `Code.gs` is (Saga meldt dan "het Google-script is 
 
 - Zet **#s** in de titel of beschrijving van een afspraak in je Google Agenda, en ze verschijnt in Saga.
 - Zet **#sw** als het een extra werkdag is (studiedag, evaluatiedag). Lesvoorbereiding valt dan niet op die dag.
-- Saga leest alle agenda's die je in Google Agenda ziet, maar neemt enkel afspraken met de code over, van een week terug tot ongeveer 2,5 maand vooruit.
+- Saga leest de agenda **Zottekes**. Een andere of extra agenda? Pas bovenaan in `Code.gs` de regel
+  `const AGENDA_NAMEN = ['Zottekes'];` aan (bv. `['Zottekes', 'Werk']`, of `[]` voor alle agenda's), bewaar en maak een nieuwe versie.
+- Enkel afspraken met de code worden overgenomen, van een week terug tot ongeveer 2,5 maand vooruit.
+- In Saga zie je bij Instellingen wanneer de agenda laatst ingelezen is en hoeveel afspraken er gevonden zijn.
+- Verschijnt er niets? Kies in de script-editor de functie **testAgenda** en klik **Uitvoeren**. Het logboek toont welke
+  agenda's er zijn en welke afspraken Saga zou overnemen.
 - Het script schrijft nooit in je agenda.

@@ -19,6 +19,8 @@
   --rood-vlak: #fdecec;
   --oranje: #b86d0a;
   --oranje-vlak: #fdf3e2;
+  --groen-tekst: #23806b;
+  --vlag: var(--fuchsia);
   --vandaag: #e6f5f1;
   --werk: #eef2f8;
   --schaduw: 0 1px 2px rgb(18 59 120 / 8%), 0 2px 8px rgb(18 59 120 / 6%);
@@ -41,6 +43,8 @@
     --rood-vlak: #3a1f26;
     --oranje: #f2b45a;
     --oranje-vlak: #3a2e1c;
+    --groen-tekst: #7fd6c0;
+    --vlag: #ff9a99;
     --vandaag: #173a3a;
     --werk: #1b2740;
     --schaduw: 0 1px 2px rgb(0 0 0 / 30%);
@@ -61,6 +65,8 @@
   --rood-vlak: #3a1f26;
   --oranje: #f2b45a;
   --oranje-vlak: #3a2e1c;
+  --groen-tekst: #7fd6c0;
+  --vlag: #ff9a99;
   --vandaag: #173a3a;
   --werk: #1b2740;
   --schaduw: 0 1px 2px rgb(0 0 0 / 30%);
@@ -323,14 +329,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .deadline {
   font-size: .75rem;
   font-weight: 600;
-  color: var(--fuchsia);
+  color: var(--vlag);
   cursor: pointer;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-:root[data-theme="dark"] .deadline { color: #ff9a99; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .deadline { color: #ff9a99; } }
 
 /* ---------- bakje ---------- */
 
@@ -572,15 +576,13 @@ dialog::backdrop { background: rgb(15 23 36 / 45%); }
 .einde {
   font-size: .8rem;
   font-weight: 600;
-  color: #fff;
-  background: var(--klas);
-  border-radius: 999px;
-  padding: 3px 10px;
+  color: var(--groen-tekst);
   cursor: pointer;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.dag.buiten { opacity: .45; }
 
 .filter { display: inline-flex; margin-left: auto; border: 1px solid var(--rand-sterk); border-radius: 999px; padding: 2px; background: var(--vlak); }
 .filter button { border: none; background: transparent; border-radius: 999px; padding: 4px 11px; font-weight: 600; font-size: .85rem; cursor: pointer; color: var(--zacht); }
@@ -647,9 +649,8 @@ dialog::backdrop { background: rgb(15 23 36 / 45%); }
 .rij-taak.klaar .rij-tekst { text-decoration: line-through; opacity: .6; }
 .rij-taak.klaar > .vink { background: var(--groen); border-color: var(--groen); }
 .rij-dl { white-space: nowrap; }
-.vlag { color: var(--fuchsia); font-weight: 600; white-space: nowrap; }
-:root[data-theme="dark"] .vlag { color: #ff9a99; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vlag { color: #ff9a99; } }
+.vlag { color: var(--vlag); font-weight: 600; white-space: nowrap; }
+.vlag.opl, .deadline.opl { color: var(--groen-tekst); }
 
 .afspraak {
   font-size: .78rem;

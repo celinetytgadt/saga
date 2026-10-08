@@ -9,6 +9,8 @@ export const COLLECTIES = ['klassen', 'lessen', 'taken', 'sjablonen', 'dagen', '
 export const DAGNAMEN = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'];
 export const MAANDNAMEN = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
 
+export const MAANDNAMEN_LANG = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december'];
+
 export const KLASKLEUREN = ['#123b78', '#5bbba4', '#2f8fcf', '#6f9a3a', '#8a5bb5', '#e0962a', '#3d7f86', '#5a6f9e', '#ef4f4e', '#c2577f', '#e27aa5'];
 // Opleiding: warme tinten. School mag dezelfde kleuren gebruiken; het onderscheid zit in de stippelrand en 🎓.
 export const VAKKLEUREN = ['#ef4f4e', '#c2577f', '#e0762a', '#a84c9e', '#d4504f', '#b8664a'];
@@ -58,6 +60,32 @@ export function verschilDagen(van, tot) {
 
 export function maandagVan(s) {
   return plusDagen(s, -((weekdag(s) + 6) % 7));
+}
+
+// Eerste dag van de maand van `s`, verschoven met `offset` maanden.
+export function eersteVanMaand(s, offset = 0) {
+  const d = parseDatum(s);
+  return isoDatum(new Date(d.getFullYear(), d.getMonth() + offset, 1));
+}
+
+export function laatsteVanMaand(eerste) {
+  const d = parseDatum(eerste);
+  return isoDatum(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+}
+
+// Dagen van een maandkalender: van de maandag van de week van de 1e
+// tot de zondag van de week van de laatste dag.
+export function maandRaster(eerste) {
+  const van = maandagVan(eerste);
+  const tot = plusDagen(maandagVan(laatsteVanMaand(eerste)), 6);
+  const dagen = [];
+  for (let d = van; d <= tot; d = plusDagen(d, 1)) dagen.push(d);
+  return dagen;
+}
+
+export function maandNaam(eerste) {
+  const d = parseDatum(eerste);
+  return `${MAANDNAMEN_LANG[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 export function kortDatum(s) {

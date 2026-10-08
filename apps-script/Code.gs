@@ -5,7 +5,7 @@
  * als één JSON-bestand in de map "Saga" op Drive. Elke dag wordt een
  * back-up bewaard (de laatste 14 blijven staan).
  *
- * Elke nacht (rond 5 uur) leest het script de agenda's en neemt het enkel
+ * Elke nacht (rond 5 uur) leest het script de agenda('s) uit AGENDA_NAMEN en neemt het enkel
  * afspraken over met #s (tonen) of #sw (tonen + telt als werkdag) in de
  * titel of beschrijving. Het script schrijft nooit in de agenda.
  *
@@ -17,7 +17,11 @@ const BESTAND_NAAM = 'saga-data.json';
 const BACKUPS_HOUDEN = 14;
 
 // Verhogen bij elke wijziging die de app moet kennen; de app waarschuwt bij een oudere versie.
-const SCRIPT_VERSIE = 3;
+const SCRIPT_VERSIE = 4;
+
+// Welke agenda('s) gelezen worden, op naam (hoofdletters maken niet uit).
+// Leeg laten ([]) = alle agenda's die je in Google Agenda ziet.
+const AGENDA_NAMEN = ['Zottekes'];
 
 const AGENDA_DAGEN_TERUG = 7;
 const AGENDA_DAGEN_VOORUIT = 75;
@@ -66,13 +70,13 @@ function doPost(e) {
     const opgeslagen = JSON.parse(bestand.getBlob().getDataAsString() || '{}');
     if (verzoek.actie === 'sync') {
       const samen = merge(opgeslagen, verzoek.data || {});
-      if (verzoek.agenda) samen.afspraken = leesAgenda_(samen.afspraken || {});
+      if (verzoek.agenda) samen.afspraken = bewaarAgendaInfo_(leesAgenda_(samen.afspraken || {}));
       const tekst = JSON.stringify(samen);
       if (tekst !== JSON.stringify(opgeslagen)) {
         maakDagelijkseBackup_(bestand);
         bestand.setContent(tekst);
       }
-      return json_({ ok: true, data: samen, scriptVersie: SCRIPT_VERSIE });
+      return json_({ ok: true, data: samen, scriptVersie: SCRIPT_VERSIE, agendaInfo: agendaInfo_() });
     }
     return json_({ ok: false, fout: 'onbekende actie' });
   } finally {
@@ -88,16 +92,51 @@ function verversAgenda() {
     const bestand = haalBestand_();
     const data = JSON.parse(bestand.getBlob().getDataAsString() || '{}');
     const voor = JSON.stringify(data.afspraken || {});
-    data.afspraken = leesAgenda_(data.afspraken || {});
+    data.afspraken = bewaarAgendaInfo_(leesAgenda_(data.afspraken || {}));
     if (JSON.stringify(data.afspraken) !== voor) bestand.setContent(JSON.stringify(data));
   } finally {
     slot.releaseLock();
   }
 }
 
+/** Handig om te testen vanuit de editor: toont welke agenda's er zijn en wat Saga zou overnemen. */
+function testAgenda() {
+  Logger.log('Agenda\'s in je account: %s', CalendarApp.getAllCalendars().map(function (c) { return c.getName(); }).join(', '));
+  const r = leesAgenda_({});
+  Logger.log('Gelezen: %s', r.info.agendas.join(', ') || '(geen)');
+  if (r.info.fout) Logger.log('Probleem: %s', r.info.fout);
+  Object.keys(r.afspraken).forEach(function (id) {
+    const a = r.afspraken[id];
+    Logger.log('%s %s %s%s', a.datum, a.tijd || '', a.titel, a.werk ? ' (werkdag)' : '');
+  });
+}
+
+function kiesAgendas_() {
+  if (!AGENDA_NAMEN.length) return CalendarApp.getAllCalendars();
+  const r = [];
+  AGENDA_NAMEN.forEach(function (naam) {
+    CalendarApp.getCalendarsByName(naam).forEach(function (c) { r.push(c); });
+  });
+  return r;
+}
+
+function bewaarAgendaInfo_(resultaat) {
+  PropertiesService.getScriptProperties().setProperty('SAGA_AGENDA_INFO', JSON.stringify(resultaat.info));
+  return resultaat.afspraken;
+}
+
+function agendaInfo_() {
+  try {
+    return JSON.parse(PropertiesService.getScriptProperties().getProperty('SAGA_AGENDA_INFO') || 'null');
+  } catch (err) {
+    return null;
+  }
+}
+
 /**
- * Leest alle agenda's en geeft de bijgewerkte collectie afspraken terug.
+ * Leest de gekozen agenda's en geeft { afspraken, info } terug.
  * Enkel wat veranderde krijgt een nieuwe `upd`; verdwenen afspraken worden als verwijderd gemarkeerd.
+ * Wordt de agenda niet gevonden, dan blijft alles zoals het was.
  */
 function leesAgenda_(oud) {
   const nu = new Date();
@@ -108,8 +147,14 @@ function leesAgenda_(oud) {
   const stempel = Date.now();
   const r = Object.assign({}, oud);
   const gezien = {};
+  const agendas = kiesAgendas_();
+  const info = { tijd: stempel, agendas: agendas.map(function (a) { return a.getName(); }), aantal: 0, fout: null };
+  if (!agendas.length) {
+    info.fout = 'agenda "' + AGENDA_NAMEN.join('", "') + '" niet gevonden';
+    return { afspraken: oud, info: info };
+  }
 
-  CalendarApp.getAllCalendars().forEach(function (agenda) {
+  agendas.forEach(function (agenda) {
     let afspraken;
     try {
       afspraken = agenda.getEvents(van, tot);
@@ -137,6 +182,7 @@ function leesAgenda_(oud) {
       const schoon = titel.replace(CODE_SW, '$1').replace(CODE_S, '$1').replace(/\s+/g, ' ').trim();
       const item = { id: id, titel: schoon || '(afspraak)', datum: datum, eindDatum: eindDatum, tijd: tijd, werk: werk };
       gezien[id] = true;
+      info.aantal++;
       const o = oud[id];
       const zelfde = o && !o.del && o.titel === item.titel && o.datum === item.datum &&
         o.eindDatum === item.eindDatum && o.tijd === item.tijd && o.werk === item.werk;
@@ -150,7 +196,7 @@ function leesAgenda_(oud) {
   Object.keys(r).forEach(function (id) {
     if (!gezien[id] && !r[id].del) r[id] = { id: id, del: true, upd: stempel };
   });
-  return r;
+  return { afspraken: r, info: info };
 }
 
 /**

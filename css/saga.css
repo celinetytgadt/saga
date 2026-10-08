@@ -264,20 +264,19 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .les {
   display: flex;
-  flex-direction: column;
-  gap: 1px;
-  border-radius: 8px;
+  align-items: baseline;
+  gap: 6px;
+  border-radius: 6px;
   border: 1px solid var(--rand);
-  border-left: 4px solid var(--klas);
+  border-left: 3px solid var(--klas);
   background: var(--vlak);
-  padding: 4px 7px;
-  font-size: .85rem;
+  padding: 2px 6px;
+  font-size: .78rem;
   cursor: pointer;
   min-width: 0;
 }
-.les-klas { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.les-boven { display: flex; gap: 6px; align-items: baseline; min-width: 0; }
-.les-titel { min-width: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: .95em; }
+.les-tekst { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.les-tekst b { font-weight: 600; }
 .teller { font-size: .75rem; font-weight: 600; color: var(--zacht); flex: none; }
 .teller.af { color: var(--groen); }
 
@@ -534,7 +533,8 @@ dialog::backdrop { background: rgb(15 23 36 / 45%); }
   .dag.voorbij { opacity: 1; }
   .dag-datum { font-size: .95rem; }
   .dag-plus { opacity: 1; width: 32px; height: 32px; background: var(--vlak-2); }
-  .les, .taak { font-size: .95rem; padding: 7px 9px; }
+  .taak { font-size: .95rem; padding: 7px 9px; }
+  .les { font-size: .88rem; padding: 3px 8px; }
   .taak { cursor: default; }
   .taak-tekst .sub { font-size: .8rem; }
   .vink { width: 22px; height: 22px; }
@@ -561,7 +561,7 @@ dialog::backdrop { background: rgb(15 23 36 / 45%); }
 
 /* ---------- school & opleiding ---------- */
 
-.les.samen { box-shadow: inset 4px 0 0 var(--klas2); padding-left: 11px; }
+.les.samen { box-shadow: inset 3px 0 0 var(--klas2); padding-left: 9px; }
 
 .taak.opl:not(.rood):not(.oranje) {
   background: color-mix(in srgb, var(--klas) 9%, var(--vlak));
@@ -666,7 +666,7 @@ dialog::backdrop { background: rgb(15 23 36 / 45%); }
 .afspraak.werk { border: 1px solid var(--rand-sterk); }
 .afspraak .tijd { font-weight: 600; }
 
-.bakje .groep, .bakje .taak, .bakje .les { font-size: .9rem; }
+.bakje .groep, .bakje .taak { font-size: .9rem; }
 
 @media (max-width: 760px) {
   .groep { font-size: .95rem; padding: 6px 9px; }

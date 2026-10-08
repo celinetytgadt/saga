@@ -169,8 +169,8 @@ function lesKaart(s, l) {
   const v = voortgang(taken);
   const samen = klassenVan(s, l).length > 1;
   const teller = v.totaal ? `<span class="teller ${v.klaar === v.totaal ? 'af' : ''}">${v.klaar}/${v.totaal}</span>` : '';
-  return `<div class="les ${samen ? 'samen' : ''}" role="button" tabindex="0" draggable="true" data-sleep="les:${l.id}" data-actie="les" data-id="${l.id}" style="${klasStijl(s, l)}">
-    <span class="les-boven"><span class="les-klas">${esc(klasLabel(s, l))}</span>${teller}</span><span class="les-titel">${esc(l.titel)}</span>
+  return `<div class="les ${samen ? 'samen' : ''}" role="button" tabindex="0" draggable="true" data-sleep="les:${l.id}" data-actie="les" data-id="${l.id}" style="${klasStijl(s, l)}" title="${esc(klasLabel(s, l))} · ${esc(l.titel)}">
+    <span class="les-tekst"><b>${esc(klasLabel(s, l))}</b> ${esc(l.titel)}</span>${teller}
   </div>`;
 }
 

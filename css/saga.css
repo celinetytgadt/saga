@@ -395,8 +395,6 @@ details summary { cursor: pointer; color: var(--zacht); font-weight: 600; paddin
 .dagknop-check input { position: absolute; opacity: 0; pointer-events: none; }
 .dagknop-check input:focus-visible + span { outline: 2px solid var(--groen); outline-offset: 2px; }
 
-.sjablonen { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
-.sjabloon { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) auto auto; gap: 8px; align-items: center; }
 
 .sync-tekst { font-weight: 600; }
 .sync-ok { color: var(--groen); }
@@ -543,9 +541,6 @@ dialog::backdrop { background: rgb(15 23 36 / 45%); }
   .pagina { padding: 16px; }
   .bakje.pagina { gap: 7px; }
   .groepen { grid-template-columns: minmax(0, 1fr); }
-  .sjabloon { grid-template-columns: minmax(0, 1fr) auto; }
-  .sjabloon select { grid-column: 1 / -1; grid-row: 2; }
-  .sjabloon .check { grid-row: 3; }
 
   dialog {
     width: 100vw;
@@ -711,3 +706,14 @@ dialog::backdrop { background: rgb(15 23 36 / 45%); }
 @media (max-width: 1100px) {
   .sleepgreep { left: calc(12px + var(--zijbalk) + 1px); }
 }
+
+/* ---------- één taak per les ---------- */
+
+.taak.lestaak:not(.rood):not(.oranje) {
+  background: color-mix(in srgb, var(--klas) 14%, var(--vlak));
+  border-color: color-mix(in srgb, var(--klas) 30%, var(--rand));
+  border-left: 3px solid var(--klas);
+  box-shadow: inset 3px 0 0 var(--klas2);
+}
+.taak.lestaak { padding-left: 8px; }
+.splits { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -4px 0 12px; color: var(--zacht); font-size: .9rem; }

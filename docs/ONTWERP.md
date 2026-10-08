@@ -112,6 +112,12 @@ In het overzicht: "BKH3-K2 + K3" met de kleuren van beide klassen.
 - Deadlines van de opleiding: groen vlaggetje (school/losse taken: roze-rood).
 - Agenda: enkel de agenda **De Zottekes** (instelbaar in `AGENDA_NAMEN` in Code.gs).
 
+### Vereenvoudiging (na gebruik)
+- **Eén taak per les**, met de naam van de les (id `h-<les>`), getint in de klaskleur. Standaard staat ze op de dag vóór de les (verder terug als dat een werkdag is) en schuift ze mee met de les; eens verplaatst blijft ze staan. "Standaard" zet ze terug. Geen standaardtaken meer; oude (lesvoorbereiding, CR-taak, prints) zijn opgegaan in die ene taak.
+- **Opsplitsen:** een taak kan in 2–10 blokken gesplitst worden (1/3, 2/3, 3/3); de extra blokken komen in het bakje.
+- Agenda-afspraken: enkel de titel, zonder uur.
+- Opleidingskleuren: ook geel.
+
 ## 3. Regels
 
 1. **Werkdag schuif ik zelf, deadline volgt de les.** Verschuift een les, dan schuiven de relatieve deadlines (en `vanaf`) mee. Werkdagen blijven staan. Ook als de vaste werkdagen wijzigen of er een extra werkdag bijkomt, worden relatieve deadlines herberekend.

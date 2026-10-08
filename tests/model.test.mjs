@@ -83,16 +83,41 @@ test('verbeterdeadline: volgende les, anders lesrooster, anders +7', () => {
   assert.equal(M.volgendeLesNa(s, 'k1', '2026-10-22'), '2026-10-29');
 });
 
-test('standaardtaken en les verwijderen', () => {
-  const s = basis();
-  const taken = M.maakStandaardTaken(s, s.lessen.l1, ['sj-voorb', 'sj-prints', 'bestaat-niet']);
-  assert.deepEqual(taken.map((t) => t.titel), ['Lesvoorbereiding', 'Prints']);
-  assert.equal(M.takenVanLes(s, 'l1').length, 2);
-  taken[0].deadline.rel = -5; // kopie, sjabloon blijft ongewijzigd
-  assert.equal(s.sjablonen['sj-voorb'].deadline.rel, -1);
+test('één taak per les: aangemaakt, standaard vóór de les, verplaatsbaar', () => {
+  const s = basis(); // les l1 op do 15/10, werkdagen di + vr
+  // oude standaardtaken worden samengevoegd
+  s.taken.oud1 = { id: 'oud1', titel: 'Lesvoorbereiding', lesId: 'l1', werkdag: '2026-10-12', klaar: false, upd: 1 };
+  s.taken.oud2 = { id: 'oud2', titel: 'Prints', lesId: 'l1', werkdag: null, klaar: false, upd: 1 };
+  s.taken.eigen = { id: 'eigen', titel: 'Verbeteren', lesId: 'l1', werkdag: null, klaar: false, upd: 1 };
+  assert.equal(M.zorgHoofdtaken(s), true);
+  assert.equal(M.zorgHoofdtaken(s), false); // maar één keer
+  const h = s.taken[M.hoofdId('l1')];
+  assert.equal(h.hoofd, true);
+  assert.equal(h.werkdag, '2026-10-12'); // overgenomen van de oude lesvoorbereiding
+  assert.equal(s.taken.oud1.del, true);
+  assert.equal(s.taken.oud2.del, true);
+  assert.equal(s.taken.eigen.titel, 'Verbeteren'); // eigen taak blijft
+  // zonder eigen werkdag: dag vóór de les, niet op een werkdag
+  h.werkdag = null;
+  assert.equal(M.werkdagVan(s, h), '2026-10-14');
+  s.lessen.l1.datum = '2026-10-17'; // za → vrijdag is werkdag → do
+  assert.equal(M.werkdagVan(s, h), '2026-10-15');
   M.verwijderLes(s, 'l1');
-  assert.equal(M.takenVanLes(s, 'l1').length, 0);
-  assert.equal(M.lijst(s, 'lessen').length, 0);
+  assert.equal(s.taken[M.hoofdId('l1')].del, true);
+});
+
+test('taak opsplitsen in blokken', () => {
+  const s = basis();
+  M.zorgHoofdtaken(s);
+  const id = M.hoofdId('l1');
+  const nieuw = M.splitsTaak(s, id, 3);
+  assert.equal(nieuw.length, 2);
+  assert.deepEqual([s.taken[id].deelNr, s.taken[id].deelVan, s.taken[id].hoofd], [1, 3, true]);
+  assert.deepEqual(nieuw.map((t) => [t.deelNr, t.titel, t.werkdag, t.hoofd, t.lesId]), [
+    [2, 'Aankoopfactuur', null, false, 'l1'],
+    [3, 'Aankoopfactuur', null, false, 'l1'],
+  ]);
+  assert.deepEqual(M.splitsTaak(s, nieuw[0].id, 2), []); // een blok niet opnieuw splitsen
 });
 
 test('deadline-sleutels heen en terug', () => {

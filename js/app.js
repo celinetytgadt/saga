@@ -107,14 +107,10 @@ const sorteerLessen = (s) => (a, b) => klasLabel(s, a).localeCompare(klasLabel(s
 
 const opNaam = (a, b) => a.naam.localeCompare(b.naam);
 
-function sjablonenGesorteerd(s) {
-  return M.lijst(s, 'sjablonen').sort((a, b) => (a.volg || 0) - (b.volg || 0));
-}
-
 // Taken die in het bakje horen: geen werkdag, en (als ze bij een les horen) de les heeft een datum.
 function inTePlannen(s) {
   return M.lijst(s, 'taken').filter((t) => {
-    if (t.klaar || t.werkdag) return false;
+    if (t.klaar || M.werkdagVan(s, t)) return false;
     if (t.opdrachtId) return !!opdrachtVan(s, t);
     if (!t.lesId) return true;
     const l = lesVan(s, t);
@@ -123,7 +119,10 @@ function inTePlannen(s) {
 }
 
 function blijvenLiggen(s, v = M.vandaag()) {
-  return M.lijst(s, 'taken').filter((t) => !t.klaar && t.werkdag && t.werkdag < v);
+  return M.lijst(s, 'taken').filter((t) => {
+    const wd = !t.klaar && M.werkdagVan(s, t);
+    return wd && wd < v;
+  });
 }
 
 function dagKort(datum) {
@@ -146,7 +145,28 @@ function voortgang(taken) {
 
 // ---------- bouwstenen ----------
 
+// Naam van een taak: de taak van een les heet zoals de les; blokken krijgen (2/3).
+function taakTitel(s, t) {
+  const basis = t.titel || lesVan(s, t)?.titel || '(zonder titel)';
+  return t.deelVan ? `${basis} (${t.deelNr}/${t.deelVan})` : basis;
+}
+
+// Taak bij een les: één blok met de naam van de les, getint in de kleur van de klas.
+function lesTaakKaart(s, t) {
+  const les = lesVan(s, t);
+  const w = M.waarschuwing(s, t);
+  const naam = taakTitel(s, t);
+  const ander = t.titel && t.titel !== les.titel && !t.deelVan;
+  return `<div class="taak lestaak ${w ? w.niveau : ''} ${t.klaar ? 'klaar' : ''}" draggable="true" data-sleep="taak:${t.id}" style="${klasStijl(s, les)}" title="${esc(klasLabel(s, les))} · ${esc(les.titel)}">
+    <button class="vink" data-actie="vink" data-id="${t.id}" aria-label="${t.klaar ? 'Markeer als niet klaar' : 'Markeer als klaar'}">${t.klaar ? '✓' : ''}</button>
+    <div class="taak-tekst" role="button" tabindex="0" data-actie="taak" data-id="${t.id}">
+      <span class="titel">${esc(naam)}</span>${ander ? `<span class="sub">${esc(les.titel)}</span>` : ''}${w ? `<span class="sub"><span class="reden">${esc(w.reden)}</span></span>` : ''}
+    </div>
+  </div>`;
+}
+
 function taakKaart(s, t) {
+  if (lesVan(s, t)) return lesTaakKaart(s, t);
   const w = M.waarschuwing(s, t);
   const a = anker(s, t);
   const opl = M.domeinVan(t) === 'opleiding';
@@ -159,7 +179,7 @@ function taakKaart(s, t) {
   return `<div class="taak ${opl ? 'opl' : ''} ${w ? w.niveau : ''} ${t.klaar ? 'klaar' : ''}" draggable="true" data-sleep="taak:${t.id}" style="--klas:${a.kleur}">
     <button class="vink" data-actie="vink" data-id="${t.id}" aria-label="${t.klaar ? 'Markeer als niet klaar' : 'Markeer als klaar'}">${t.klaar ? '✓' : ''}</button>
     <div class="taak-tekst" role="button" tabindex="0" data-actie="taak" data-id="${t.id}">
-      <span class="titel">${opl ? '<span class="pet" aria-label="Opleiding">🎓</span> ' : ''}${esc(t.titel)}</span>${sub.length ? `<span class="sub">${sub.join(' · ')}</span>` : ''}
+      <span class="titel">${opl ? '<span class="pet" aria-label="Opleiding">🎓</span> ' : ''}${esc(taakTitel(s, t))}</span>${sub.length ? `<span class="sub">${sub.join(' · ')}</span>` : ''}
     </div>
   </div>`;
 }
@@ -169,7 +189,7 @@ function lesKaart(s, l, metKlas = true) {
   const taken = M.takenVanLes(s, l.id);
   const v = voortgang(taken);
   const samen = klassenVan(s, l).length > 1;
-  const teller = v.totaal ? `<span class="teller ${v.klaar === v.totaal ? 'af' : ''}">${v.klaar}/${v.totaal}</span>` : '';
+  const teller = v.totaal && v.klaar === v.totaal ? '<span class="teller af" title="voorbereid">✓</span>' : '';
   return `<div class="les ${samen ? 'samen' : ''}" role="button" tabindex="0" draggable="true" data-sleep="les:${l.id}" data-actie="les" data-id="${l.id}" style="${klasStijl(s, l)}" title="${esc(klasLabel(s, l))} · ${esc(l.titel)}">
     <span class="les-tekst">${metKlas ? `<b>${esc(klasLabel(s, l))}</b> ` : ''}${esc(l.titel)}</span>${teller}
   </div>`;
@@ -182,7 +202,7 @@ function groepen(s, taken) {
   for (const t of taken) {
     const les = lesVan(s, t);
     const opd = !les && opdrachtVan(s, t);
-    const sleutel = les ? 'les:' + les.id : opd ? 'opd:' + opd.id : 'los:' + t.id;
+    const sleutel = les ? 'les:' + t.id : opd ? 'opd:' + opd.id : 'los:' + t.id;
     if (!map.has(sleutel)) map.set(sleutel, { sleutel, les, opd, taken: [] });
     map.get(sleutel).taken.push(t);
   }
@@ -190,7 +210,7 @@ function groepen(s, taken) {
   const lijst = [...map.values()].sort(
     (a, b) =>
       rang(a) - rang(b) ||
-      (a.les && b.les ? vergelijkDatum(a.les.datum, b.les.datum) || sorteerLessen(s)(a.les, b.les) : 0) ||
+      (a.les && b.les ? vergelijkDatum(a.les.datum, b.les.datum) || sorteerLessen(s)(a.les, b.les) || (a.taken[0].deelNr || 0) - (b.taken[0].deelNr || 0) : 0) ||
       (a.opd && b.opd ? M.volgordeOpdracht(a.opd, b.opd) : 0) ||
       (!a.les && !a.opd ? sorteerTaken(s)(a.taken[0], b.taken[0]) : 0)
   );
@@ -199,7 +219,7 @@ function groepen(s, taken) {
 }
 
 function groepKaart(s, g, inDag) {
-  if (!g.les && !g.opd) return taakKaart(s, g.taken[0]);
+  if (!g.opd) return taakKaart(s, g.taken[0]);
   const opl = !!g.opd;
   let kop, kleur;
   if (g.les) {
@@ -241,10 +261,13 @@ function indexeer(s) {
     }
   for (const t of M.lijst(s, 'taken')) {
     if (!toonTaak(t)) continue;
-    if (t.werkdag) (taken[t.werkdag] ||= []).push(t);
+    const wd = M.werkdagVan(s, t);
+    if (wd) (taken[wd] ||= []).push(t);
     if (!t.klaar && !t.lesId && !t.deadline?.eind) {
       const dl = M.deadlineVan(s, t);
-      if (dl && dl !== t.werkdag) (deadlines[dl] ||= []).push(t);
+      // blokken van één opgesplitste taak: maar één vlaggetje
+      const dubbel = t.deelGroep && (deadlines[dl] || []).some((x) => x.deelGroep === t.deelGroep);
+      if (dl && dl !== wd && !dubbel) (deadlines[dl] ||= []).push(t);
     }
   }
   return { lessen, taken, deadlines, eindes };
@@ -274,7 +297,7 @@ function dagBlok(s, idx, datum, v, raster, buiten = false) {
       <button class="dag-plus" data-actie="dag" data-datum="${datum}" aria-label="Acties voor ${M.kortDatum(datum)}">+</button>
     </header>
     ${afspraken
-      .map((a) => `<div class="afspraak ${a.werk ? 'werk' : ''}" title="${esc(a.titel)}">${a.tijd ? `<span class="tijd">${a.tijd}</span> ` : ''}${esc(a.titel)}</div>`)
+      .map((a) => `<div class="afspraak ${a.werk ? 'werk' : ''}" title="${esc(a.titel)}">${esc(a.titel)}</div>`)
       .join('')}
     ${eindes
       .map(
@@ -526,22 +549,6 @@ function viewInstellingen(s) {
     </section>
 
     <section class="kaart">
-      <h2>Standaardtaken bij een les</h2>
-      <p class="hint">Worden voorgesteld bij elke nieuwe les. Aanpassen hier verandert niets aan taken die al bestaan.</p>
-      <div class="sjablonen">${sjablonenGesorteerd(s)
-        .map(
-          (sj) => `<div class="sjabloon">
-          <input aria-label="Naam" value="${esc(sj.titel)}" data-sj="${sj.id}" data-veld="titel">
-          <select aria-label="Klaar tegen" data-sj="${sj.id}" data-veld="deadline">${deadlineOpties(M.deadlineSleutel(sj.deadline), { datum: false })}</select>
-          <label class="check"><input type="checkbox" ${sj.aan ? 'checked' : ''} data-sj="${sj.id}" data-veld="aan"> standaard aangevinkt</label>
-          <button class="knop klein gevaar" data-actie="sjabloon-weg" data-id="${sj.id}" aria-label="Verwijder ${esc(sj.titel)}">✕</button>
-        </div>`
-        )
-        .join('')}</div>
-      <button class="knop klein" data-actie="sjabloon-nieuw">+ standaardtaak</button>
-    </section>
-
-    <section class="kaart">
       <h2>Weergave</h2>
       <p class="hint">Tekstgrootte op dit toestel</p>
       <div class="dagknoppen">${[
@@ -589,6 +596,11 @@ function viewInstellingen(s) {
 // Wat er na een wijziging opnieuw getekend wordt. Tijdens het slepen wachten we,
 // anders verdwijnt het blokje onder je muis.
 function opWijziging(soort) {
+  // na een synchronisatie kunnen er lessen zonder taak binnengekomen zijn
+  if (soort === 'data' && M.lijst(getState(), 'lessen').some((l) => !getState().taken[M.hoofdId(l.id)])) {
+    wijzig((st) => M.zorgHoofdtaken(st));
+    return;
+  }
   if (soort === 'status' && ui.view !== 'instellingen') return tekenStatus();
   if (ui.sleept) {
     ui.tekenStraks = true;
@@ -760,10 +772,11 @@ function openTaak(id, voorinvulling = {}, terug = null) {
   const hoort = t.lesId ? 'les:' + t.lesId : t.opdrachtId ? 'opd:' + t.opdrachtId : 'los:' + M.domeinVan(t);
   const sleutel = M.deadlineSleutel(t.deadline);
   const vanaf = M.vanafVan(s, t);
-  const basis = t.werkdag || M.vandaag();
+  const basis = M.werkdagVan(s, t) || M.vandaag();
+  const les = lesVan(s, t);
 
   dialoog(
-    `<h2>${id ? (t.opdrachtId ? 'Stuk van opdracht' : 'Taak') : t.opdrachtId ? 'Nieuw stuk' : 'Nieuwe taak'}</h2>
+    `<h2>${id ? (t.hoofd ? esc(taakTitel(s, t)) : t.opdrachtId ? 'Stuk van opdracht' : 'Taak') : t.opdrachtId ? 'Nieuw stuk' : 'Nieuwe taak'}</h2>
     ${
       id
         ? `<div class="snel" aria-label="Verplaats naar">
@@ -771,14 +784,26 @@ function openTaak(id, voorinvulling = {}, terug = null) {
         <button class="chip" data-zet="${M.vandaag()}">Vandaag</button>
         <button class="chip" data-zet="${M.plusDagen(M.vandaag(), 1)}">Morgen</button>
         <button class="chip" data-zet="${M.plusDagen(basis, 7)}">+1 week</button>
-        <button class="chip" data-zet="">Bakje</button>
+        <button class="chip" data-zet="">${t.hoofd ? 'Standaard (vóór de les)' : 'Bakje'}</button>
       </div>`
         : ''
     }
+    ${
+      id && t.deelVan
+        ? `<p class="hint">Blok ${t.deelNr} van ${t.deelVan}.</p>`
+        : id
+          ? `<div class="splits"><span>Te groot voor één blok?</span> <button type="button" class="chip" data-splits>Opsplitsen in blokken</button></div>`
+          : ''
+    }
     <form id="f-taak" class="formulier">
-      <label>Wat<input name="titel" required value="${esc(t.titel)}" ${id ? '' : 'autofocus'}></label>
-      <label>Hoort bij<select name="hoort">${hoortBijOpties(s, hoort)}</select></label>
-      <label>Werkdag <small>(wanneer ik eraan werk; leeg = bakje)</small><input type="date" name="werkdag" value="${t.werkdag || ''}"></label>
+      ${
+        t.hoofd
+          ? `<input type="hidden" name="titel" value="${esc(t.titel)}"><input type="hidden" name="hoort" value="${hoort}">
+             <p class="hint">Taak van de les ${esc(klasLabel(s, les))} · ${esc(les.titel)}${les.datum ? ` (${M.kortDatum(les.datum)})` : ''}.</p>`
+          : `<label>Wat<input name="titel" required value="${esc(t.titel)}" ${id ? '' : 'autofocus'}></label>
+             <label>Hoort bij<select name="hoort">${hoortBijOpties(s, hoort)}</select></label>`
+      }
+      <label>Werkdag <small>(wanneer ik eraan werk; leeg = ${t.hoofd ? 'standaard, vóór de les' : 'bakje'})</small><input type="date" name="werkdag" value="${t.werkdag || ''}"></label>
       <div class="rij">
         <label>Klaar tegen<select name="deadlineSoort">${deadlineOpties(sleutel, { eind: true })}</select></label>
         <label class="dl-datum">Datum<input type="date" name="deadlineDatum" value="${t.deadline?.datum || ''}"></label>
@@ -788,7 +813,7 @@ function openTaak(id, voorinvulling = {}, terug = null) {
       <label>Notitie<textarea name="notitie" rows="2">${esc(t.notitie)}</textarea></label>
       <label class="check"><input type="checkbox" name="klaar" ${t.klaar ? 'checked' : ''}> Klaar</label>
       <div class="knoppen">
-        ${id ? `<button type="button" class="knop gevaar" data-weg>Verwijderen</button>` : ''}
+        ${id && !t.hoofd ? `<button type="button" class="knop gevaar" data-weg>Verwijderen</button>` : ''}
         <span class="vul"></span>
         <button type="button" class="knop" data-sluit>Annuleren</button>
         <button class="knop primair">Opslaan</button>
@@ -796,6 +821,13 @@ function openTaak(id, voorinvulling = {}, terug = null) {
     </form>`,
     (d) => {
       const f = $('#f-taak', d);
+      $('[data-splits]', d)?.addEventListener('click', () => {
+        const antwoord = prompt('In hoeveel blokken wil je deze taak opsplitsen? (2 tot 10)', '2');
+        const aantal = Math.round(Number(antwoord));
+        if (!antwoord || !(aantal >= 2 && aantal <= 10)) return;
+        wijzig((st) => M.splitsTaak(st, id, aantal));
+        sluit();
+      });
       const bijwerken = () => {
         const bij = leesHoortBij(f.hoort.value);
         for (const o of f.deadlineSoort.options) {
@@ -866,11 +898,12 @@ function takenLijst(s, taken, terugAttr) {
         .map((t) => {
           const w = M.waarschuwing(s, t);
           const dl = M.deadlineVan(s, t);
-          const info = [t.werkdag ? `werk: ${M.kortDatum(t.werkdag)}` : 'in bakje', dl && !t.deadline?.eind ? `⚑ ${M.kortDatum(dl)}` : ''].filter(Boolean);
+          const wd = M.werkdagVan(s, t);
+          const info = [wd ? `gepland: ${M.kortDatum(wd)}${t.hoofd && !t.werkdag ? ' (standaard)' : ''}` : 'in bakje', dl && !t.deadline?.eind && !t.lesId ? `⚑ ${M.kortDatum(dl)}` : ''].filter(Boolean);
           return `<li class="${w ? w.niveau : ''} ${t.klaar ? 'klaar' : ''}">
             <button class="vink" data-actie="vink" data-id="${t.id}" aria-label="${t.klaar ? 'Markeer als niet klaar' : 'Markeer als klaar'}">${t.klaar ? '✓' : ''}</button>
             <div class="taak-tekst" role="button" tabindex="0" data-actie="taak" data-id="${t.id}" ${terugAttr}>
-              <span class="titel">${esc(t.titel)}</span><span class="sub">${info.join(' · ')}${w ? ` · <span class="reden">${esc(w.reden)}</span>` : ''}</span>
+              <span class="titel">${esc(taakTitel(s, t))}</span><span class="sub">${info.join(' · ')}${w ? ` · <span class="reden">${esc(w.reden)}</span>` : ''}</span>
             </div>
           </li>`;
         })
@@ -880,14 +913,11 @@ function takenLijst(s, taken, terugAttr) {
 
 function lesTakenHtml(s, lesId) {
   const les = s.lessen[lesId];
-  const taken = M.takenVanLes(s, lesId).sort(sorteerTaken(s));
-  const titels = new Set(taken.map((t) => t.titel.toLowerCase()));
-  const ontbrekend = sjablonenGesorteerd(s).filter((sj) => !titels.has(sj.titel.toLowerCase()));
-  return `<h3>Taken</h3>
-    ${takenLijst(s, taken, `data-terug-les="${lesId}"`) || '<p class="leeg">Nog geen taken bij deze les.</p>'}
+  const taken = M.takenVanLes(s, lesId).sort((a, b) => !!b.hoofd - !!a.hoofd || (a.deelNr || 0) - (b.deelNr || 0) || sorteerTaken(s)(a, b));
+  return `<h3>Taak</h3>
+    ${takenLijst(s, taken, `data-terug-les="${lesId}"`) || '<p class="leeg">Nog geen taak bij deze les.</p>'}
     <div class="chips">
-      ${ontbrekend.map((sj) => `<button type="button" class="chip" data-actie="sjabloon-bij-les" data-les="${lesId}" data-sj="${sj.id}">+ ${esc(sj.titel)}</button>`).join('')}
-      <button type="button" class="chip" data-actie="nieuwe-taak" data-les="${lesId}">+ eigen taak</button>
+      <button type="button" class="chip" data-actie="nieuwe-taak" data-les="${lesId}">+ extra taak</button>
       ${les?.datum ? `<button type="button" class="chip" data-actie="verbeteren" data-les="${lesId}">+ verbeteren</button>` : ''}
     </div>`;
 }
@@ -934,12 +964,7 @@ function openLes(id, voorinvulling = {}) {
       ${
         id
           ? `<p class="hint">Verschuif je de les, dan schuiven de deadlines van de taken mee. Je werkdagen blijven staan.</p>`
-          : `<fieldset><legend>Standaardtaken</legend>${sjablonenGesorteerd(s)
-              .map(
-                (sj) =>
-                  `<label class="check"><input type="checkbox" name="sj" value="${sj.id}" ${sj.aan ? 'checked' : ''}> ${esc(sj.titel)} <small>(${M.deadlineLabel(sj.deadline)})</small></label>`
-              )
-              .join('')}</fieldset>`
+          : `<p class="hint">Saga maakt bij de les één taak met dezelfde naam, op de dag vóór de les (of vroeger als dat een werkdag is). Die kun je daarna verschuiven.</p>`
       }
       <div class="knoppen">
         ${id ? `<button type="button" class="knop gevaar" data-weg>Verwijderen</button>` : ''}
@@ -982,7 +1007,7 @@ function openLes(id, voorinvulling = {}) {
             datum: fd.get('datum') || null,
             volg: huidig?.volg ?? M.volgendeVolg(st, klasIds[0]),
           });
-          if (!id) M.maakStandaardTaken(st, les, fd.getAll('sj'));
+          if (!id) M.zorgHoofdtaken(st);
         });
         sluitHelemaal();
       });
@@ -1313,8 +1338,7 @@ function openPlakken(klasId) {
     `<h2>Lessen plakken · ${esc(k.naam)}</h2>
     <form id="f-plak" class="formulier">
       <label>Eén les per regel, in volgorde<textarea name="lijst" rows="8" placeholder="Documentenstroom&#10;Aankoopfactuur basis&#10;Aankoopfactuur met korting" autofocus></textarea></label>
-      <label class="check"><input type="checkbox" name="sj" checked> Standaardtaken toevoegen</label>
-      <p class="hint">De lessen krijgen nog geen datum en komen bij "Lessen zonder datum". Hun taken verschijnen pas in het bakje zodra de les een datum heeft. Krijgt een les samen met een andere klas, dan vink je die klas daarna aan bij de les.</p>
+      <p class="hint">De lessen krijgen nog geen datum en komen bij "Lessen zonder datum". Hun taak verschijnt zodra de les een datum heeft. Krijgt een les samen met een andere klas, dan vink je die klas daarna aan bij de les.</p>
       <div class="knoppen"><span class="vul"></span>
         <button type="button" class="knop" data-sluit>Annuleren</button>
         <button class="knop primair">Toevoegen</button>
@@ -1324,16 +1348,12 @@ function openPlakken(klasId) {
       const f = $('#f-plak', d);
       f.addEventListener('submit', (e) => {
         e.preventDefault();
-        const metSj = f.sj.checked;
         wijzig((st) => {
-          const sjIds = sjablonenGesorteerd(st)
-            .filter((sj) => sj.aan)
-            .map((sj) => sj.id);
           let volg = M.volgendeVolg(st, klasId);
           for (const titel of regels(f.lijst.value)) {
-            const les = M.zet(st, 'lessen', { id: M.nieuwId(), klasIds: [klasId], titel, datum: null, volg: volg++ });
-            if (metSj) M.maakStandaardTaken(st, les, sjIds);
+            M.zet(st, 'lessen', { id: M.nieuwId(), klasIds: [klasId], titel, datum: null, volg: volg++ });
           }
+          M.zorgHoofdtaken(st);
         });
         sluit();
       });
@@ -1382,9 +1402,6 @@ const acties = {
   },
   verbeteren(el) {
     openVerbeteren(el.dataset.les);
-  },
-  'sjabloon-bij-les'(el) {
-    wijzig((s) => M.maakStandaardTaken(s, s.lessen[el.dataset.les], [el.dataset.sj]));
   },
   'stukken-plakken'(el) {
     openStukkenPlakken(el.dataset.opdracht);
@@ -1447,17 +1464,6 @@ const acties = {
       s.instellingen = { ...s.instellingen, werkdagen: [...w].sort(), upd: Date.now() };
     });
   },
-  'sjabloon-nieuw'() {
-    wijzig((s) => {
-      const volg = Math.max(0, ...M.lijst(s, 'sjablonen').map((sj) => sj.volg || 0)) + 1;
-      M.zet(s, 'sjablonen', { id: M.nieuwId(), titel: 'Nieuwe taak', deadline: { rel: -1 }, aan: false, volg });
-    });
-  },
-  'sjabloon-weg'(el) {
-    const sj = getState().sjablonen[el.dataset.id];
-    if (sj && confirm(`Standaardtaak "${sj.titel}" verwijderen? Bestaande taken blijven staan.`))
-      wijzig((s) => M.wis(s, 'sjablonen', sj.id));
-  },
   backup() {
     const blob = new Blob([JSON.stringify(getState(), null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
@@ -1487,18 +1493,7 @@ document.addEventListener('keydown', (e) => {
 // Instellingen die direct bij wijziging bewaard worden.
 document.addEventListener('change', (e) => {
   const el = e.target;
-  if (el.dataset.sj && el.dataset.veld) {
-    wijzig((s) => {
-      const sj = s.sjablonen[el.dataset.sj];
-      if (!sj) return;
-      const waarde = {
-        titel: () => el.value.trim() || sj.titel,
-        deadline: () => M.deadlineUitSleutel(el.value),
-        aan: () => el.checked,
-      }[el.dataset.veld]();
-      M.zet(s, 'sjablonen', { ...sj, [el.dataset.veld]: waarde });
-    });
-  } else if (el.dataset.instelling) {
+  if (el.dataset.instelling) {
     wijzig((s) => {
       s.instellingen = { ...s.instellingen, [el.dataset.instelling]: el.checked, upd: Date.now() };
     });
@@ -1617,6 +1612,7 @@ document.addEventListener('visibilitychange', () => {
 });
 setInterval(() => document.visibilityState === 'visible' && sync(), 15 * 60 * 1000);
 
+if (M.lijst(getState(), 'lessen').some((l) => !getState().taken[M.hoofdId(l.id)])) wijzig((st) => M.zorgHoofdtaken(st));
 route();
 sync();
 

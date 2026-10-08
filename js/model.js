@@ -13,7 +13,7 @@ export const MAANDNAMEN_LANG = ['januari', 'februari', 'maart', 'april', 'mei', 
 
 export const KLASKLEUREN = ['#123b78', '#5bbba4', '#2f8fcf', '#6f9a3a', '#8a5bb5', '#e0962a', '#3d7f86', '#5a6f9e', '#ef4f4e', '#c2577f', '#e27aa5'];
 // Opleiding: warme tinten. School mag dezelfde kleuren gebruiken; het onderscheid zit in de stippelrand en 🎓.
-export const VAKKLEUREN = ['#ef4f4e', '#c2577f', '#e0762a', '#a84c9e', '#d4504f', '#b8664a'];
+export const VAKKLEUREN = ['#ef4f4e', '#c2577f', '#e0762a', '#a84c9e', '#d4504f', '#b8664a', '#e8b400', '#f2c94c', '#c99a1a'];
 
 // Mogelijke deadlines van een taak bij een les.
 export const DEADLINE_KEUZES = [
@@ -231,12 +231,19 @@ export function deadlineLabel(deadline) {
   return k ? k.label : '';
 }
 
+// Dag waarop een taak in de kalender staat. De taak van een les staat standaard
+// op haar deadline (dag vóór de les, niet op een werkdag) tot je ze zelf verplaatst.
+export function werkdagVan(state, taak) {
+  if (taak.werkdag) return taak.werkdag;
+  return taak.hoofd ? deadlineVan(state, taak) : null;
+}
+
 // Waarschuwing voor een taak: { niveau: 'rood' | 'oranje', reden } of null.
 export function waarschuwing(state, taak, vandaagDatum = vandaag()) {
   if (taak.klaar) return null;
   const dl = deadlineVan(state, taak);
   const va = vanafVan(state, taak);
-  const wd = taak.werkdag;
+  const wd = werkdagVan(state, taak);
   if (wd && dl && wd > dl) return { niveau: 'rood', reden: 'gepland ná de deadline' };
   if (wd && va && wd < va) return { niveau: 'rood', reden: `kan pas vanaf ${kortDatum(va)}` };
   if (dl && dl < vandaagDatum) return { niveau: 'rood', reden: 'deadline voorbij' };
@@ -306,25 +313,6 @@ export function takenVanLes(state, lesId) {
   return lijst(state, 'taken').filter((t) => t.lesId === lesId);
 }
 
-// Maakt de gekozen standaardtaken aan bij een les (zonder werkdag: ze komen in het bakje).
-export function maakStandaardTaken(state, les, sjabloonIds) {
-  return sjabloonIds
-    .map((id) => state.sjablonen[id])
-    .filter((sj) => sj && !sj.del)
-    .map((sj) =>
-      zet(state, 'taken', {
-        id: nieuwId(),
-        titel: sj.titel,
-        lesId: les.id,
-        werkdag: null,
-        deadline: sj.deadline ? { ...sj.deadline } : null,
-        vanaf: null,
-        klaar: false,
-        notitie: '',
-      })
-    );
-}
-
 // Haalt een klas uit alle lessen; lessen zonder klas verdwijnen (met hun taken).
 export function verwijderKlas(state, klasId) {
   for (const l of lessenVanKlas(state, klasId)) {
@@ -333,6 +321,66 @@ export function verwijderKlas(state, klasId) {
     else verwijderLes(state, l.id);
   }
   wis(state, 'klassen', klasId);
+}
+
+// ---------- één taak per les ----------
+
+export const HOOFD_DEADLINE = { rel: -1, nietOpWerkdag: true };
+// Taken die vroeger automatisch bij elke les kwamen; ze gaan op in de ene lestaak.
+const OUDE_STANDAARDTAKEN = ['lesvoorbereiding', 'cr-taak klaarzetten', 'prints'];
+
+export const hoofdId = (lesId) => 'h-' + lesId;
+
+// Zorgt dat elke les precies één (hoofd)taak heeft. Het id is vast ('h-' + les-id),
+// zodat twee toestellen dezelfde taak maken. Geeft true als er iets veranderde.
+export function zorgHoofdtaken(state) {
+  let veranderd = false;
+  for (const les of lijst(state, 'lessen')) {
+    const id = hoofdId(les.id);
+    if (state.taken[id]) continue; // bestaat (of werd bewust verwijderd)
+    const oude = takenVanLes(state, les.id).filter((t) => !t.hoofd && OUDE_STANDAARDTAKEN.includes((t.titel || '').toLowerCase()));
+    const lvb = oude.find((t) => t.titel.toLowerCase() === 'lesvoorbereiding');
+    zet(state, 'taken', {
+      id,
+      titel: '',
+      lesId: les.id,
+      hoofd: true,
+      werkdag: lvb?.werkdag || null,
+      deadline: { ...HOOFD_DEADLINE },
+      vanaf: null,
+      klaar: oude.length ? oude.every((t) => t.klaar) : false,
+      notitie: '',
+    });
+    for (const t of oude) wis(state, 'taken', t.id);
+    veranderd = true;
+  }
+  return veranderd;
+}
+
+// Een te grote taak opdelen in `aantal` blokken. Het origineel wordt blok 1,
+// de andere blokken komen in het bakje (of bij een les zonder werkdag) om te verslepen.
+export function splitsTaak(state, taakId, aantal) {
+  const t = state.taken[taakId];
+  if (!t || t.del || t.deelVan || aantal < 2) return [];
+  const groep = t.id;
+  zet(state, 'taken', { ...t, deelGroep: groep, deelNr: 1, deelVan: aantal });
+  const nieuw = [];
+  for (let i = 2; i <= aantal; i++) {
+    nieuw.push(
+      zet(state, 'taken', {
+        ...t,
+        id: nieuwId(),
+        hoofd: false,
+        titel: t.titel || (t.lesId && state.lessen[t.lesId]?.titel) || '',
+        werkdag: null,
+        klaar: false,
+        deelGroep: groep,
+        deelNr: i,
+        deelVan: aantal,
+      })
+    );
+  }
+  return nieuw;
 }
 
 export function verwijderLes(state, lesId) {

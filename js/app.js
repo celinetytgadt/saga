@@ -1,7 +1,7 @@
 // Saga – schermen en interactie.
 
 import * as M from './model.js';
-import { getState, abonneer, wijzig, getSync, zetSyncCfg, sync, vernieuwAgenda, voegSamen } from './store.js';
+import { getState, abonneer, wijzig, getSync, zetSyncCfg, sync, syncAlsNodig, vernieuwAgenda, voegSamen } from './store.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const esc = (s) =>
@@ -36,6 +36,7 @@ const ui = {
   laatsteKlassen: lokaal('saga.laatsteKlassen', []),
   laatsteVak: null,
   tekst: lokaal('saga.tekst', 'normaal'), // klein | normaal | groot
+  zijbalk: lokaal('saga.zijbalk', { breedte: 270, verborgen: false }), // bakje op de computer
   terug: null, // wat er na het sluiten van een dialoog opnieuw moet openen
   herteken: null, // stukje van de open dialoog dat mee moet vernieuwen
 };
@@ -321,7 +322,10 @@ function bakjeInhoud(s) {
   const kaarten = (lijst) => groepen(s, lijst).map((g) => groepKaart(s, g, false)).join('');
   return `<div class="bakje-kop">
       <h2>Nog in te plannen</h2>
-      <button class="knop klein" data-actie="nieuwe-taak">+ taak</button>
+      <div class="knoppen-rij">
+        <button class="knop klein" data-actie="nieuwe-taak">+ taak</button>
+        ${mobiel.matches ? '' : '<button class="knop klein verberg" data-actie="bakje-verberg" title="Bakje verbergen" aria-label="Bakje verbergen">‹</button>'}
+      </div>
     </div>
     ${liggen.length ? `<h3 class="kop-rood">Blijven liggen</h3>${kaarten(liggen)}` : ''}
     ${school.length ? `${ui.filter === 'alles' || liggen.length ? '<h3>School</h3>' : ''}${kaarten(school)}` : ''}
@@ -349,8 +353,14 @@ function viewRaster(s) {
   const laatste = M.laatsteVanMaand(eerste);
   const dagen = M.maandRaster(eerste);
   const idx = indexeer(s);
-  return `<div class="overzicht">
-    <aside class="bakje zijbalk" data-drop="bakje" data-scroll="bakje">${bakjeInhoud(s)}</aside>
+  const zb = ui.zijbalk;
+  const aantal = inTePlannen(s).filter(toonTaak).length + blijvenLiggen(s, v).filter(toonTaak).length;
+  return `<div class="overzicht ${zb.verborgen ? 'zonder-bakje' : ''}" style="--zijbalk:${zb.breedte}px">
+    ${
+      zb.verborgen
+        ? `<button class="bakje-open" data-actie="bakje-toon" data-drop="bakje" title="Bakje tonen">Nog in te plannen${aantal ? ` (${aantal})` : ''}</button>`
+        : `<aside class="bakje zijbalk" data-drop="bakje" data-scroll="bakje">${bakjeInhoud(s)}</aside><div class="sleepgreep" data-greep title="Sleep om het bakje breder of smaller te maken"></div>`
+    }
     <div class="raster-wrap">
       ${periodeNav(eerste)}
       <div class="raster-kop">${WEEK.map((d) => `<div>${M.DAGNAMEN[d]}</div>`).join('')}</div>
@@ -602,6 +612,7 @@ function tekenStatus() {
 
 function render() {
   const s = getState();
+  ui.dag = M.vandaag();
   // scrollposities bewaren, zodat de lijsten niet terug naar boven springen
   const scroll = [...document.querySelectorAll('[data-scroll]')].map((el) => [el.dataset.scroll, el.scrollTop]);
   let view = ui.view;
@@ -1397,6 +1408,16 @@ const acties = {
   agenda() {
     vernieuwAgenda();
   },
+  'bakje-verberg'() {
+    ui.zijbalk = { ...ui.zijbalk, verborgen: true };
+    bewaarLokaal('saga.zijbalk', ui.zijbalk);
+    render();
+  },
+  'bakje-toon'() {
+    ui.zijbalk = { ...ui.zijbalk, verborgen: false };
+    bewaarLokaal('saga.zijbalk', ui.zijbalk);
+    render();
+  },
   filter(el) {
     ui.filter = el.dataset.f;
     bewaarLokaal('saga.filter', ui.filter);
@@ -1548,6 +1569,33 @@ document.addEventListener('drop', (e) => {
   });
 });
 
+// ---------- bakje breder of smaller slepen ----------
+
+document.addEventListener('pointerdown', (e) => {
+  const greep = e.target.closest?.('[data-greep]');
+  if (!greep) return;
+  e.preventDefault();
+  const overzicht = greep.closest('.overzicht');
+  const links = overzicht.getBoundingClientRect().left + parseFloat(getComputedStyle(overzicht).paddingLeft);
+  greep.classList.add('actief');
+  greep.setPointerCapture(e.pointerId);
+  const beweeg = (ev) => {
+    const breedte = Math.round(Math.min(480, Math.max(180, ev.clientX - links)));
+    ui.zijbalk = { ...ui.zijbalk, breedte };
+    overzicht.style.setProperty('--zijbalk', breedte + 'px');
+  };
+  const klaar = () => {
+    greep.classList.remove('actief');
+    greep.removeEventListener('pointermove', beweeg);
+    greep.removeEventListener('pointerup', klaar);
+    greep.removeEventListener('pointercancel', klaar);
+    bewaarLokaal('saga.zijbalk', ui.zijbalk);
+  };
+  greep.addEventListener('pointermove', beweeg);
+  greep.addEventListener('pointerup', klaar);
+  greep.addEventListener('pointercancel', klaar);
+});
+
 // ---------- start ----------
 
 function zetTekst() {
@@ -1557,14 +1605,17 @@ zetTekst();
 
 abonneer(opWijziging);
 window.addEventListener('hashchange', route);
+window.addEventListener('pagehide', syncAlsNodig);
 mobiel.addEventListener('change', render);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
-    render(); // de datum van vandaag kan veranderd zijn
+    if (ui.dag !== M.vandaag()) render(); // de datum van vandaag is veranderd
     sync();
+  } else {
+    syncAlsNodig();
   }
 });
-setInterval(() => document.visibilityState === 'visible' && sync(), 10 * 60 * 1000);
+setInterval(() => document.visibilityState === 'visible' && sync(), 15 * 60 * 1000);
 
 route();
 sync();

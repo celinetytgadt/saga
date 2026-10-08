@@ -150,9 +150,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
   flex: none;
 }
 .sync-dot.sync-ok { background: var(--groen); }
-.sync-dot.sync-bezig, .sync-dot.sync-wacht { background: var(--groen); opacity: .5; animation: puls 1s infinite alternate; }
+.sync-dot.sync-bezig, .sync-dot.sync-wacht { background: var(--groen); opacity: .45; }
 .sync-dot.sync-fout { background: var(--fuchsia); }
-@keyframes puls { to { opacity: 1; } }
 
 /* ---------- knoppen ---------- */
 
@@ -195,7 +194,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .overzicht {
   display: grid;
-  grid-template-columns: 270px minmax(0, 1fr);
+  grid-template-columns: var(--zijbalk, 270px) minmax(0, 1fr);
   gap: 18px;
   padding: 16px 20px 40px;
   align-items: start;
@@ -494,7 +493,7 @@ dialog::backdrop { background: rgb(15 23 36 / 45%); }
 }
 
 @media (max-width: 1100px) and (min-width: 761px) {
-  .overzicht { grid-template-columns: 220px minmax(0, 1fr); padding: 12px; gap: 12px; }
+  .overzicht { padding: 12px; gap: 12px; }
 }
 
 @media (max-width: 760px) {
@@ -674,4 +673,40 @@ dialog::backdrop { background: rgb(15 23 36 / 45%); }
   .rij-tekst { font-size: .9rem; }
   .rij-taak .vink { width: 20px; height: 20px; }
   .afspraak { font-size: .88rem; }
+}
+
+/* ---------- bakje smaller maken of verbergen ---------- */
+
+.overzicht { position: relative; }
+.sleepgreep {
+  position: absolute;
+  top: 16px;
+  bottom: 40px;
+  left: calc(20px + var(--zijbalk) + 4px);
+  width: 10px;
+  cursor: col-resize;
+  border-radius: 5px;
+  touch-action: none;
+}
+.sleepgreep::after { content: ""; position: absolute; left: 4px; top: 0; bottom: 0; width: 2px; border-radius: 1px; background: transparent; }
+.sleepgreep:hover::after, .sleepgreep.actief::after { background: var(--rand-sterk); }
+.overzicht.zonder-bakje { grid-template-columns: 40px minmax(0, 1fr); }
+.bakje-open {
+  position: sticky;
+  top: 74px;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  border: 1px solid var(--rand);
+  background: var(--vlak);
+  border-radius: var(--radius);
+  padding: 14px 8px;
+  font-weight: 600;
+  color: var(--zacht);
+  cursor: pointer;
+}
+.bakje-open:hover, .bakje-open.drop-hier { color: var(--accent); border-color: var(--accent); }
+.bakje-kop .knoppen-rij { gap: 4px; }
+.verberg { padding: 4px 9px; }
+@media (max-width: 1100px) {
+  .sleepgreep { left: calc(12px + var(--zijbalk) + 1px); }
 }

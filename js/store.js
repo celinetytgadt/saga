@@ -63,6 +63,15 @@ export function voegSamen(data) {
 
 // ---------- synchronisatie ----------
 
+// Bij het verlaten of wegleggen van de app: openstaande wijzigingen meteen doorsturen.
+export function syncAlsNodig() {
+  if (timer) {
+    clearTimeout(timer);
+    timer = null;
+    sync();
+  }
+}
+
 export function getSync() {
   return { ...syncCfg, ...syncStatus };
 }
@@ -100,14 +109,27 @@ function uitleg(e) {
   return m;
 }
 
+// Kwam er iets nieuws binnen? (merge behoudt dezelfde objecten als er niets veranderde)
+function iets(voor, na) {
+  if (voor.instellingen !== na.instellingen) return true;
+  return Object.keys(na).some((k) => {
+    if (k === 'instellingen' || !na[k] || typeof na[k] !== 'object') return false;
+    return Object.keys(na[k]).some((id) => na[k][id] !== voor[k]?.[id]);
+  });
+}
+
 let timer = null;
 let bezig = false;
 let opnieuw = false;
 
-export function planSync(ms = 1500) {
+// Wijzigingen worden gebundeld: pas 20 seconden na de laatste wijziging gaat alles naar Drive.
+export function planSync(ms = 20000) {
   if (!syncCfg.url) return;
   clearTimeout(timer);
-  timer = setTimeout(sync, ms);
+  timer = setTimeout(() => {
+    timer = null;
+    sync();
+  }, ms);
 }
 
 // Synchroniseren en meteen de agenda opnieuw laten inlezen.
@@ -144,10 +166,10 @@ export async function sync({ agenda = false } = {}) {
     const j = await antwoord.json();
     if (!j.ok) throw new Error(j.fout || 'onbekende fout');
     // Wijzigingen die tijdens het wachten gebeurden zitten al in `state` en zijn recenter.
-    const voor = JSON.stringify(state);
+    const voor = state;
     state = merge(state, j.data);
     bewaar();
-    if (JSON.stringify(state) !== voor) melden('data');
+    if (iets(voor, state)) melden('data');
     syncStatus.agenda = j.agendaInfo || null;
     if ((j.scriptVersie || 1) < SCRIPT_VERSIE) {
       zetStatus('fout', 'je planning is bewaard, maar het Google-script is verouderd. Plak de nieuwe Code.gs, voer "installeer" opnieuw uit en maak een nieuwe versie (zie installatiegids, "Het script bijwerken").');

@@ -24,7 +24,7 @@ const SCRIPT_VERSIE = 5;
 
 // Welke agenda('s) gelezen worden, op naam (hoofdletters maken niet uit).
 // Leeg laten ([]) = alle agenda's die je in Google Agenda ziet.
-const AGENDA_NAMEN = ['Zottekes'];
+const AGENDA_NAMEN = ['De Zottekes'];
 
 const AGENDA_DAGEN_TERUG = 7;
 const AGENDA_DAGEN_VOORUIT = 75;

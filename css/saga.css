@@ -268,8 +268,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
   flex-direction: column;
   gap: 1px;
   border-radius: 8px;
+  border: 1px solid var(--rand);
   border-left: 4px solid var(--klas);
-  background: color-mix(in srgb, var(--klas) 16%, var(--vlak));
+  background: var(--vlak);
   padding: 4px 7px;
   font-size: .85rem;
   cursor: pointer;

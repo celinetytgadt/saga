@@ -308,13 +308,13 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .vink {
   flex: none;
-  width: 18px;
-  height: 18px;
-  margin-top: 1px;
-  border: 2px solid var(--rand-sterk);
-  border-radius: 6px;
+  width: 13px;
+  height: 13px;
+  margin-top: 3px;
+  border: 1.5px solid var(--rand-sterk);
+  border-radius: 4px;
   background: var(--vlak);
-  font-size: .7rem;
+  font-size: .55rem;
   font-weight: 700;
   line-height: 1;
   padding: 0;
@@ -537,7 +537,7 @@ dialog::backdrop { background: rgb(15 23 36 / 45%); }
   .les { font-size: .88rem; padding: 3px 8px; }
   .taak { cursor: default; }
   .taak-tekst .sub { font-size: .8rem; }
-  .vink { width: 22px; height: 22px; }
+  .vink { width: 17px; height: 17px; }
   .deadline { font-size: .85rem; }
 
   .pagina { padding: 16px; }
@@ -639,7 +639,7 @@ dialog::backdrop { background: rgb(15 23 36 / 45%); }
 .groep-naam b { font-weight: 600; }
 .groep-info { font-size: .75rem; color: var(--zacht); }
 .rij-taak { display: flex; gap: 6px; align-items: flex-start; padding: 2px 0; cursor: grab; border-radius: 6px; }
-.rij-taak .vink { width: 15px; height: 15px; border-width: 1.5px; border-radius: 5px; font-size: .6rem; margin-top: 2px; }
+.rij-taak .vink { width: 12px; height: 12px; border-width: 1.5px; border-radius: 3px; font-size: .5rem; margin-top: 3px; }
 .rij-tekst { flex: 1; min-width: 0; cursor: pointer; font-size: .8rem; color: var(--zacht); overflow-wrap: break-word; }
 .rij-tekst .reden { display: block; font-size: .72rem; }
 .rij-taak.rood { background: var(--rood-vlak); }
@@ -671,7 +671,7 @@ dialog::backdrop { background: rgb(15 23 36 / 45%); }
 @media (max-width: 760px) {
   .groep { font-size: .95rem; padding: 6px 9px; }
   .rij-tekst { font-size: .9rem; }
-  .rij-taak .vink { width: 20px; height: 20px; }
+  .rij-taak .vink { width: 16px; height: 16px; }
   .afspraak { font-size: .88rem; }
 }
 

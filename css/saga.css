@@ -561,7 +561,8 @@ dialog::backdrop { background: rgb(15 23 36 / 45%); }
 
 /* ---------- school & opleiding ---------- */
 
-.les.samen { box-shadow: inset 3px 0 0 var(--klas2); padding-left: 9px; }
+/* Elke les even dikke kleurlijn; bij twee klassen in hun twee kleuren. */
+.les { box-shadow: inset 3px 0 0 var(--klas2); padding-left: 9px; }
 
 .taak.opl:not(.rood):not(.oranje) {
   background: color-mix(in srgb, var(--klas) 9%, var(--vlak));

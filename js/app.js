@@ -204,8 +204,8 @@ function groepKaart(s, g, inDag) {
   let kop, kleur;
   if (g.les) {
     kleur = klassenVan(s, g.les)[0]?.kleur || GRIJS;
-    kop = `<div class="groep-kop" role="button" tabindex="0" data-actie="les" data-id="${g.les.id}">
-      <span class="groep-naam"><b>${esc(klasLabel(s, g.les))}</b> ${esc(g.les.titel)}</span>
+    kop = `<div class="groep-kop" role="button" tabindex="0" data-actie="les" data-id="${g.les.id}" title="${esc(klasLabel(s, g.les))} · ${esc(g.les.titel)}">
+      <span class="groep-naam"><b>${esc(g.les.titel)}</b></span>
       ${g.les.datum ? `<span class="groep-info">les ${M.kortDatum(g.les.datum)}</span>` : ''}
     </div>`;
   } else {

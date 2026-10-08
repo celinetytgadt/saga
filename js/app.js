@@ -1,7 +1,7 @@
 // Saga – schermen en interactie.
 
 import * as M from './model.js';
-import { getState, abonneer, wijzig, getSync, zetSyncCfg, sync, voegSamen } from './store.js';
+import { getState, abonneer, wijzig, getSync, zetSyncCfg, sync, vernieuwAgenda, voegSamen } from './store.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const esc = (s) =>
@@ -34,6 +34,7 @@ const ui = {
   filter: lokaal('saga.filter', 'alles'), // alles | school | opleiding
   laatsteKlassen: lokaal('saga.laatsteKlassen', []),
   laatsteVak: null,
+  tekst: lokaal('saga.tekst', 'normaal'), // klein | normaal | groot
   terug: null, // wat er na het sluiten van een dialoog opnieuw moet openen
   herteken: null, // stukje van de open dialoog dat mee moet vernieuwen
 };
@@ -151,7 +152,7 @@ function taakKaart(s, t) {
   const sub = [];
   if (a.label) sub.push(`<b>${esc(a.label)}</b> ${esc(a.titel)}`);
   else if (opl) sub.push('<b>Opleiding</b>');
-  if (dl && !t.klaar) sub.push(`⚑ ${M.kortDatum(dl)}`);
+  if (dl && !t.klaar && !t.lesId) sub.push(`⚑ ${M.kortDatum(dl)}`);
   if (w) sub.push(`<span class="reden">${esc(w.reden)}</span>`);
   return `<div class="taak ${opl ? 'opl' : ''} ${w ? w.niveau : ''} ${t.klaar ? 'klaar' : ''}" draggable="true" data-sleep="taak:${t.id}" style="--klas:${a.kleur}">
     <button class="vink" data-actie="vink" data-id="${t.id}" aria-label="${t.klaar ? 'Markeer als niet klaar' : 'Markeer als klaar'}">${t.klaar ? '✓' : ''}</button>
@@ -167,8 +168,62 @@ function lesKaart(s, l) {
   const samen = klassenVan(s, l).length > 1;
   const teller = v.totaal ? `<span class="teller ${v.klaar === v.totaal ? 'af' : ''}">${v.klaar}/${v.totaal}</span>` : '';
   return `<div class="les ${samen ? 'samen' : ''}" role="button" tabindex="0" draggable="true" data-sleep="les:${l.id}" data-actie="les" data-id="${l.id}" style="${klasStijl(s, l)}">
-    <span class="les-klas">${esc(klasLabel(s, l))}</span><span class="les-titel">${esc(l.titel)}</span>${teller}
+    <span class="les-boven"><span class="les-klas">${esc(klasLabel(s, l))}</span>${teller}</span><span class="les-titel">${esc(l.titel)}</span>
   </div>`;
+}
+
+// Taken bundelen per les of opdracht, zodat je eerst ziet waarvoor het is.
+// Volgorde: lessen (op datum), dan opdrachten (zoals ingegeven), dan losse taken.
+function groepen(s, taken) {
+  const map = new Map();
+  for (const t of taken) {
+    const les = lesVan(s, t);
+    const opd = !les && opdrachtVan(s, t);
+    const sleutel = les ? 'les:' + les.id : opd ? 'opd:' + opd.id : 'los:' + t.id;
+    if (!map.has(sleutel)) map.set(sleutel, { sleutel, les, opd, taken: [] });
+    map.get(sleutel).taken.push(t);
+  }
+  const rang = (g) => (g.les ? 0 : g.opd ? 1 : 2);
+  const lijst = [...map.values()].sort(
+    (a, b) =>
+      rang(a) - rang(b) ||
+      (a.les && b.les ? vergelijkDatum(a.les.datum, b.les.datum) || sorteerLessen(s)(a.les, b.les) : 0) ||
+      (a.opd && b.opd ? M.volgordeOpdracht(a.opd, b.opd) : 0) ||
+      (!a.les && !a.opd ? sorteerTaken(s)(a.taken[0], b.taken[0]) : 0)
+  );
+  for (const g of lijst) g.taken.sort((a, b) => a.klaar - b.klaar || (a.volg || 0) - (b.volg || 0) || vergelijkDatum(M.deadlineVan(s, a), M.deadlineVan(s, b)));
+  return lijst;
+}
+
+function groepKaart(s, g, inDag) {
+  if (!g.les && !g.opd) return taakKaart(s, g.taken[0]);
+  const opl = !!g.opd;
+  let kop, kleur;
+  if (g.les) {
+    kleur = klassenVan(s, g.les)[0]?.kleur || GRIJS;
+    kop = `<div class="groep-kop" role="button" tabindex="0" data-actie="les" data-id="${g.les.id}">
+      <span class="groep-naam"><b>${esc(klasLabel(s, g.les))}</b> ${esc(g.les.titel)}</span>
+      ${g.les.datum ? `<span class="groep-info">les ${M.kortDatum(g.les.datum)}</span>` : ''}
+    </div>`;
+  } else {
+    const vak = vakVan(s, g.opd);
+    kleur = vak?.kleur || 'var(--fuchsia)';
+    kop = `<div class="groep-kop" role="button" tabindex="0" data-actie="opdracht" data-id="${g.opd.id}">
+      <span class="groep-naam">🎓 <b>${esc(g.opd.titel)}</b></span>
+      <span class="groep-info">${vak ? esc(vak.naam) + ' · ' : ''}${g.opd.deadline ? 'tegen ' + M.kortDatum(g.opd.deadline) : ''}</span>
+    </div>`;
+  }
+  const rijen = g.taken
+    .map((t) => {
+      const w = M.waarschuwing(s, t);
+      const eigen = !t.lesId && t.deadline?.datum && !t.klaar ? ` <span class="rij-dl">⚑ ${M.kortDatum(t.deadline.datum)}</span>` : '';
+      return `<div class="rij-taak ${w ? w.niveau : ''} ${t.klaar ? 'klaar' : ''}" draggable="true" data-sleep="taak:${t.id}">
+        <button class="vink" data-actie="vink" data-id="${t.id}" aria-label="${t.klaar ? 'Markeer als niet klaar' : 'Markeer als klaar'}">${t.klaar ? '✓' : ''}</button>
+        <div class="rij-tekst" role="button" tabindex="0" data-actie="taak" data-id="${t.id}">${esc(t.titel)}${eigen}${w ? `<span class="reden">${esc(w.reden)}</span>` : ''}</div>
+      </div>`;
+    })
+    .join('');
+  return `<div class="groep ${opl ? 'opl' : ''}" style="--klas:${kleur}">${kop}${rijen}</div>`;
 }
 
 function indexeer(s) {
@@ -185,7 +240,7 @@ function indexeer(s) {
   for (const t of M.lijst(s, 'taken')) {
     if (!toonTaak(t)) continue;
     if (t.werkdag) (taken[t.werkdag] ||= []).push(t);
-    if (!t.klaar && !t.deadline?.eind) {
+    if (!t.klaar && !t.lesId && !t.deadline?.eind) {
       const dl = M.deadlineVan(s, t);
       if (dl && dl !== t.werkdag) (deadlines[dl] ||= []).push(t);
     }
@@ -197,11 +252,10 @@ function dagBlok(s, idx, datum, v, raster) {
   const werk = M.isWerkdag(s, datum);
   const weekend = [0, 6].includes(M.weekdag(datum));
   const lessen = (idx.lessen[datum] || []).sort(sorteerLessen(s));
-  const taken = (idx.taken[datum] || [])
-    .filter((t) => s.instellingen.toonKlaar || !t.klaar)
-    .sort(sorteerTaken(s));
+  const taken = (idx.taken[datum] || []).filter((t) => s.instellingen.toonKlaar || !t.klaar);
   const dls = idx.deadlines[datum] || [];
   const eindes = idx.eindes[datum] || [];
+  const afspraken = M.afsprakenOp(s, datum);
   const klassen = [
     'dag',
     datum === v && 'vandaag',
@@ -213,9 +267,12 @@ function dagBlok(s, idx, datum, v, raster) {
   return `<section class="${klassen.join(' ')}" data-drop="${datum}">
     <header class="dag-kop">
       <span class="dag-datum">${raster ? dagKort(datum) : M.kortDatum(datum)}</span>
-      ${werk ? '<span class="label-werk">werk</span>' : ''}
+      ${werk ? `<span class="label-werk" title="werkdag">${raster ? '' : 'werk'}</span>` : ''}
       <button class="dag-plus" data-actie="dag" data-datum="${datum}" aria-label="Acties voor ${M.kortDatum(datum)}">+</button>
     </header>
+    ${afspraken
+      .map((a) => `<div class="afspraak ${a.werk ? 'werk' : ''}" title="${esc(a.titel)}">${a.tijd ? `<span class="tijd">${a.tijd}</span> ` : ''}${esc(a.titel)}</div>`)
+      .join('')}
     ${eindes
       .map(
         (o) =>
@@ -223,7 +280,7 @@ function dagBlok(s, idx, datum, v, raster) {
       )
       .join('')}
     ${lessen.map((l) => lesKaart(s, l)).join('')}
-    ${taken.map((t) => taakKaart(s, t)).join('')}
+    ${groepen(s, taken).map((g) => groepKaart(s, g, true)).join('')}
     ${
       dls.length
         ? `<div class="deadlines">${dls
@@ -259,7 +316,7 @@ function bakjeInhoud(s) {
         .filter((l) => !l.datum)
         .sort(sorteerLessen(s))
     : [];
-  const kaarten = (lijst) => lijst.map((t) => taakKaart(s, t)).join('');
+  const kaarten = (lijst) => groepen(s, lijst).map((g) => groepKaart(s, g, false)).join('');
   return `<div class="bakje-kop">
       <h2>Nog in te plannen</h2>
       <button class="knop klein" data-actie="nieuwe-taak">+ taak</button>
@@ -430,7 +487,7 @@ function viewInstellingen(s) {
     lokaal: 'Alleen op dit toestel. Vul hieronder de koppeling in om te synchroniseren.',
     wacht: 'Wacht op synchronisatie…',
     bezig: 'Bezig met synchroniseren…',
-    ok: 'Gesynchroniseerd met Google Drive.',
+    ok: `✓ Gesynchroniseerd met Google Drive${sy.laatste ? ` om ${new Date(sy.laatste).toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' })}` : ''}.`,
     fout: `Synchroniseren mislukt: ${esc(sy.melding)}`,
   }[sy.status];
   return `<div class="pagina instellingen">
@@ -463,6 +520,15 @@ function viewInstellingen(s) {
 
     <section class="kaart">
       <h2>Weergave</h2>
+      <p class="hint">Tekstgrootte op dit toestel</p>
+      <div class="dagknoppen">${[
+        ['klein', 'Kleiner'],
+        ['normaal', 'Normaal'],
+        ['groot', 'Groter'],
+      ]
+        .map(([k, l]) => `<button class="dagknop ${ui.tekst === k ? 'aan' : ''}" data-actie="tekst" data-k="${k}" aria-pressed="${ui.tekst === k}">${l}</button>`)
+        .join('')}</div>
+      <p></p>
       <label class="check"><input type="checkbox" data-instelling="toonKlaar" ${s.instellingen.toonKlaar ? 'checked' : ''}> Afgevinkte taken blijven zichtbaar in het overzicht</label>
     </section>
 
@@ -472,8 +538,12 @@ function viewInstellingen(s) {
       <form id="f-sync" class="formulier">
         <label>Adres van de Apps Script-webapp<input name="url" type="url" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(sy.url)}"></label>
         <label>Geheime sleutel<input name="token" type="password" autocomplete="off" value="${esc(sy.token)}"></label>
-        <div class="knoppen"><button class="knop primair">Opslaan en synchroniseren</button></div>
+        <div class="knoppen">
+          <button class="knop primair">Opslaan en synchroniseren</button>
+          ${sy.url ? '<button type="button" class="knop" data-actie="agenda">Agenda nu vernieuwen</button>' : ''}
+        </div>
       </form>
+      <p class="hint">Agenda: afspraken met <b>#s</b> in de titel of beschrijving verschijnen in Saga, met <b>#sw</b> tellen ze ook als werkdag. Ze worden elke nacht ingelezen.</p>
       <p class="hint">Hoe je dit instelt: zie <a href="https://github.com/celinetytgadt/saga/blob/HEAD/docs/INSTALLATIE.md" target="_blank" rel="noopener">de installatiegids</a>.</p>
     </section>
 
@@ -1003,6 +1073,7 @@ function openOpdracht(id, voorinvulling = {}) {
             vakId,
             titel: w.titel.trim(),
             deadline: w.deadline,
+            volg: id ? st.opdrachten[id].volg : M.volgendeOpdrachtVolg(st),
           });
           if (!id && w.stukken) {
             M.maakStukken(st, opd.id, regels(w.stukken));
@@ -1268,6 +1339,15 @@ const acties = {
       for (const p of plan) M.zet(s, 'taken', { ...s.taken[p.taak.id], werkdag: p.datum });
     });
   },
+  tekst(el) {
+    ui.tekst = el.dataset.k;
+    bewaarLokaal('saga.tekst', ui.tekst);
+    zetTekst();
+    render();
+  },
+  agenda() {
+    vernieuwAgenda();
+  },
   filter(el) {
     ui.filter = el.dataset.f;
     bewaarLokaal('saga.filter', ui.filter);
@@ -1412,6 +1492,11 @@ document.addEventListener('drop', (e) => {
 });
 
 // ---------- start ----------
+
+function zetTekst() {
+  document.documentElement.dataset.tekst = ui.tekst;
+}
+zetTekst();
 
 abonneer(render);
 window.addEventListener('hashchange', route);

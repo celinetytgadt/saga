@@ -4,7 +4,7 @@
 // Elk object heeft een `upd` (tijdstempel van laatste wijziging) zodat twee
 // toestellen hun gegevens kunnen samenvoegen. Verwijderen = `del: true`.
 
-export const COLLECTIES = ['klassen', 'lessen', 'taken', 'sjablonen', 'dagen', 'vakken', 'opdrachten'];
+export const COLLECTIES = ['klassen', 'lessen', 'taken', 'sjablonen', 'dagen', 'vakken', 'opdrachten', 'afspraken'];
 
 export const DAGNAMEN = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'];
 export const MAANDNAMEN = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
@@ -89,6 +89,7 @@ export function leegeState() {
     dagen: {},
     vakken: {},
     opdrachten: {},
+    afspraken: {}, // komt uit Google Agenda (alleen-lezen, geschreven door het script)
     instellingen: { werkdagen: [2, 5], toonKlaar: false, upd: 0 },
   };
 }
@@ -137,10 +138,20 @@ export function lijst(state, collectie) {
 
 // ---------- werkdagen ----------
 
+// Volgorde: manuele aanduiding > afspraak met #sw > vaste werkdagen.
 export function isWerkdag(state, datum) {
   const m = state.dagen[datum];
   if (m && !m.del && typeof m.werkdag === 'boolean') return m.werkdag;
+  if (afsprakenOp(state, datum).some((a) => a.werk)) return true;
   return state.instellingen.werkdagen.includes(weekdag(datum));
+}
+
+// ---------- agenda ----------
+
+export function afsprakenOp(state, datum) {
+  return lijst(state, 'afspraken')
+    .filter((a) => a.datum <= datum && datum <= (a.eindDatum || a.datum))
+    .sort((a, b) => (a.tijd || '') < (b.tijd || '') ? -1 : 1);
 }
 
 // ---------- deadlines ----------
@@ -309,10 +320,19 @@ export function takenVanOpdracht(state, opdrachtId) {
     .sort((a, b) => (a.volg || 0) - (b.volg || 0));
 }
 
+// Opdrachten in de volgorde waarin ze ingegeven zijn (`volg`, anders het id, dat met de tijd begint).
+export function volgordeOpdracht(a, b) {
+  return (a.volg || 0) - (b.volg || 0) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+}
+
 export function opdrachtenVanVak(state, vakId) {
   return lijst(state, 'opdrachten')
     .filter((o) => (o.vakId || null) === (vakId || null))
-    .sort((a, b) => (a.deadline || '9999') < (b.deadline || '9999') ? -1 : 1);
+    .sort(volgordeOpdracht);
+}
+
+export function volgendeOpdrachtVolg(state) {
+  return Math.max(0, ...lijst(state, 'opdrachten').map((o) => o.volg || 0)) + 1;
 }
 
 export function volgendStuk(state, opdrachtId) {

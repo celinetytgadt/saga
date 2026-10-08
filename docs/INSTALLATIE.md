@@ -65,6 +65,23 @@ Doe dit op je laptop én op je gsm.
 - **Zonder internet:** Saga blijft werken. Wijzigingen worden doorgestuurd zodra je weer online bent.
 - **Sleutel kwijt of gelekt?** Open het script → **Projectinstellingen** (tandwiel links) → **Scripteigenschappen**,
   verwijder `SAGA_TOKEN` en voer **installeer** opnieuw uit. Vul de nieuwe sleutel in op je toestellen.
-- **Het script aanpassen (bv. in fase 2)?** Plak de nieuwe `Code.gs`, bewaar, en ga naar **Implementeren** →
-  **Implementaties beheren** → potloodje → Versie: **Nieuwe versie** → **Implementeren**.
-  De URL blijft dan dezelfde.
+
+## Het script bijwerken
+
+Als er een nieuwe versie van `Code.gs` is (Saga meldt dan "het Google-script is verouderd"):
+
+1. Open je project op <https://script.google.com>.
+2. Wis alles in `Code.gs`, plak de nieuwe inhoud van [`apps-script/Code.gs`](../apps-script/Code.gs) en klik op het **diskette-icoon**.
+3. Kies de functie **installeer** en klik **Uitvoeren**. Google vraagt mogelijk opnieuw toestemming, bijvoorbeeld voor je agenda.
+   Dat is weer de melding "niet geverifieerd": **Advanced** → **Go to Saga (unsafe)** → **Allow**.
+   Dit plant ook de dagelijkse agenda-update (rond 5 uur 's nachts) en leest de agenda meteen in.
+4. **Implementeren** → **Implementaties beheren** → potloodje ✏️ → bij Versie: **Nieuwe versie** → **Implementeren**.
+   De URL blijft dezelfde; in Saga hoef je niets te veranderen.
+5. In Saga: Instellingen → **Agenda nu vernieuwen**. De melding wordt groen.
+
+## Agenda
+
+- Zet **#s** in de titel of beschrijving van een afspraak in je Google Agenda, en ze verschijnt in Saga.
+- Zet **#sw** als het een extra werkdag is (studiedag, evaluatiedag). Lesvoorbereiding valt dan niet op die dag.
+- Saga leest alle agenda's die je in Google Agenda ziet, maar neemt enkel afspraken met de code over, van een week terug tot ongeveer 2,5 maand vooruit.
+- Het script schrijft nooit in je agenda.

@@ -200,3 +200,69 @@ test('samenvoegen neemt nieuwe collecties vanzelf mee', () => {
   assert.equal(r.nieuw.x.id, 'x');
   assert.deepEqual(M.merge(r, { vakken: { v1: { id: 'v1', naam: 'Oud', upd: 1 } } }).vakken.v1.naam, 'Didactiek');
 });
+
+test('afspraken uit de agenda: tonen en #sw als werkdag', () => {
+  const s = basis();
+  s.afspraken.a1 = { id: 'a1', titel: 'Tandarts', datum: '2026-10-14', tijd: '16:30', werk: false, upd: 1 };
+  s.afspraken.a2 = { id: 'a2', titel: 'Studiedag', datum: '2026-10-14', eindDatum: '2026-10-14', werk: true, upd: 1 };
+  s.afspraken.a3 = { id: 'a3', del: true, upd: 2 };
+  assert.deepEqual(M.afsprakenOp(s, '2026-10-14').map((a) => a.id), ['a2', 'a1']);
+  assert.equal(M.isWerkdag(s, '2026-10-14'), true);
+  // lesvoorbereiding voor les op do 15/10 schuift naar maandag (wo = #sw, di = vaste werkdag)
+  assert.equal(M.deadlineVan(s, taak({ deadline: { rel: -1, nietOpWerkdag: true } })), '2026-10-12');
+  // manuele aanduiding wint
+  s.dagen['2026-10-14'] = { id: '2026-10-14', werkdag: false, upd: 1 };
+  assert.equal(M.isWerkdag(s, '2026-10-14'), false);
+});
+
+test('Code.gs leest enkel afspraken met #s of #sw', () => {
+  const dag = (d, u = 0, m = 0) => new Date(2026, 9, d, u, m);
+  const ev = (titel, beschrijving, start, einde, heleDag = false, id = titel) => ({
+    getId: () => id,
+    getTitle: () => titel,
+    getDescription: () => beschrijving,
+    isAllDayEvent: () => heleDag,
+    getStartTime: () => start,
+    getEndTime: () => einde,
+    getAllDayStartDate: () => start,
+    getAllDayEndDate: () => einde,
+  });
+  const fmt = (d, tz, p) => {
+    const z = (n) => String(n).padStart(2, '0');
+    return p === 'HH:mm' ? `${z(d.getHours())}:${z(d.getMinutes())}` : `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
+  };
+  const agenda = [
+    ev('Tandarts #s', '', dag(14, 16, 30), dag(14, 17)),
+    ev('Poetsvrouw', '', dag(14, 9), dag(14, 12)),
+    ev('Studiedag', 'meenemen: laptop #sw', dag(21), dag(22), true),
+    ev('Uitstap #s', '', dag(23), dag(25), true),
+    ev('#school feest', '', dag(15, 10), dag(15, 11)),
+  ];
+  const ctx = {
+    Date,
+    Session: { getScriptTimeZone: () => 'Europe/Brussels' },
+    Utilities: { formatDate: fmt },
+    CalendarApp: {
+      getDefaultCalendar: () => ({ getTimeZone: () => 'Europe/Brussels' }),
+      getAllCalendars: () => [{ getEvents: () => agenda }],
+    },
+  };
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(new URL('../apps-script/Code.gs', import.meta.url), 'utf8'), ctx);
+  const oud = { weg_2026: { id: 'weg_2026', titel: 'Oude afspraak', datum: '2026-10-01', upd: 1 } };
+  const r = JSON.parse(JSON.stringify(ctx.leesAgenda_(oud)));
+  const zichtbaar = Object.values(r).filter((a) => !a.del);
+  assert.deepEqual(zichtbaar.map((a) => a.titel).sort(), ['Studiedag', 'Tandarts', 'Uitstap']);
+  const tandarts = zichtbaar.find((a) => a.titel === 'Tandarts');
+  assert.equal(tandarts.datum, '2026-10-14');
+  assert.equal(tandarts.tijd, '16:30');
+  assert.equal(tandarts.werk, false);
+  const studiedag = zichtbaar.find((a) => a.titel === 'Studiedag');
+  assert.deepEqual([studiedag.datum, studiedag.eindDatum, studiedag.werk, studiedag.tijd], ['2026-10-21', '2026-10-21', true, null]);
+  const uitstap = zichtbaar.find((a) => a.titel === 'Uitstap');
+  assert.deepEqual([uitstap.datum, uitstap.eindDatum], ['2026-10-23', '2026-10-24']);
+  assert.equal(r.weg_2026.del, true); // niet meer in de agenda
+  // tweede keer inlezen: niets verandert, dus geen nieuwe upd
+  const r2 = JSON.parse(JSON.stringify(ctx.leesAgenda_(r)));
+  assert.equal(r2[tandarts.id].upd, tandarts.upd);
+});

@@ -5,6 +5,10 @@
  * als één JSON-bestand in de map "Saga" op Drive. Elke dag wordt een
  * back-up bewaard (de laatste 14 blijven staan).
  *
+ * Elke nacht (rond 5 uur) leest het script de agenda's en neemt het enkel
+ * afspraken over met #s (tonen) of #sw (tonen + telt als werkdag) in de
+ * titel of beschrijving. Het script schrijft nooit in de agenda.
+ *
  * Installatie: zie docs/INSTALLATIE.md.
  */
 
@@ -13,9 +17,18 @@ const BESTAND_NAAM = 'saga-data.json';
 const BACKUPS_HOUDEN = 14;
 
 // Verhogen bij elke wijziging die de app moet kennen; de app waarschuwt bij een oudere versie.
-const SCRIPT_VERSIE = 2;
+const SCRIPT_VERSIE = 3;
 
-/** Eenmalig uitvoeren vanuit de editor: maakt map, bestand en geheime sleutel aan. */
+const AGENDA_DAGEN_TERUG = 7;
+const AGENDA_DAGEN_VOORUIT = 75;
+// De code moet als los woord staan: #school of #sport tellen niet mee.
+const CODE_S = /(^|\s)#s(?=$|\s|[.,;:!?)\]])/i;
+const CODE_SW = /(^|\s)#sw(?=$|\s|[.,;:!?)\]])/i;
+
+/**
+ * Uitvoeren vanuit de editor (eerste keer, en opnieuw na een nieuwe versie van dit script):
+ * maakt map, bestand en geheime sleutel aan, plant de dagelijkse agenda-update en voert ze meteen uit.
+ */
 function installeer() {
   const props = PropertiesService.getScriptProperties();
   let token = props.getProperty('SAGA_TOKEN');
@@ -24,6 +37,11 @@ function installeer() {
     props.setProperty('SAGA_TOKEN', token);
   }
   haalBestand_();
+  ScriptApp.getProjectTriggers()
+    .filter(function (t) { return t.getHandlerFunction() === 'verversAgenda'; })
+    .forEach(function (t) { ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('verversAgenda').timeBased().everyDays(1).atHour(5).create();
+  verversAgenda();
   Logger.log('Saga is klaar. Je geheime sleutel is:\n\n%s\n\nKopieer die naar Instellingen → Synchronisatie in Saga.', token);
 }
 
@@ -48,6 +66,7 @@ function doPost(e) {
     const opgeslagen = JSON.parse(bestand.getBlob().getDataAsString() || '{}');
     if (verzoek.actie === 'sync') {
       const samen = merge(opgeslagen, verzoek.data || {});
+      if (verzoek.agenda) samen.afspraken = leesAgenda_(samen.afspraken || {});
       const tekst = JSON.stringify(samen);
       if (tekst !== JSON.stringify(opgeslagen)) {
         maakDagelijkseBackup_(bestand);
@@ -59,6 +78,79 @@ function doPost(e) {
   } finally {
     slot.releaseLock();
   }
+}
+
+/** Dagelijks (trigger): de agenda-afspraken met #s of #sw bijwerken in het databestand. */
+function verversAgenda() {
+  const slot = LockService.getScriptLock();
+  slot.waitLock(30000);
+  try {
+    const bestand = haalBestand_();
+    const data = JSON.parse(bestand.getBlob().getDataAsString() || '{}');
+    const voor = JSON.stringify(data.afspraken || {});
+    data.afspraken = leesAgenda_(data.afspraken || {});
+    if (JSON.stringify(data.afspraken) !== voor) bestand.setContent(JSON.stringify(data));
+  } finally {
+    slot.releaseLock();
+  }
+}
+
+/**
+ * Leest alle agenda's en geeft de bijgewerkte collectie afspraken terug.
+ * Enkel wat veranderde krijgt een nieuwe `upd`; verdwenen afspraken worden als verwijderd gemarkeerd.
+ */
+function leesAgenda_(oud) {
+  const nu = new Date();
+  const van = new Date(nu.getTime() - AGENDA_DAGEN_TERUG * 86400000);
+  const tot = new Date(nu.getTime() + AGENDA_DAGEN_VOORUIT * 86400000);
+  const scriptTz = Session.getScriptTimeZone();
+  const agendaTz = CalendarApp.getDefaultCalendar().getTimeZone();
+  const stempel = Date.now();
+  const r = Object.assign({}, oud);
+  const gezien = {};
+
+  CalendarApp.getAllCalendars().forEach(function (agenda) {
+    let afspraken;
+    try {
+      afspraken = agenda.getEvents(van, tot);
+    } catch (err) {
+      return; // agenda niet leesbaar: overslaan
+    }
+    afspraken.forEach(function (ev) {
+      const titel = ev.getTitle() || '';
+      const beschrijving = ev.getDescription() || '';
+      const werk = CODE_SW.test(titel) || CODE_SW.test(beschrijving);
+      if (!werk && !CODE_S.test(titel) && !CODE_S.test(beschrijving)) return;
+
+      const heleDag = ev.isAllDayEvent();
+      let datum, eindDatum, tijd;
+      if (heleDag) {
+        datum = Utilities.formatDate(ev.getAllDayStartDate(), scriptTz, 'yyyy-MM-dd');
+        eindDatum = Utilities.formatDate(new Date(ev.getAllDayEndDate().getTime() - 43200000), scriptTz, 'yyyy-MM-dd');
+        tijd = null;
+      } else {
+        datum = Utilities.formatDate(ev.getStartTime(), agendaTz, 'yyyy-MM-dd');
+        eindDatum = Utilities.formatDate(new Date(ev.getEndTime().getTime() - 1000), agendaTz, 'yyyy-MM-dd');
+        tijd = Utilities.formatDate(ev.getStartTime(), agendaTz, 'HH:mm');
+      }
+      const id = ev.getId() + '_' + datum;
+      const schoon = titel.replace(CODE_SW, '$1').replace(CODE_S, '$1').replace(/\s+/g, ' ').trim();
+      const item = { id: id, titel: schoon || '(afspraak)', datum: datum, eindDatum: eindDatum, tijd: tijd, werk: werk };
+      gezien[id] = true;
+      const o = oud[id];
+      const zelfde = o && !o.del && o.titel === item.titel && o.datum === item.datum &&
+        o.eindDatum === item.eindDatum && o.tijd === item.tijd && o.werk === item.werk;
+      if (!zelfde) {
+        item.upd = stempel;
+        r[id] = item;
+      }
+    });
+  });
+
+  Object.keys(r).forEach(function (id) {
+    if (!gezien[id] && !r[id].del) r[id] = { id: id, del: true, upd: stempel };
+  });
+  return r;
 }
 
 /**

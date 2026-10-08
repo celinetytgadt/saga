@@ -164,13 +164,14 @@ function taakKaart(s, t) {
   </div>`;
 }
 
-function lesKaart(s, l) {
+// In de kalender enkel het onderwerp: de kleurlijn toont de klas (volledige naam bij aanwijzen).
+function lesKaart(s, l, metKlas = true) {
   const taken = M.takenVanLes(s, l.id);
   const v = voortgang(taken);
   const samen = klassenVan(s, l).length > 1;
   const teller = v.totaal ? `<span class="teller ${v.klaar === v.totaal ? 'af' : ''}">${v.klaar}/${v.totaal}</span>` : '';
   return `<div class="les ${samen ? 'samen' : ''}" role="button" tabindex="0" draggable="true" data-sleep="les:${l.id}" data-actie="les" data-id="${l.id}" style="${klasStijl(s, l)}" title="${esc(klasLabel(s, l))} · ${esc(l.titel)}">
-    <span class="les-tekst"><b>${esc(klasLabel(s, l))}</b> ${esc(l.titel)}</span>${teller}
+    <span class="les-tekst">${metKlas ? `<b>${esc(klasLabel(s, l))}</b> ` : ''}${esc(l.titel)}</span>${teller}
   </div>`;
 }
 
@@ -282,7 +283,7 @@ function dagBlok(s, idx, datum, v, raster, buiten = false) {
           `<div class="einde" role="button" tabindex="0" data-actie="opdracht" data-id="${o.id}">⚑ ${esc(o.titel)}</div>`
       )
       .join('')}
-    ${lessen.map((l) => lesKaart(s, l)).join('')}
+    ${lessen.map((l) => lesKaart(s, l, false)).join('')}
     ${groepen(s, taken).map((g) => groepKaart(s, g, true)).join('')}
     ${
       dls.length

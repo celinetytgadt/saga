@@ -110,7 +110,7 @@ In het overzicht: "BKH3-K2 + K3" met de kleuren van beide klassen.
 - Rustiger lettertype (Open Sans voor tekst, Quicksand voor titels) en een instelbare **tekstgrootte** per toestel.
 - Kalender per **maand**: de eerste rij is altijd de week van de 1e; ‹ › verschuift een maand.
 - Deadlines van de opleiding: groen vlaggetje (school/losse taken: roze-rood).
-- Agenda: enkel de agenda **Zottekes** (instelbaar in `AGENDA_NAMEN` in Code.gs).
+- Agenda: enkel de agenda **De Zottekes** (instelbaar in `AGENDA_NAMEN` in Code.gs).
 
 ## 3. Regels
 

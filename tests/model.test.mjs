@@ -245,14 +245,14 @@ test('Code.gs leest enkel afspraken met #s of #sw', () => {
     CalendarApp: {
       getDefaultCalendar: () => ({ getTimeZone: () => 'Europe/Brussels' }),
       getAllCalendars: () => [{ getName: () => 'Hoofdagenda', getEvents: () => [] }],
-      getCalendarsByName: (n) => (n.toLowerCase() === 'zottekes' ? [{ getName: () => 'Zottekes', getEvents: () => agenda }] : []),
+      getCalendarsByName: (n) => (n.toLowerCase() === 'de zottekes' ? [{ getName: () => 'De Zottekes', getEvents: () => agenda }] : []),
     },
   };
   vm.createContext(ctx);
   vm.runInContext(fs.readFileSync(new URL('../apps-script/Code.gs', import.meta.url), 'utf8'), ctx);
   const oud = { weg_2026: { id: 'weg_2026', titel: 'Oude afspraak', datum: '2026-10-01', upd: 1 } };
   const res = JSON.parse(JSON.stringify(ctx.leesAgenda_(oud)));
-  assert.deepEqual([res.info.agendas, res.info.aantal, res.info.fout], [['Zottekes'], 3, null]);
+  assert.deepEqual([res.info.agendas, res.info.aantal, res.info.fout], [['De Zottekes'], 3, null]);
   const r = res.afspraken;
   const zichtbaar = Object.values(r).filter((a) => !a.del);
   assert.deepEqual(zichtbaar.map((a) => a.titel).sort(), ['Studiedag', 'Tandarts', 'Uitstap']);

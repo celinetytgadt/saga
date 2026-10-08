@@ -565,7 +565,7 @@ dialog::backdrop { background: rgb(15 23 36 / 45%); }
 .les { box-shadow: inset 3px 0 0 var(--klas2); padding-left: 9px; }
 
 .taak.opl:not(.rood):not(.oranje) {
-  background: color-mix(in srgb, var(--klas) 9%, var(--vlak));
+  background: var(--vlak);
   border-style: dashed;
   border-left-style: solid;
   border-color: color-mix(in srgb, var(--klas) 45%, var(--rand));
@@ -620,7 +620,7 @@ dialog::backdrop { background: rgb(15 23 36 / 45%); }
 .label-werk:empty { width: 7px; height: 7px; padding: 0; border: none; border-radius: 50%; background: var(--rand-sterk); }
 
 .groep {
-  background: var(--vlak);
+  background: color-mix(in srgb, var(--klas) 12%, var(--vlak)); /* schooltaken: tint van de les */
   border: 1px solid var(--rand);
   border-left: 3px solid var(--klas);
   border-radius: 8px;
@@ -629,7 +629,7 @@ dialog::backdrop { background: rgb(15 23 36 / 45%); }
   min-width: 0;
 }
 .groep.opl {
-  background: color-mix(in srgb, var(--klas) 7%, var(--vlak));
+  background: var(--vlak);
   border-style: dashed;
   border-left-style: solid;
   border-color: color-mix(in srgb, var(--klas) 40%, var(--rand));

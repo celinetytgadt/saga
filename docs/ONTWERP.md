@@ -176,6 +176,7 @@ Afwezigheden beheren, standaardtaken beheren, vaste werkdagen instellen.
 - **Opslag op Google Drive** via Google Apps Script: alles blijft in mijn eigen Google-account, gratis, en Apps Script kan rechtstreeks de agenda lezen (geen aparte koppeling nodig). Proton heeft geen bruikbare koppeling voor zo'n webapp.
 - **Webapp** zonder installatie via een appwinkel; op de gsm "toevoegen aan beginscherm".
 - Toegang beveiligd met een geheime sleutel die enkel op mijn toestellen staat.
+- **Minimale rechten** (apps-script/appsscript.json): agenda enkel lezen (`calendar.readonly`), Drive enkel eigen bestanden (`drive.file`, via de Drive-API in plaats van DriveApp).
 
 ## 7. Fasering
 

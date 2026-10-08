@@ -2,7 +2,10 @@
  * Saga – opslag op Google Drive.
  *
  * Dit script draait in het Google-account van Céline en bewaart de planning
- * als één JSON-bestand in de map "Saga" op Drive. Elke dag wordt een
+ * als één JSON-bestand in de map "Saga" op Drive.
+ *
+ * Rechten (zie appsscript.json): de agenda wordt enkel gelezen, en op Drive
+ * kan het script alleen aan de bestanden die het zelf maakte. Elke dag wordt een
  * back-up bewaard (de laatste 14 blijven staan).
  *
  * Elke nacht (rond 5 uur) leest het script de agenda('s) uit AGENDA_NAMEN en neemt het enkel
@@ -17,7 +20,7 @@ const BESTAND_NAAM = 'saga-data.json';
 const BACKUPS_HOUDEN = 14;
 
 // Verhogen bij elke wijziging die de app moet kennen; de app waarschuwt bij een oudere versie.
-const SCRIPT_VERSIE = 4;
+const SCRIPT_VERSIE = 5;
 
 // Welke agenda('s) gelezen worden, op naam (hoofdletters maken niet uit).
 // Leeg laten ([]) = alle agenda's die je in Google Agenda ziet.
@@ -67,14 +70,14 @@ function doPost(e) {
   slot.waitLock(20000);
   try {
     const bestand = haalBestand_();
-    const opgeslagen = JSON.parse(bestand.getBlob().getDataAsString() || '{}');
+    const opgeslagen = leesData_(bestand);
     if (verzoek.actie === 'sync') {
       const samen = merge(opgeslagen, verzoek.data || {});
       if (verzoek.agenda) samen.afspraken = bewaarAgendaInfo_(leesAgenda_(samen.afspraken || {}));
       const tekst = JSON.stringify(samen);
       if (tekst !== JSON.stringify(opgeslagen)) {
         maakDagelijkseBackup_(bestand);
-        bestand.setContent(tekst);
+        schrijfBestand_(bestand, tekst);
       }
       return json_({ ok: true, data: samen, scriptVersie: SCRIPT_VERSIE, agendaInfo: agendaInfo_() });
     }
@@ -90,10 +93,10 @@ function verversAgenda() {
   slot.waitLock(30000);
   try {
     const bestand = haalBestand_();
-    const data = JSON.parse(bestand.getBlob().getDataAsString() || '{}');
+    const data = leesData_(bestand);
     const voor = JSON.stringify(data.afspraken || {});
     data.afspraken = bewaarAgendaInfo_(leesAgenda_(data.afspraken || {}));
-    if (JSON.stringify(data.afspraken) !== voor) bestand.setContent(JSON.stringify(data));
+    if (JSON.stringify(data.afspraken) !== voor) schrijfBestand_(bestand, JSON.stringify(data));
   } finally {
     slot.releaseLock();
   }
@@ -232,35 +235,72 @@ function merge(a, b) {
   return r;
 }
 
+// ---------- Drive ----------
+// Saga gebruikt de Drive-API rechtstreeks met het beperkte recht "drive.file":
+// het script kan enkel de bestanden zien en wijzigen die het zelf aangemaakt heeft,
+// niet de rest van je Drive. (DriveApp zou toegang tot je hele Drive vragen.)
+
+const DRIVE_API = 'https://www.googleapis.com/drive/v3/files';
+const UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3/files';
+
+function drive_(methode, url, opties) {
+  opties = opties || {};
+  const params = {
+    method: methode,
+    headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
+    muteHttpExceptions: true,
+  };
+  if (opties.json !== undefined) {
+    params.contentType = 'application/json';
+    params.payload = JSON.stringify(opties.json);
+  }
+  if (opties.inhoud !== undefined) {
+    params.contentType = 'application/json';
+    params.payload = opties.inhoud;
+  }
+  const antwoord = UrlFetchApp.fetch(url, params);
+  const code = antwoord.getResponseCode();
+  if ((code === 404 || code === 403) && opties.magOntbreken) return null;
+  if (code >= 300) throw new Error('Drive ' + code + ': ' + antwoord.getContentText().slice(0, 200));
+  return antwoord.getContentText();
+}
+
+// Bestaat het bestand (of de map) nog en staat het niet in de prullenbak?
+function bestaat_(id) {
+  const meta = id && drive_('get', DRIVE_API + '/' + id + '?fields=id,trashed', { magOntbreken: true });
+  return !!meta && !JSON.parse(meta).trashed;
+}
+
 function haalMap_() {
   const props = PropertiesService.getScriptProperties();
   const id = props.getProperty('SAGA_MAP');
-  if (id) {
-    try {
-      return DriveApp.getFolderById(id);
-    } catch (err) {
-      // map verwijderd: hieronder opnieuw aanmaken
-    }
-  }
-  const map = DriveApp.createFolder(MAP_NAAM);
-  props.setProperty('SAGA_MAP', map.getId());
-  return map;
+  if (bestaat_(id)) return id;
+  const map = JSON.parse(drive_('post', DRIVE_API + '?fields=id', {
+    json: { name: MAP_NAAM, mimeType: 'application/vnd.google-apps.folder' },
+  }));
+  props.setProperty('SAGA_MAP', map.id);
+  return map.id;
 }
 
 function haalBestand_() {
   const props = PropertiesService.getScriptProperties();
   const id = props.getProperty('SAGA_BESTAND');
-  if (id) {
-    try {
-      const f = DriveApp.getFileById(id);
-      if (!f.isTrashed()) return f;
-    } catch (err) {
-      // bestand verwijderd: hieronder opnieuw aanmaken
-    }
-  }
-  const f = haalMap_().createFile(BESTAND_NAAM, '{}', 'application/json');
-  props.setProperty('SAGA_BESTAND', f.getId());
-  return f;
+  if (bestaat_(id)) return id;
+  // Nieuw (of oud bestand van vóór de beperkte rechten): de toestellen vullen het bij de volgende sync.
+  const f = JSON.parse(drive_('post', DRIVE_API + '?fields=id', {
+    json: { name: BESTAND_NAAM, parents: [haalMap_()], mimeType: 'application/json' },
+  }));
+  schrijfBestand_(f.id, '{}');
+  props.setProperty('SAGA_BESTAND', f.id);
+  return f.id;
+}
+
+function leesData_(id) {
+  return JSON.parse(drive_('get', DRIVE_API + '/' + id + '?alt=media') || '{}');
+}
+
+function schrijfBestand_(id, tekst) {
+  drive_('patch', UPLOAD_API + '/' + id + '?uploadType=media', { inhoud: tekst });
 }
 
 function maakDagelijkseBackup_(bestand) {
@@ -268,21 +308,17 @@ function maakDagelijkseBackup_(bestand) {
   const vandaag = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
   if (props.getProperty('SAGA_LAATSTE_BACKUP') === vandaag) return;
   const map = haalMap_();
-  bestand.makeCopy('saga-backup-' + vandaag + '.json', map);
+  drive_('post', DRIVE_API + '/' + bestand + '/copy?fields=id', {
+    json: { name: 'saga-backup-' + vandaag + '.json', parents: [map] },
+  });
   props.setProperty('SAGA_LAATSTE_BACKUP', vandaag);
 
-  const backups = [];
-  const it = map.getFiles();
-  while (it.hasNext()) {
-    const f = it.next();
-    if (f.getName().indexOf('saga-backup-') === 0) backups.push(f);
-  }
-  backups.sort(function (x, y) {
-    return x.getName() < y.getName() ? 1 : -1;
-  });
-  backups.slice(BACKUPS_HOUDEN).forEach(function (f) {
-    f.setTrashed(true);
-  });
+  const q = "'" + map + "' in parents and name contains 'saga-backup-' and trashed = false";
+  const lijst = JSON.parse(drive_('get', DRIVE_API + '?pageSize=100&fields=files(id,name)&q=' + encodeURIComponent(q)));
+  lijst.files
+    .sort(function (x, y) { return x.name < y.name ? 1 : -1; })
+    .slice(BACKUPS_HOUDEN)
+    .forEach(function (f) { drive_('patch', DRIVE_API + '/' + f.id, { json: { trashed: true } }); });
 }
 
 function json_(obj) {

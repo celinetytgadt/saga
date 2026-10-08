@@ -274,3 +274,81 @@ test('Code.gs leest enkel afspraken met #s of #sw', () => {
   assert.deepEqual(weg.afspraken, r);
   assert.match(weg.info.fout, /niet gevonden/);
 });
+
+test('Code.gs bewaart op Drive met enkel eigen bestanden (nagemaakte Drive-API)', () => {
+  const bestanden = {}; // id → { name, parents, trashed, inhoud }
+  let teller = 0;
+  const props = {};
+  const antwoord = (code, tekst = '') => ({ getResponseCode: () => code, getContentText: () => tekst });
+  const UrlFetchApp = {
+    fetch(url, p) {
+      const u = new URL(url);
+      const delen = u.pathname.split('/').filter(Boolean); // [drive|upload, ...]
+      const isUpload = delen[0] === 'upload';
+      const id = isUpload ? delen[4] : delen[3];
+      const actie = delen[4] === 'copy' ? 'copy' : null;
+      const body = p.payload && p.contentType === 'application/json' && !isUpload ? JSON.parse(p.payload) : null;
+      if (p.method === 'post' && actie === 'copy') {
+        const nieuw = 'f' + ++teller;
+        bestanden[nieuw] = { ...bestanden[id], ...body };
+        return antwoord(200, JSON.stringify({ id: nieuw }));
+      }
+      if (p.method === 'post') {
+        const nieuw = 'f' + ++teller;
+        bestanden[nieuw] = { ...body, trashed: false, inhoud: '' };
+        return antwoord(200, JSON.stringify({ id: nieuw }));
+      }
+      if (p.method === 'get' && !id) {
+        const q = u.searchParams.get('q');
+        const map = q.match(/'([^']+)' in parents/)[1];
+        const files = Object.entries(bestanden)
+          .filter(([, f]) => !f.trashed && (f.parents || []).includes(map) && f.name.startsWith('saga-backup-'))
+          .map(([i, f]) => ({ id: i, name: f.name }));
+        return antwoord(200, JSON.stringify({ files }));
+      }
+      if (!bestanden[id]) return antwoord(404, 'niet gevonden');
+      if (p.method === 'get' && u.searchParams.get('alt') === 'media') return antwoord(200, bestanden[id].inhoud);
+      if (p.method === 'get') return antwoord(200, JSON.stringify({ id, trashed: bestanden[id].trashed }));
+      if (p.method === 'patch' && isUpload) {
+        bestanden[id].inhoud = p.payload;
+        return antwoord(200, '{}');
+      }
+      if (p.method === 'patch') {
+        Object.assign(bestanden[id], body);
+        return antwoord(200, '{}');
+      }
+      throw new Error('onverwacht ' + p.method + ' ' + url);
+    },
+  };
+  let dag = 1;
+  const ctx = {
+    UrlFetchApp,
+    ScriptApp: { getOAuthToken: () => 'token' },
+    PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => props[k] ?? null, setProperty: (k, v) => (props[k] = v) }) },
+    Utilities: { formatDate: () => `2026-10-${String(dag).padStart(2, '0')}` },
+    Session: { getScriptTimeZone: () => 'Europe/Brussels' },
+  };
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(new URL('../apps-script/Code.gs', import.meta.url), 'utf8'), ctx);
+
+  const id = ctx.haalBestand_();
+  assert.equal(bestanden[props.SAGA_MAP].mimeType, 'application/vnd.google-apps.folder');
+  assert.deepEqual(bestanden[id].parents, [props.SAGA_MAP]);
+  assert.deepEqual(JSON.parse(JSON.stringify(ctx.leesData_(id))), {});
+  ctx.schrijfBestand_(id, '{"taken":{}}');
+  assert.equal(ctx.haalBestand_(), id); // bestaat al
+  assert.deepEqual(JSON.parse(JSON.stringify(ctx.leesData_(id))), { taken: {} });
+
+  // 16 dagen back-ups: enkel de laatste 14 blijven
+  for (dag = 1; dag <= 16; dag++) ctx.maakDagelijkseBackup_(id);
+  const backups = Object.values(bestanden).filter((f) => f.name.startsWith('saga-backup-'));
+  assert.equal(backups.filter((f) => !f.trashed).length, 14);
+  assert.equal(backups.find((f) => f.name === 'saga-backup-2026-10-01.json').trashed, true);
+  dag = 16;
+  ctx.maakDagelijkseBackup_(id); // zelfde dag: geen extra kopie
+  assert.equal(Object.values(bestanden).filter((f) => f.name.startsWith('saga-backup-')).length, 16);
+
+  // bestand in de prullenbak of onbereikbaar: er komt een nieuw
+  bestanden[id].trashed = true;
+  assert.notEqual(ctx.haalBestand_(), id);
+});

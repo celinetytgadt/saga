@@ -233,9 +233,37 @@ export function deadlineLabel(deadline) {
 
 // Dag waarop een taak in de kalender staat. De taak van een les staat standaard
 // op haar deadline (dag vóór de les, niet op een werkdag) tot je ze zelf verplaatst.
+// Die standaarddag wordt vastgelegd (zie zorgHoofdtaken), zodat de taak niet vanzelf
+// verschuift als er later een werkdag bijkomt; enkel een verplaatste les zet ze opnieuw.
 export function werkdagVan(state, taak) {
   if (taak.werkdag) return taak.werkdag;
-  return taak.hoofd ? deadlineVan(state, taak) : null;
+  return taak.hoofd ? standaardWerkdag(state, taak) : null;
+}
+
+export function standaardWerkdag(state, taak) {
+  return deadlineVan(state, { ...taak, deadline: taak.deadline || HOOFD_DEADLINE });
+}
+
+// Werkdag van een taak zetten. Bij de taak van een les: een datum = zelf verplaatst;
+// leeg = terug naar de standaarddag (vóór de les).
+export function zetWerkdag(state, taakId, datum) {
+  const t = state.taken[taakId];
+  if (!t || t.del) return;
+  if (t.hoofd) {
+    zet(state, 'taken', datum ? { ...t, werkdag: datum, manueel: true } : { ...t, werkdag: standaardWerkdag(state, t), manueel: false });
+  } else {
+    zet(state, 'taken', { ...t, werkdag: datum || null });
+  }
+}
+
+// Les naar een andere dag (of zonder datum). De taak van de les verhuist mee,
+// tenzij je ze zelf al naar een andere dag verplaatst had.
+export function verplaatsLes(state, lesId, datum) {
+  const les = state.lessen[lesId];
+  if (!les || les.del) return;
+  zet(state, 'lessen', { ...les, datum: datum || null });
+  const h = state.taken[hoofdId(lesId)];
+  if (h && !h.del && !h.manueel) zet(state, 'taken', { ...h, werkdag: datum ? standaardWerkdag(state, h) : null });
 }
 
 // Waarschuwing voor een taak: { niveau: 'rood' | 'oranje', reden } of null.
@@ -350,7 +378,8 @@ export function heeftOpruimwerk(state) {
   return lijst(state, 'lessen').some((les) => {
     const h = state.taken[hoofdId(les.id)];
     if (!h) return true;
-    return !h.del && oudeTakenVanLes(state, les.id, titels).length > 0;
+    if (h.del) return false;
+    return oudeTakenVanLes(state, les.id, titels).length > 0 || (!h.werkdag && !!les.datum);
   });
 }
 
@@ -366,7 +395,7 @@ export function zorgHoofdtaken(state) {
     const h = state.taken[id];
     if (h && h.del) continue; // bewust verwijderd
     const oude = oudeTakenVanLes(state, les.id, titels);
-    if (h && !oude.length) continue;
+    if (h && !oude.length && (h.werkdag || !les.datum)) continue;
     const voorkeur = (t) => ['lesvoorbereiding', 'lvb'].includes(t.titel.trim().toLowerCase());
     const metDag = oude.filter((t) => t.werkdag).sort((a, b) => voorkeur(b) - voorkeur(a))[0];
     const basis = h || {
@@ -380,11 +409,17 @@ export function zorgHoofdtaken(state) {
       klaar: false,
       notitie: '',
     };
-    zet(state, 'taken', {
+    // een zelf gekozen dag (van de lestaak of van een oude lesvoorbereiding) gaat voor op de standaarddag
+    const werkdag = (basis.manueel && basis.werkdag) || metDag?.werkdag || basis.werkdag || null;
+    const nieuw = {
       ...basis,
-      werkdag: basis.werkdag || metDag?.werkdag || null,
+      werkdag,
+      manueel: !!(basis.manueel || metDag),
       klaar: h ? h.klaar || (oude.length > 0 && oude.every((t) => t.klaar)) : oude.length > 0 && oude.every((t) => t.klaar),
-    });
+    };
+    // standaarddag vastleggen, zodat ze niet meer vanzelf verschuift
+    if (!nieuw.werkdag && les.datum) nieuw.werkdag = standaardWerkdag(state, nieuw);
+    zet(state, 'taken', nieuw);
     for (const t of oude) wis(state, 'taken', t.id);
     veranderd = true;
   }

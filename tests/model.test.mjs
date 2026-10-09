@@ -94,14 +94,24 @@ test('één taak per les: aangemaakt, standaard vóór de les, verplaatsbaar', (
   const h = s.taken[M.hoofdId('l1')];
   assert.equal(h.hoofd, true);
   assert.equal(h.werkdag, '2026-10-12'); // overgenomen van de oude lesvoorbereiding
+  assert.equal(h.manueel, true);
   assert.equal(s.taken.oud1.del, true);
   assert.equal(s.taken.oud2.del, true);
   assert.equal(s.taken.eigen.titel, 'Verbeteren'); // eigen taak blijft
-  // zonder eigen werkdag: dag vóór de les, niet op een werkdag
-  h.werkdag = null;
-  assert.equal(M.werkdagVan(s, h), '2026-10-14');
-  s.lessen.l1.datum = '2026-10-17'; // za → vrijdag is werkdag → do
-  assert.equal(M.werkdagVan(s, h), '2026-10-15');
+  // terug naar standaard: dag vóór de les, niet op een werkdag, en vastgelegd
+  M.zetWerkdag(s, h.id, null);
+  assert.deepEqual([s.taken[h.id].werkdag, s.taken[h.id].manueel], ['2026-10-14', false]);
+  // een extra werkdag (#sw) laat de taak staan
+  s.afspraken.sw = { id: 'sw', titel: 'Studiedag', datum: '2026-10-14', werk: true, upd: 1 };
+  assert.equal(M.werkdagVan(s, s.taken[h.id]), '2026-10-14');
+  delete s.afspraken.sw;
+  // de les verplaatsen: de taak verhuist mee (za → vrijdag is werkdag → do)
+  M.verplaatsLes(s, 'l1', '2026-10-17');
+  assert.equal(s.taken[h.id].werkdag, '2026-10-15');
+  // zelf verplaatst: blijft staan als de les verschuift
+  M.zetWerkdag(s, h.id, '2026-10-12');
+  M.verplaatsLes(s, 'l1', '2026-10-22');
+  assert.deepEqual([s.taken[h.id].werkdag, s.taken[h.id].manueel], ['2026-10-12', true]);
   M.verwijderLes(s, 'l1');
   assert.equal(s.taken[M.hoofdId('l1')].del, true);
 });

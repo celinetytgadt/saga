@@ -540,7 +540,7 @@ function viewInstellingen(s) {
 
     <section class="kaart">
       <h2>Vaste werkdagen</h2>
-      <p class="hint">Op deze dagen sta ik op school. Lesvoorbereiding valt dan een dag vroeger, en stukken van opdrachten worden er niet op verdeeld. Een extra werkdag (studiedag, evaluatiedag) duid je aan via de + bij die dag.</p>
+      <p class="hint">Afspraken met <b>#sw</b> in je agenda tellen altijd als werkdag. Staan al je werkdagen in de agenda, dan mag je hier alles uitvinken. Een lestaak komt standaard op de dag vóór de les die geen werkdag is; als je werkdagen later veranderen, blijven je taken staan waar ze staan.</p>
       <div class="dagknoppen">${WEEK.map(
         (d) =>
           `<button class="dagknop ${s.instellingen.werkdagen.includes(d) ? 'aan' : ''}" data-actie="werkdag" data-dag="${d}" aria-pressed="${s.instellingen.werkdagen.includes(d)}">${M.DAGNAMEN[d]}</button>`
@@ -853,6 +853,10 @@ function openTaak(id, voorinvulling = {}, terug = null) {
         wijzig((st) => {
           const huidig = id ? st.taken[id] : null;
           const nieuw = { ...(huidig || t), id: id || M.nieuwId(), ...wijzigingen };
+          if (nieuw.hoofd && 'werkdag' in wijzigingen) {
+            if (!nieuw.werkdag) Object.assign(nieuw, { werkdag: M.standaardWerkdag(st, nieuw), manueel: false });
+            else if (nieuw.werkdag !== huidig?.werkdag) nieuw.manueel = true;
+          }
           if (nieuw.opdrachtId && (!huidig || huidig.opdrachtId !== nieuw.opdrachtId)) nieuw.volg = M.volgendStuk(st, nieuw.opdrachtId);
           M.zet(st, 'taken', nieuw);
         });
@@ -875,7 +879,7 @@ function openTaak(id, voorinvulling = {}, terug = null) {
       });
       d.querySelectorAll('[data-zet]').forEach((b) =>
         b.addEventListener('click', () => {
-          bewaar({ werkdag: b.dataset.zet || null });
+          wijzig((st) => M.zetWerkdag(st, id, b.dataset.zet || null));
           sluit();
         })
       );
@@ -1007,6 +1011,7 @@ function openLes(id, voorinvulling = {}) {
             volg: huidig?.volg ?? M.volgendeVolg(st, klasIds[0]),
           });
           if (!id) M.zorgHoofdtaken(st);
+          else if ((huidig.datum || null) !== les.datum) M.verplaatsLes(st, id, les.datum);
         });
         sluitHelemaal();
       });
@@ -1558,8 +1563,8 @@ document.addEventListener('drop', (e) => {
   const [soort, id] = e.dataTransfer.getData('text/plain').split(':');
   const doel = z.dataset.drop === 'bakje' ? null : z.dataset.drop;
   wijzig((s) => {
-    if (soort === 'taak' && s.taken[id]) M.zet(s, 'taken', { ...s.taken[id], werkdag: doel });
-    if (soort === 'les' && s.lessen[id]) M.zet(s, 'lessen', { ...s.lessen[id], datum: doel });
+    if (soort === 'taak') M.zetWerkdag(s, id, doel);
+    if (soort === 'les') M.verplaatsLes(s, id, doel);
   });
 });
 

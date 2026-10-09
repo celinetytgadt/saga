@@ -114,6 +114,7 @@ In het overzicht: "BKH3-K2 + K3" met de kleuren van beide klassen.
 
 ### Vereenvoudiging (na gebruik)
 - **Eén taak per les**, met de naam van de les (id `h-<les>`), getint in de klaskleur. Standaard staat ze op de dag vóór de les (verder terug als dat een werkdag is) en schuift ze mee met de les; eens verplaatst blijft ze staan. "Standaard" zet ze terug. Geen standaardtaken meer; oude (lesvoorbereiding, CR-taak, prints) zijn opgegaan in die ene taak.
+- **Werkdagen veranderen verschuift niets:** de standaarddag van een lestaak wordt vastgelegd bij het aanmaken. Komt er later een werkdag bij (#sw in de agenda), dan blijft de taak staan. Enkel als je de les zelf verplaatst, verhuist een niet zelf verplaatste lestaak mee.
 - **Opsplitsen:** een taak kan in 2–10 blokken gesplitst worden (1/3, 2/3, 3/3); de extra blokken komen in het bakje.
 - Agenda-afspraken: enkel de titel, zonder uur.
 - Opleidingskleuren: ook geel.

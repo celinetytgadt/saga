@@ -597,7 +597,10 @@ function viewInstellingen(s) {
 function opWijziging(soort) {
   // na een synchronisatie kunnen er lessen zonder taak binnengekomen zijn
   if (soort === 'data' && M.heeftOpruimwerk(getState())) {
-    wijzig((st) => M.zorgHoofdtaken(st));
+    wijzig((st) => {
+      M.zorgHoofdtaken(st);
+      M.herstelDeelDeadlines(st);
+    });
     return;
   }
   if (soort === 'status' && ui.view !== 'instellingen') return tekenStatus();
@@ -859,6 +862,7 @@ function openTaak(id, voorinvulling = {}, terug = null) {
           }
           if (nieuw.opdrachtId && (!huidig || huidig.opdrachtId !== nieuw.opdrachtId)) nieuw.volg = M.volgendStuk(st, nieuw.opdrachtId);
           M.zet(st, 'taken', nieuw);
+          if (nieuw.deelGroep && 'deadline' in wijzigingen) M.deelDeadline(st, nieuw.id);
         });
 
       f.addEventListener('submit', (e) => {
@@ -1616,7 +1620,12 @@ document.addEventListener('visibilitychange', () => {
 });
 setInterval(() => document.visibilityState === 'visible' && sync(), 15 * 60 * 1000);
 
-if (M.heeftOpruimwerk(getState())) wijzig((st) => M.zorgHoofdtaken(st));
+if (M.heeftOpruimwerk(getState())) {
+  wijzig((st) => {
+    M.zorgHoofdtaken(st);
+    M.herstelDeelDeadlines(st);
+  });
+}
 route();
 sync();
 

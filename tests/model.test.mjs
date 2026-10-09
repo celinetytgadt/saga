@@ -146,6 +146,22 @@ test('taak opsplitsen in blokken', () => {
   assert.deepEqual(M.splitsTaak(s, nieuw[0].id, 2), []); // een blok niet opnieuw splitsen
 });
 
+test('blokken van een opgesplitste taak delen één deadline', () => {
+  const s = basis();
+  M.zorgHoofdtaken(s);
+  s.taken.c = { id: 'c', titel: 'Cursus', werkdag: null, deadline: { datum: '2026-10-20' }, klaar: false, upd: 1 };
+  const [b2, b3] = M.splitsTaak(s, 'c', 3);
+  s.taken.c = { ...s.taken.c, deadline: { datum: '2026-10-21' } };
+  M.deelDeadline(s, 'c');
+  assert.deepEqual([s.taken[b2.id].deadline, s.taken[b3.id].deadline], [{ datum: '2026-10-21' }, { datum: '2026-10-21' }]);
+  // oude, uiteengelopen gegevens: de laatst gewijzigde deadline geldt
+  s.taken[b3.id] = { ...s.taken[b3.id], deadline: { datum: '2026-10-25' }, upd: Date.now() + 1000 };
+  assert.equal(M.heeftOpruimwerk(s), true);
+  assert.equal(M.herstelDeelDeadlines(s), true);
+  assert.deepEqual(['c', b2.id].map((id) => s.taken[id].deadline.datum), ['2026-10-25', '2026-10-25']);
+  assert.equal(M.heeftOpruimwerk(s), false);
+});
+
 test('deadline-sleutels heen en terug', () => {
   for (const k of M.DEADLINE_KEUZES) assert.equal(M.deadlineSleutel(M.deadlineUitSleutel(k.sleutel)), k.sleutel);
   assert.deepEqual(M.deadlineUitSleutel('datum', '2026-10-01'), { datum: '2026-10-01' });

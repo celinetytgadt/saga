@@ -375,6 +375,7 @@ function oudeTakenVanLes(state, lesId, titels) {
 // Is er nog opruimwerk: een les zonder taak, of oude standaardtaken naast de lestaak?
 export function heeftOpruimwerk(state) {
   const titels = oudeStandaardTitels(state);
+  if (groepenMetVerschillendeDeadline(state).length) return true;
   return lijst(state, 'lessen').some((les) => {
     const h = state.taken[hoofdId(les.id)];
     if (!h) return true;
@@ -424,6 +425,38 @@ export function zorgHoofdtaken(state) {
     veranderd = true;
   }
   return veranderd;
+}
+
+// ---------- opgesplitste taken ----------
+
+const zelfdeDeadline = (a, b) => JSON.stringify(a.deadline || null) === JSON.stringify(b.deadline || null);
+
+export function blokkenVan(state, deelGroep) {
+  return lijst(state, 'taken').filter((t) => t.deelGroep === deelGroep);
+}
+
+// De blokken van één opgesplitste taak delen één deadline. Na een wijziging
+// aan één blok krijgen de andere blokken dezelfde deadline.
+export function deelDeadline(state, taakId) {
+  const t = state.taken[taakId];
+  if (!t || t.del || !t.deelGroep) return;
+  for (const b of blokkenVan(state, t.deelGroep)) {
+    if (b.id !== t.id && !zelfdeDeadline(b, t)) zet(state, 'taken', { ...b, deadline: t.deadline ? { ...t.deadline } : null });
+  }
+}
+
+// Opgesplitste taken waarvan de blokken (nog) verschillende deadlines hebben:
+// de laatst gewijzigde deadline geldt voor alle blokken.
+function groepenMetVerschillendeDeadline(state) {
+  const groepen = {};
+  for (const t of lijst(state, 'taken')) if (t.deelGroep) (groepen[t.deelGroep] ||= []).push(t);
+  return Object.values(groepen).filter((g) => g.some((t) => !zelfdeDeadline(t, g[0])));
+}
+
+export function herstelDeelDeadlines(state) {
+  const groepen = groepenMetVerschillendeDeadline(state);
+  for (const g of groepen) deelDeadline(state, g.sort((a, b) => (b.upd || 0) - (a.upd || 0))[0].id);
+  return groepen.length > 0;
 }
 
 // Een te grote taak opdelen in `aantal` blokken. Het origineel wordt blok 1,

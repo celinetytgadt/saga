@@ -151,17 +151,16 @@ function taakTitel(s, t) {
   return t.deelVan ? `${basis} (${t.deelNr}/${t.deelVan})` : basis;
 }
 
-// Taak bij een les: één blok met de naam van de les, getint in de kleur van de klas.
+// Taak bij een les: zelfde vorm als de les (één regel met de naam van de les),
+// maar met een ingekleurde achtergrond en een vinkje.
 function lesTaakKaart(s, t) {
   const les = lesVan(s, t);
   const w = M.waarschuwing(s, t);
   const naam = taakTitel(s, t);
-  const ander = t.titel && t.titel !== les.titel && !t.deelVan;
-  return `<div class="taak lestaak ${w ? w.niveau : ''} ${t.klaar ? 'klaar' : ''}" draggable="true" data-sleep="taak:${t.id}" style="${klasStijl(s, les)}" title="${esc(klasLabel(s, les))} · ${esc(les.titel)}">
+  const tip = [klasLabel(s, les) + ' · ' + les.titel, w?.reden].filter(Boolean).join(' – ');
+  return `<div class="lestaak ${w ? w.niveau : ''} ${t.klaar ? 'klaar' : ''}" draggable="true" data-sleep="taak:${t.id}" style="${klasStijl(s, les)}" title="${esc(tip)}">
     <button class="vink" data-actie="vink" data-id="${t.id}" aria-label="${t.klaar ? 'Markeer als niet klaar' : 'Markeer als klaar'}">${t.klaar ? '✓' : ''}</button>
-    <div class="taak-tekst" role="button" tabindex="0" data-actie="taak" data-id="${t.id}">
-      <span class="titel">${esc(naam)}</span>${ander ? `<span class="sub">${esc(les.titel)}</span>` : ''}${w ? `<span class="sub"><span class="reden">${esc(w.reden)}</span></span>` : ''}
-    </div>
+    <span class="les-tekst" role="button" tabindex="0" data-actie="taak" data-id="${t.id}">${esc(naam)}</span>${w ? '<span class="lestaak-let" aria-hidden="true">!</span>' : ''}
   </div>`;
 }
 
@@ -597,7 +596,7 @@ function viewInstellingen(s) {
 // anders verdwijnt het blokje onder je muis.
 function opWijziging(soort) {
   // na een synchronisatie kunnen er lessen zonder taak binnengekomen zijn
-  if (soort === 'data' && M.lijst(getState(), 'lessen').some((l) => !getState().taken[M.hoofdId(l.id)])) {
+  if (soort === 'data' && M.heeftOpruimwerk(getState())) {
     wijzig((st) => M.zorgHoofdtaken(st));
     return;
   }
@@ -1612,7 +1611,7 @@ document.addEventListener('visibilitychange', () => {
 });
 setInterval(() => document.visibilityState === 'visible' && sync(), 15 * 60 * 1000);
 
-if (M.lijst(getState(), 'lessen').some((l) => !getState().taken[M.hoofdId(l.id)])) wijzig((st) => M.zorgHoofdtaken(st));
+if (M.heeftOpruimwerk(getState())) wijzig((st) => M.zorgHoofdtaken(st));
 route();
 sync();
 

@@ -327,29 +327,63 @@ export function verwijderKlas(state, klasId) {
 
 export const HOOFD_DEADLINE = { rel: -1, nietOpWerkdag: true };
 // Taken die vroeger automatisch bij elke les kwamen; ze gaan op in de ene lestaak.
-const OUDE_STANDAARDTAKEN = ['lesvoorbereiding', 'cr-taak klaarzetten', 'prints'];
+// Ook de namen die je zelf aan die standaardtaken gaf (bv. "LVB") tellen mee.
+const OUDE_STANDAARDTAKEN = ['lesvoorbereiding', 'lvb', 'cr-taak klaarzetten', 'prints'];
 
 export const hoofdId = (lesId) => 'h-' + lesId;
 
+function oudeStandaardTitels(state) {
+  const titels = new Set(OUDE_STANDAARDTAKEN);
+  for (const sj of Object.values(state.sjablonen || {})) if (sj.titel) titels.add(sj.titel.trim().toLowerCase());
+  return titels;
+}
+
+function oudeTakenVanLes(state, lesId, titels) {
+  return takenVanLes(state, lesId).filter(
+    (t) => !t.hoofd && !t.deelGroep && titels.has((t.titel || '').trim().toLowerCase())
+  );
+}
+
+// Is er nog opruimwerk: een les zonder taak, of oude standaardtaken naast de lestaak?
+export function heeftOpruimwerk(state) {
+  const titels = oudeStandaardTitels(state);
+  return lijst(state, 'lessen').some((les) => {
+    const h = state.taken[hoofdId(les.id)];
+    if (!h) return true;
+    return !h.del && oudeTakenVanLes(state, les.id, titels).length > 0;
+  });
+}
+
 // Zorgt dat elke les precies één (hoofd)taak heeft. Het id is vast ('h-' + les-id),
-// zodat twee toestellen dezelfde taak maken. Geeft true als er iets veranderde.
+// zodat twee toestellen dezelfde taak maken. Oude standaardtaken van de les gaan erin op:
+// hun werkdag (bij voorkeur die van de lesvoorbereiding) en "klaar" worden overgenomen.
+// Geeft true als er iets veranderde.
 export function zorgHoofdtaken(state) {
+  const titels = oudeStandaardTitels(state);
   let veranderd = false;
   for (const les of lijst(state, 'lessen')) {
     const id = hoofdId(les.id);
-    if (state.taken[id]) continue; // bestaat (of werd bewust verwijderd)
-    const oude = takenVanLes(state, les.id).filter((t) => !t.hoofd && OUDE_STANDAARDTAKEN.includes((t.titel || '').toLowerCase()));
-    const lvb = oude.find((t) => t.titel.toLowerCase() === 'lesvoorbereiding');
-    zet(state, 'taken', {
+    const h = state.taken[id];
+    if (h && h.del) continue; // bewust verwijderd
+    const oude = oudeTakenVanLes(state, les.id, titels);
+    if (h && !oude.length) continue;
+    const voorkeur = (t) => ['lesvoorbereiding', 'lvb'].includes(t.titel.trim().toLowerCase());
+    const metDag = oude.filter((t) => t.werkdag).sort((a, b) => voorkeur(b) - voorkeur(a))[0];
+    const basis = h || {
       id,
       titel: '',
       lesId: les.id,
       hoofd: true,
-      werkdag: lvb?.werkdag || null,
+      werkdag: null,
       deadline: { ...HOOFD_DEADLINE },
       vanaf: null,
-      klaar: oude.length ? oude.every((t) => t.klaar) : false,
+      klaar: false,
       notitie: '',
+    };
+    zet(state, 'taken', {
+      ...basis,
+      werkdag: basis.werkdag || metDag?.werkdag || null,
+      klaar: h ? h.klaar || (oude.length > 0 && oude.every((t) => t.klaar)) : oude.length > 0 && oude.every((t) => t.klaar),
     });
     for (const t of oude) wis(state, 'taken', t.id);
     veranderd = true;

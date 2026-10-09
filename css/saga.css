@@ -709,11 +709,31 @@ dialog::backdrop { background: rgb(15 23 36 / 45%); }
 
 /* ---------- één taak per les ---------- */
 
-.taak.lestaak:not(.rood):not(.oranje) {
-  background: color-mix(in srgb, var(--klas) 14%, var(--vlak));
-  border-color: color-mix(in srgb, var(--klas) 30%, var(--rand));
+/* Zelfde vorm als een les, maar ingekleurd en met een vinkje. */
+.lestaak {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--klas) 30%, var(--rand));
   border-left: 3px solid var(--klas);
   box-shadow: inset 3px 0 0 var(--klas2);
+  background: color-mix(in srgb, var(--klas) 16%, var(--vlak));
+  padding: 2px 6px 2px 9px;
+  font-size: .78rem;
+  min-width: 0;
+  cursor: grab;
 }
-.taak.lestaak { padding-left: 8px; }
+.lestaak .vink { margin-top: 0; }
+.lestaak .les-tekst { cursor: pointer; }
+.lestaak.klaar .les-tekst { text-decoration: line-through; opacity: .6; }
+.lestaak.klaar > .vink { background: var(--groen); border-color: var(--groen); }
+.lestaak.rood { background: var(--rood-vlak); border-color: var(--rood); }
+.lestaak.oranje { background: var(--oranje-vlak); border-color: var(--oranje); }
+.lestaak-let { font-weight: 700; color: var(--rood); }
+.lestaak.oranje .lestaak-let { color: var(--oranje); }
+.bakje .lestaak { font-size: .85rem; }
+@media (max-width: 760px) {
+  .lestaak { font-size: .88rem; padding: 3px 8px 3px 9px; }
+}
 .splits { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -4px 0 12px; color: var(--zacht); font-size: .9rem; }

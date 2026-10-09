@@ -106,6 +106,22 @@ test('één taak per les: aangemaakt, standaard vóór de les, verplaatsbaar', (
   assert.equal(s.taken[M.hoofdId('l1')].del, true);
 });
 
+test('eigen namen van oude standaardtaken (bv. LVB) gaan op in de lestaak', () => {
+  const s = basis();
+  s.sjablonen = { x: { id: 'x', titel: 'Kopies', upd: 1 } };
+  M.zorgHoofdtaken(s); // lestaak bestaat al
+  s.taken.lvb = { id: 'lvb', titel: 'LVB', lesId: 'l1', werkdag: '2026-10-11', klaar: false, upd: 1 };
+  s.taken.kop = { id: 'kop', titel: 'kopies', lesId: 'l1', werkdag: null, klaar: false, upd: 1 };
+  s.taken.ver = { id: 'ver', titel: 'Verbeteren', lesId: 'l1', werkdag: null, klaar: false, upd: 1 };
+  assert.equal(M.heeftOpruimwerk(s), true);
+  assert.equal(M.zorgHoofdtaken(s), true);
+  assert.equal(M.heeftOpruimwerk(s), false);
+  assert.equal(s.taken[M.hoofdId('l1')].werkdag, '2026-10-11');
+  assert.equal(s.taken.lvb.del, true);
+  assert.equal(s.taken.kop.del, true);
+  assert.equal(s.taken.ver.del, undefined);
+});
+
 test('taak opsplitsen in blokken', () => {
   const s = basis();
   M.zorgHoofdtaken(s);

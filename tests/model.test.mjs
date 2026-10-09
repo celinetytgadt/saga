@@ -285,15 +285,17 @@ test('Code.gs leest enkel afspraken met #s of #sw', () => {
     Utilities: { formatDate: fmt },
     CalendarApp: {
       getDefaultCalendar: () => ({ getTimeZone: () => 'Europe/Brussels' }),
-      getAllCalendars: () => [{ getName: () => 'Hoofdagenda', getEvents: () => [] }],
-      getCalendarsByName: (n) => (n.toLowerCase() === 'de zottekes' ? [{ getName: () => 'De Zottekes', getEvents: () => agenda }] : []),
+      getAllCalendars: () => [
+        { getName: () => 'Hoofdagenda', getEvents: () => [] },
+        { getName: () => 'De  zottekes ', getEvents: () => agenda },
+      ],
     },
   };
   vm.createContext(ctx);
   vm.runInContext(fs.readFileSync(new URL('../apps-script/Code.gs', import.meta.url), 'utf8'), ctx);
   const oud = { weg_2026: { id: 'weg_2026', titel: 'Oude afspraak', datum: '2026-10-01', upd: 1 } };
   const res = JSON.parse(JSON.stringify(ctx.leesAgenda_(oud)));
-  assert.deepEqual([res.info.agendas, res.info.aantal, res.info.fout], [['De Zottekes'], 3, null]);
+  assert.deepEqual([res.info.agendas, res.info.aantal, res.info.fout], [['De  zottekes '], 3, null]);
   const r = res.afspraken;
   const zichtbaar = Object.values(r).filter((a) => !a.del);
   assert.deepEqual(zichtbaar.map((a) => a.titel).sort(), ['Studiedag', 'Tandarts', 'Uitstap']);
@@ -313,7 +315,7 @@ test('Code.gs leest enkel afspraken met #s of #sw', () => {
   vm.runInContext('AGENDA_NAMEN.splice(0, 1, "Bestaat niet")', ctx);
   const weg = JSON.parse(JSON.stringify(ctx.leesAgenda_(r)));
   assert.deepEqual(weg.afspraken, r);
-  assert.match(weg.info.fout, /niet gevonden/);
+  assert.match(weg.info.fout, /niet gevonden\. Het script ziet: Hoofdagenda, De  zottekes/);
 });
 
 test('Code.gs bewaart op Drive met enkel eigen bestanden (nagemaakte Drive-API)', () => {

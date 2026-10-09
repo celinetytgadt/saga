@@ -86,6 +86,7 @@ Als er een nieuwe versie van `Code.gs` is (Saga meldt dan "het Google-script is 
    Dit plant ook de dagelijkse agenda-update (rond 5 uur 's nachts) en leest de agenda meteen in.
 4. **Implementeren** → **Implementaties beheren** → potloodje ✏️ → bij Versie: **Nieuwe versie** → **Implementeren**.
    De URL blijft dezelfde; in Saga hoef je niets te veranderen.
+   ⚠️ Deze stap is nodig: zonder nieuwe versie blijft de web-app de *oude* code gebruiken, ook al heb je de nieuwe bewaard.
 5. In Saga: Instellingen → **Agenda nu vernieuwen**. De melding wordt groen.
 
 ## Eerder al ruimere rechten gegeven?

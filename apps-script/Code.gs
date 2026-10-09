@@ -20,7 +20,7 @@ const BESTAND_NAAM = 'saga-data.json';
 const BACKUPS_HOUDEN = 14;
 
 // Verhogen bij elke wijziging die de app moet kennen; de app waarschuwt bij een oudere versie.
-const SCRIPT_VERSIE = 5;
+const SCRIPT_VERSIE = 6;
 
 // Welke agenda('s) gelezen worden, op naam (hoofdletters maken niet uit).
 // Leeg laten ([]) = alle agenda's die je in Google Agenda ziet.
@@ -114,13 +114,18 @@ function testAgenda() {
   });
 }
 
+// Namen vergelijken zonder op hoofdletters, spaties of "De " vooraan te letten.
+function naamSleutel_(naam) {
+  return String(naam || '').toLowerCase().replace(/^\s*de\s+/, '').replace(/\s+/g, ' ').trim();
+}
+
 function kiesAgendas_() {
-  if (!AGENDA_NAMEN.length) return CalendarApp.getAllCalendars();
-  const r = [];
-  AGENDA_NAMEN.forEach(function (naam) {
-    CalendarApp.getCalendarsByName(naam).forEach(function (c) { r.push(c); });
+  const alle = CalendarApp.getAllCalendars();
+  if (!AGENDA_NAMEN.length) return alle;
+  const gezocht = AGENDA_NAMEN.map(naamSleutel_);
+  return alle.filter(function (c) {
+    return gezocht.indexOf(naamSleutel_(c.getName())) !== -1;
   });
-  return r;
 }
 
 function bewaarAgendaInfo_(resultaat) {
@@ -153,7 +158,8 @@ function leesAgenda_(oud) {
   const agendas = kiesAgendas_();
   const info = { tijd: stempel, agendas: agendas.map(function (a) { return a.getName(); }), aantal: 0, fout: null };
   if (!agendas.length) {
-    info.fout = 'agenda "' + AGENDA_NAMEN.join('", "') + '" niet gevonden';
+    const namen = CalendarApp.getAllCalendars().map(function (c) { return c.getName(); });
+    info.fout = 'agenda "' + AGENDA_NAMEN.join('", "') + '" niet gevonden. Het script ziet: ' + (namen.join(', ') || 'geen agenda\'s');
     return { afspraken: oud, info: info };
   }
 

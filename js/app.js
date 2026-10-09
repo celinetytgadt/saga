@@ -522,7 +522,7 @@ function agendaStatus(info) {
   if (!info) return '';
   const wanneer = new Date(info.tijd);
   const tijd = `${M.kortDatum(M.isoDatum(wanneer))} om ${wanneer.toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' })}`;
-  if (info.fout) return `<p class="sync-tekst sync-fout">Agenda: ${esc(info.fout)} (${tijd}). Controleer de naam bovenaan in Code.gs (AGENDA_NAMEN).</p>`;
+  if (info.fout) return `<p class="sync-tekst sync-fout">Agenda: ${esc(info.fout)} (${tijd}).</p>`;
   return `<p class="sync-tekst">📅 Agenda ${esc(info.agendas.join(', '))} ingelezen op ${tijd}: ${info.aantal} ${info.aantal === 1 ? 'afspraak' : 'afspraken'} met #s of #sw.</p>`;
 }
 

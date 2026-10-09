@@ -4,7 +4,7 @@ import { leegeState, merge } from './model.js';
 
 const LS_STATE = 'saga.state.v1';
 const LS_SYNC = 'saga.sync.v1';
-const SCRIPT_VERSIE = 5; // minimaal vereiste versie van apps-script/Code.gs
+const SCRIPT_VERSIE = 6; // minimaal vereiste versie van apps-script/Code.gs
 
 let state = laadState();
 let syncCfg = laadJson(LS_SYNC) || { url: '', token: '' };

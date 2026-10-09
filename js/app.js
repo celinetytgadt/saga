@@ -279,7 +279,7 @@ function dagBlok(s, idx, datum, v, raster, buiten = false) {
   const taken = (idx.taken[datum] || []).filter((t) => s.instellingen.toonKlaar || !t.klaar);
   const dls = idx.deadlines[datum] || [];
   const eindes = idx.eindes[datum] || [];
-  const afspraken = M.afsprakenOp(s, datum);
+  const afspraken = M.afsprakenOp(s, datum).filter((a) => !a.werk); // #sw: enkel de werkdag-rand, geen blokje
   const klassen = [
     'dag',
     datum === v && 'vandaag',

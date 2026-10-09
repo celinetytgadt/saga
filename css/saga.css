@@ -228,7 +228,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
   transition: background .15s, border-color .15s;
 }
 .dag.weekend { background: color-mix(in srgb, var(--vlak) 70%, var(--bg)); }
-.dag.werkdag { background: var(--werk); }
+/* Werkdag (vast of #sw): gewone achtergrond, wel een dikke blauwe rand. */
+.dag.werkdag { background: var(--vlak); border: 3px solid color-mix(in srgb, var(--accent) 55%, var(--vlak)); }
 .dag.voorbij { opacity: .55; }
 .dag.vandaag { border: 2px solid var(--groen); background: var(--vandaag); }
 .dag.drop-hier, .bakje.drop-hier { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
@@ -612,7 +613,7 @@ dialog::backdrop { background: rgb(15 23 36 / 45%); }
 
 /* ---------- rustiger overzicht: groepen per les/opdracht, afspraken ---------- */
 
-.label-werk:empty { width: 7px; height: 7px; padding: 0; border: none; border-radius: 50%; background: var(--rand-sterk); }
+.label-werk:empty { display: none; }
 
 .groep {
   background: color-mix(in srgb, var(--klas) 12%, var(--vlak)); /* schooltaken: tint van de les */

@@ -767,3 +767,6 @@ dialog::backdrop { background: rgb(15 23 36 / 45%); }
 .les-taken li.huidig { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
 .blokken-wrap { margin: -4px 0 14px; }
 .blokken-wrap .hint { margin-top: 0; }
+.blokken-rij > .teller { width: 28px; text-align: center; margin-top: 2px; }
+.blokken-rij .voortgang { flex: none; width: 100%; margin: 4px 0 2px; }
+.les-taken li.blokken-rij.klaar .titel { text-decoration: none; opacity: .6; }

@@ -473,15 +473,57 @@ function klasKaart(s, k) {
 
 // Losse taken in een kaart: open taken bovenaan, afgevinkte ingeklapt.
 // Blokken van een opgesplitste taak staan samen, in hun volgorde.
+// Een opgesplitste taak als één regel, zoals een opdracht bij Opleiding:
+// naam, deadline en voortgang van de blokken. Openen toont alle blokken.
+function blokkenRij(s, blokken) {
+  const hoofd = blokken[0];
+  const vg = voortgang(blokken);
+  const af = vg.klaar === vg.totaal;
+  const dl = M.deadlineVan(s, hoofd);
+  const volgende = blokken.find((t) => !t.klaar);
+  const wd = volgende && M.werkdagVan(s, volgende);
+  const w = blokken.map((t) => M.waarschuwing(s, t)).find(Boolean);
+  const tijd = totaalTijd(blokken);
+  const info = [
+    af ? '' : wd ? `volgende blok: ${M.kortDatum(wd)}` : 'volgende blok in bakje',
+    dl && !af ? `⚑ ${M.kortDatum(dl)}` : '',
+    blokken.some((t) => t.gestart) ? tijdLabel(blokken.find((t) => t.gestart)) : tijd ? `⏱ ${M.duurTekst(tijd)}` : '',
+  ].filter(Boolean);
+  return `<li class="blokken-rij ${w ? w.niveau : ''} ${af ? 'klaar' : ''}">
+    <span class="teller ${af ? 'af' : ''}" title="blokken klaar">${vg.klaar}/${vg.totaal}</span>
+    <div class="taak-tekst" role="button" tabindex="0" data-actie="taak" data-id="${hoofd.id}">
+      <span class="titel">${esc(hoofd.titel || '(zonder titel)')}</span>
+      <div class="voortgang" aria-hidden="true"><span style="width:${vg.pct}%"></span></div>
+      ${info.length || w ? `<span class="sub">${info.join(' · ')}${w ? `${info.length ? ' · ' : ''}<span class="reden">${esc(w.reden)}</span>` : ''}</span>` : ''}
+    </div>
+  </li>`;
+}
+
+// Losse taken in een kaart: één regel per taak (opgesplitste taken samen),
+// open taken bovenaan, afgewerkte ingeklapt.
 function losseTakenLijst(s, taken) {
-  const sorteer = (a, b) =>
-    vergelijkDatum(M.werkdagVan(s, a) || M.deadlineVan(s, a), M.werkdagVan(s, b) || M.deadlineVan(s, b)) ||
-    (a.deelGroep || a.id).localeCompare(b.deelGroep || b.id) ||
-    (a.deelNr || 0) - (b.deelNr || 0);
-  const open = taken.filter((t) => !t.klaar).sort(sorteer);
-  const klaar = taken.filter((t) => t.klaar).sort((a, b) => (b.upd || 0) - (a.upd || 0));
-  return `${open.length ? takenLijst(s, open, '') : '<p class="leeg">Geen open taken.</p>'}
-    ${klaar.length ? `<details><summary>Klaar (${klaar.length})</summary>${takenLijst(s, klaar, '')}</details>` : ''}`;
+  const perTaak = new Map();
+  for (const t of taken) {
+    const k = t.deelGroep || t.id;
+    if (!perTaak.has(k)) perTaak.set(k, []);
+    perTaak.get(k).push(t);
+  }
+  const items = [...perTaak.values()].map((blokken) => {
+    blokken.sort((a, b) => (a.deelNr || 0) - (b.deelNr || 0));
+    const open = blokken.filter((t) => !t.klaar);
+    const eerste = open[0] || blokken[0];
+    return {
+      blokken,
+      klaar: !open.length,
+      wanneer: M.werkdagVan(s, eerste) || M.deadlineVan(s, eerste),
+      upd: Math.max(...blokken.map((t) => t.upd || 0)),
+    };
+  });
+  const rij = (it) => (it.blokken.length > 1 || it.blokken[0].deelVan ? blokkenRij(s, it.blokken) : taakRij(s, it.blokken[0]));
+  const open = items.filter((it) => !it.klaar).sort((a, b) => vergelijkDatum(a.wanneer, b.wanneer));
+  const klaar = items.filter((it) => it.klaar).sort((a, b) => b.upd - a.upd);
+  return `${open.length ? `<ul class="les-taken">${open.map(rij).join('')}</ul>` : '<p class="leeg">Geen open taken.</p>'}
+    ${klaar.length ? `<details><summary>Klaar (${klaar.length})</summary><ul class="les-taken">${klaar.map(rij).join('')}</ul></details>` : ''}`;
 }
 
 function losseTakenKaart(s, { titel, kleur, taken, knoppen, opl = false }) {
@@ -522,7 +564,7 @@ function viewKlassen(s) {
         <button class="knop primair" data-actie="nieuwe-taak" data-domein="school">+ taak</button>
       </div>
     </div>
-    <p class="hint">Taken die niet bij een les horen, per onderwerp (bv. Stage, Vergaderingen). Ook afgewerkte blokken van een opgesplitste taak vind je hier terug.</p>
+    <p class="hint">Taken die niet bij een les horen, per onderwerp (bv. Stage, Vergaderingen). Een opgesplitste taak staat er één keer, met haar voortgang; open ze om alle blokken te zien.</p>
     ${
       onderwerpen.length || zonder.length
         ? `<div class="groepen">${onderwerpen.map((o) => onderwerpKaart(s, o)).join('')}${zonder.length || !onderwerpen.length ? onderwerpKaart(s, null) : ''}</div>`
@@ -1038,9 +1080,10 @@ function blokkenHtml(s, t) {
 
 // Lijstje taken in een les- of opdrachtdialoog, met afvinken en openen.
 function takenLijst(s, taken, terugAttr, huidigId = null) {
-  return taken.length
-    ? `<ul class="les-taken">${taken
-        .map((t) => {
+  return taken.length ? `<ul class="les-taken">${taken.map((t) => taakRij(s, t, terugAttr, huidigId)).join('')}</ul>` : '';
+}
+
+function taakRij(s, t, terugAttr = '', huidigId = null) {
           const w = M.waarschuwing(s, t);
           const dl = M.deadlineVan(s, t);
           const wd = M.werkdagVan(s, t);
@@ -1051,9 +1094,6 @@ function takenLijst(s, taken, terugAttr, huidigId = null) {
               <span class="titel">${esc(taakTitel(s, t))}</span><span class="sub">${info.join(' · ')}${w ? ` · <span class="reden">${esc(w.reden)}</span>` : ''}</span>
             </div>
           </li>`;
-        })
-        .join('')}</ul>`
-    : '';
 }
 
 function lesTakenHtml(s, lesId) {

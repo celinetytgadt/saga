@@ -770,3 +770,4 @@ dialog::backdrop { background: rgb(15 23 36 / 45%); }
 .blokken-rij > .teller { width: 28px; text-align: center; margin-top: 2px; }
 .blokken-rij .voortgang { flex: none; width: 100%; margin: 4px 0 2px; }
 .les-taken li.blokken-rij.klaar .titel { text-decoration: none; opacity: .6; }
+.einde.school { color: var(--vlag); }

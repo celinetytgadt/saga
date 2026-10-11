@@ -64,6 +64,21 @@ function vakVan(s, opd) {
   return v && !v.del ? v : null;
 }
 
+function onderwerpVanOpdracht(s, opd) {
+  const o = opd && opd.onderwerpId && s.onderwerpen?.[opd.onderwerpId];
+  return o && !o.del ? o : null;
+}
+
+// Kleur en groepsnaam van een opdracht: het opleidingsonderdeel of (school) het onderwerp.
+function opdrachtStijl(s, opd) {
+  if (M.opdrachtDomein(opd) === 'school') {
+    const o = onderwerpVanOpdracht(s, opd);
+    return { kleur: o?.kleur || GRIJS, naam: o?.naam || '', opl: false };
+  }
+  const v = vakVan(s, opd);
+  return { kleur: v?.kleur || 'var(--fuchsia)', naam: v?.naam || '', opl: true };
+}
+
 function lesVan(s, taak) {
   const l = taak.lesId && s.lessen[taak.lesId];
   return l && !l.del ? l : null;
@@ -80,8 +95,8 @@ function anker(s, taak) {
   if (les) return { kleur: klassenVan(s, les)[0]?.kleur || GRIJS, label: klasLabel(s, les), titel: les.titel };
   const opd = opdrachtVan(s, taak);
   if (opd) {
-    const vak = vakVan(s, opd);
-    return { kleur: vak?.kleur || 'var(--fuchsia)', label: vak?.naam || 'Opleiding', titel: opd.titel };
+    const st = opdrachtStijl(s, opd);
+    return { kleur: st.kleur, label: st.naam || (st.opl ? 'Opleiding' : ''), titel: opd.titel };
   }
   const ond = M.onderwerpVan(s, taak);
   if (ond) return { kleur: ond.kleur, label: ond.naam, titel: '' };
@@ -90,7 +105,6 @@ function anker(s, taak) {
 
 const toonTaak = (t) => ui.filter === 'alles' || M.domeinVan(t) === ui.filter;
 const toonSchool = () => ui.filter !== 'opleiding';
-const toonOpleiding = () => ui.filter !== 'school';
 
 function vergelijkDatum(a, b) {
   if (a === b) return 0;
@@ -244,7 +258,7 @@ function groepen(s, taken) {
 
 function groepKaart(s, g, inDag) {
   if (!g.opd) return taakKaart(s, g.taken[0]);
-  const opl = !!g.opd;
+  const opl = M.opdrachtDomein(g.opd) === 'opleiding';
   let kop, kleur;
   if (g.les) {
     kleur = klassenVan(s, g.les)[0]?.kleur || GRIJS;
@@ -252,17 +266,17 @@ function groepKaart(s, g, inDag) {
       <span class="groep-naam"><b>${esc(g.les.titel)}</b></span>
     </div>`;
   } else {
-    const vak = vakVan(s, g.opd);
-    kleur = vak?.kleur || 'var(--fuchsia)';
+    const st = opdrachtStijl(s, g.opd);
+    kleur = st.kleur;
     kop = `<div class="groep-kop" role="button" tabindex="0" data-actie="opdracht" data-id="${g.opd.id}">
-      <span class="groep-naam">🎓 <b>${esc(g.opd.titel)}</b></span>
-      <span class="groep-info">${vak ? esc(vak.naam) + ' · ' : ''}${g.opd.deadline ? `<span class="vlag opl">⚑ ${M.kortDatum(g.opd.deadline)}</span>` : ''}</span>
+      <span class="groep-naam">${opl ? '🎓 ' : ''}<b>${esc(g.opd.titel)}</b></span>
+      <span class="groep-info">${st.naam ? esc(st.naam) + (g.opd.deadline ? ' · ' : '') : ''}${g.opd.deadline ? `<span class="vlag ${opl ? 'opl' : ''}">⚑ ${M.kortDatum(g.opd.deadline)}</span>` : ''}</span>
     </div>`;
   }
   const rijen = g.taken
     .map((t) => {
       const w = M.waarschuwing(s, t);
-      const eigen = !t.lesId && t.deadline?.datum && !t.klaar ? ` <span class="rij-dl vlag ${t.opdrachtId ? 'opl' : ''}">⚑ ${M.kortDatum(t.deadline.datum)}</span>` : '';
+      const eigen = !t.lesId && t.deadline?.datum && !t.klaar ? ` <span class="rij-dl vlag ${M.domeinVan(t) === 'opleiding' ? 'opl' : ''}">⚑ ${M.kortDatum(t.deadline.datum)}</span>` : '';
       return `<div class="rij-taak ${w ? w.niveau : ''} ${t.klaar ? 'klaar' : ''}" draggable="true" data-sleep="taak:${t.id}">
         <button class="vink" data-actie="vink" data-id="${t.id}" aria-label="${t.klaar ? 'Markeer als niet klaar' : 'Markeer als klaar'}">${t.klaar ? '✓' : ''}</button>
         <div class="rij-tekst" role="button" tabindex="0" data-actie="taak" data-id="${t.id}">${esc(t.titel)}${eigen}${t.gestart ? ' ' + tijdLabel(t) : ''}${w ? `<span class="reden">${esc(w.reden)}</span>` : ''}</div>
@@ -278,11 +292,11 @@ function indexeer(s) {
   const deadlines = {};
   const eindes = {};
   if (toonSchool()) for (const l of M.lijst(s, 'lessen')) if (l.datum) (lessen[l.datum] ||= []).push(l);
-  if (toonOpleiding())
-    for (const o of M.lijst(s, 'opdrachten')) {
-      const v = voortgang(M.takenVanOpdracht(s, o.id));
-      if (o.deadline && !(v.totaal && v.klaar === v.totaal)) (eindes[o.deadline] ||= []).push(o);
-    }
+  for (const o of M.lijst(s, 'opdrachten')) {
+    if (ui.filter !== 'alles' && M.opdrachtDomein(o) !== ui.filter) continue;
+    const v = voortgang(M.takenVanOpdracht(s, o.id));
+    if (o.deadline && !(v.totaal && v.klaar === v.totaal)) (eindes[o.deadline] ||= []).push(o);
+  }
   for (const t of M.lijst(s, 'taken')) {
     if (!toonTaak(t)) continue;
     const wd = M.werkdagVan(s, t);
@@ -326,7 +340,7 @@ function dagBlok(s, idx, datum, v, raster, buiten = false) {
     ${eindes
       .map(
         (o) =>
-          `<div class="einde" role="button" tabindex="0" data-actie="opdracht" data-id="${o.id}">⚑ ${esc(o.titel)}</div>`
+          `<div class="einde ${M.opdrachtDomein(o)}" role="button" tabindex="0" data-actie="opdracht" data-id="${o.id}">⚑ ${esc(o.titel)}</div>`
       )
       .join('')}
     ${lessen.map((l) => lesKaart(s, l, false)).join('')}
@@ -471,104 +485,66 @@ function klasKaart(s, k) {
   </section>`;
 }
 
-// Losse taken in een kaart: open taken bovenaan, afgevinkte ingeklapt.
-// Blokken van een opgesplitste taak staan samen, in hun volgorde.
-// Een opgesplitste taak als één regel, zoals een opdracht bij Opleiding:
-// naam, deadline en voortgang van de blokken. Openen toont alle blokken.
-function blokkenRij(s, blokken) {
-  const hoofd = blokken[0];
-  const vg = voortgang(blokken);
-  const af = vg.klaar === vg.totaal;
-  const dl = M.deadlineVan(s, hoofd);
-  const volgende = blokken.find((t) => !t.klaar);
-  const wd = volgende && M.werkdagVan(s, volgende);
-  const w = blokken.map((t) => M.waarschuwing(s, t)).find(Boolean);
-  const tijd = totaalTijd(blokken);
-  const info = [
-    af ? '' : wd ? `volgende blok: ${M.kortDatum(wd)}` : 'volgende blok in bakje',
-    dl && !af ? `⚑ ${M.kortDatum(dl)}` : '',
-    blokken.some((t) => t.gestart) ? tijdLabel(blokken.find((t) => t.gestart)) : tijd ? `⏱ ${M.duurTekst(tijd)}` : '',
-  ].filter(Boolean);
-  return `<li class="blokken-rij ${w ? w.niveau : ''} ${af ? 'klaar' : ''}">
-    <span class="teller ${af ? 'af' : ''}" title="blokken klaar">${vg.klaar}/${vg.totaal}</span>
-    <div class="taak-tekst" role="button" tabindex="0" data-actie="taak" data-id="${hoofd.id}">
-      <span class="titel">${esc(hoofd.titel || '(zonder titel)')}</span>
-      <div class="voortgang" aria-hidden="true"><span style="width:${vg.pct}%"></span></div>
-      ${info.length || w ? `<span class="sub">${info.join(' · ')}${w ? `${info.length ? ' · ' : ''}<span class="reden">${esc(w.reden)}</span>` : ''}</span>` : ''}
-    </div>
-  </li>`;
-}
-
-// Losse taken in een kaart: één regel per taak (opgesplitste taken samen),
-// open taken bovenaan, afgewerkte ingeklapt.
-function losseTakenLijst(s, taken) {
-  const perTaak = new Map();
-  for (const t of taken) {
-    const k = t.deelGroep || t.id;
-    if (!perTaak.has(k)) perTaak.set(k, []);
-    perTaak.get(k).push(t);
-  }
-  const items = [...perTaak.values()].map((blokken) => {
-    blokken.sort((a, b) => (a.deelNr || 0) - (b.deelNr || 0));
-    const open = blokken.filter((t) => !t.klaar);
-    const eerste = open[0] || blokken[0];
-    return {
-      blokken,
-      klaar: !open.length,
-      wanneer: M.werkdagVan(s, eerste) || M.deadlineVan(s, eerste),
-      upd: Math.max(...blokken.map((t) => t.upd || 0)),
-    };
-  });
-  const rij = (it) => (it.blokken.length > 1 || it.blokken[0].deelVan ? blokkenRij(s, it.blokken) : taakRij(s, it.blokken[0]));
-  const open = items.filter((it) => !it.klaar).sort((a, b) => vergelijkDatum(a.wanneer, b.wanneer));
-  const klaar = items.filter((it) => it.klaar).sort((a, b) => b.upd - a.upd);
-  return `${open.length ? `<ul class="les-taken">${open.map(rij).join('')}</ul>` : '<p class="leeg">Geen open taken.</p>'}
-    ${klaar.length ? `<details><summary>Klaar (${klaar.length})</summary><ul class="les-taken">${klaar.map(rij).join('')}</ul></details>` : ''}`;
-}
-
-function losseTakenKaart(s, { titel, kleur, taken, knoppen, opl = false }) {
-  const tijd = totaalTijd(taken);
+// Opdrachten met stukken en losse taken in één kaart (onderwerp of opleidingsonderdeel).
+// Lopend werk bovenaan; afgewerkte opdrachten en afgevinkte taken ingeklapt.
+function werkKaart(s, { titel, kleur, opdrachten = [], taken = [], kop = '', onder = '', opl = false, leeg = 'Geen lopend werk.' }) {
+  const v = M.vandaag();
+  const afgerond = (o) => {
+    const vg = voortgang(M.takenVanOpdracht(s, o.id));
+    return vg.totaal > 0 && vg.klaar === vg.totaal && (!o.deadline || o.deadline < v);
+  };
+  const sorteer = (a, b) => vergelijkDatum(M.werkdagVan(s, a) || M.deadlineVan(s, a), M.werkdagVan(s, b) || M.deadlineVan(s, b));
+  const opdrOpen = opdrachten.filter((o) => !afgerond(o));
+  const opdrAf = opdrachten.filter(afgerond);
+  const takenOpen = taken.filter((t) => !t.klaar).sort(sorteer);
+  const takenAf = taken.filter((t) => t.klaar).sort((a, b) => (b.upd || 0) - (a.upd || 0));
+  const tijd = totaalTijd([...taken, ...opdrachten.flatMap((o) => M.takenVanOpdracht(s, o.id))]);
+  const lijsten = (opd, tk) =>
+    `${opd.length ? `<ol class="lessen-lijst">${opd.map((o) => opdrachtRegel(s, o)).join('')}</ol>` : ''}${tk.length ? takenLijst(s, tk, '') : ''}`;
+  const aantalAf = opdrAf.length + takenAf.length;
   return `<section class="kaart groep-kaart ${opl ? 'opl' : ''}" style="--klas:${kleur}">
     <header>
       <span class="bol"></span><h2>${titel}</h2>
       ${tijd ? `<span class="teller" title="bestede tijd">⏱ ${M.duurTekst(tijd)}</span>` : ''}
-      ${knoppen.kop || ''}
+      ${kop}
     </header>
-    ${losseTakenLijst(s, taken)}
-    <div class="knoppen">${knoppen.onder}</div>
+    ${opdrOpen.length || takenOpen.length ? lijsten(opdrOpen, takenOpen) : `<p class="leeg">${leeg}</p>`}
+    ${aantalAf ? `<details><summary>Afgerond (${aantalAf})</summary>${lijsten(opdrAf, takenAf)}</details>` : ''}
+    ${onder ? `<div class="knoppen">${onder}</div>` : ''}
   </section>`;
 }
 
 function onderwerpKaart(s, ond) {
-  return losseTakenKaart(s, {
+  const data = ond ? `data-onderwerp="${ond.id}"` : '';
+  return werkKaart(s, {
     titel: ond ? esc(ond.naam) : 'Zonder onderwerp',
     kleur: ond?.kleur || GRIJS,
+    opdrachten: M.opdrachtenVanOnderwerp(s, ond?.id || null),
     taken: M.takenVanOnderwerp(s, ond?.id || null),
-    knoppen: {
-      kop: ond ? `<button class="knop klein" data-actie="onderwerp-bewerk" data-id="${ond.id}">Bewerken</button>` : '',
-      onder: `<button class="knop klein" data-actie="nieuwe-taak" data-domein="school" ${ond ? `data-onderwerp="${ond.id}"` : ''}>+ taak</button>`,
-    },
+    kop: ond ? `<button class="knop klein" data-actie="onderwerp-bewerk" data-id="${ond.id}">Bewerken</button>` : '',
+    onder: `<button class="knop klein" data-actie="nieuwe-opdracht" data-domein="school" ${data}>+ opdracht</button>
+      <button class="knop klein" data-actie="nieuwe-taak" data-domein="school" ${data}>+ losse taak</button>`,
   });
 }
 
 function viewKlassen(s) {
   const klassen = M.lijst(s, 'klassen').sort(opNaam);
   const onderwerpen = M.lijst(s, 'onderwerpen').sort(opNaam);
-  const zonder = M.takenVanOnderwerp(s, null);
+  const zonder = M.opdrachtenVanOnderwerp(s, null).length + M.takenVanOnderwerp(s, null).length;
   return `<div class="pagina">
     <div class="pagina-kop"><h1>School</h1><button class="knop primair" data-actie="klas-bewerk">+ klas</button></div>
     ${klassen.length ? `<div class="groepen">${klassen.map((k) => klasKaart(s, k)).join('')}</div>` : '<p class="leeg">Nog geen klassen. Voeg je eerste klas toe, bv. BKH4.</p>'}
-    <div class="pagina-kop sectie-kop"><h1>Taken</h1>
+    <div class="pagina-kop sectie-kop"><h1>Opdrachten en taken</h1>
       <div class="knoppen-rij">
         <button class="knop" data-actie="onderwerp-bewerk">+ onderwerp</button>
-        <button class="knop primair" data-actie="nieuwe-taak" data-domein="school">+ taak</button>
+        <button class="knop primair" data-actie="nieuwe-opdracht" data-domein="school">+ opdracht</button>
       </div>
     </div>
-    <p class="hint">Taken die niet bij een les horen, per onderwerp (bv. Stage, Vergaderingen). Een opgesplitste taak staat er één keer, met haar voortgang; open ze om alle blokken te zien.</p>
+    <p class="hint">Werk dat niet bij een les hoort, per onderwerp (bv. Stage, Vergaderingen). Een opdracht deel je op in stukken, net als bij de opleiding.</p>
     ${
-      onderwerpen.length || zonder.length
-        ? `<div class="groepen">${onderwerpen.map((o) => onderwerpKaart(s, o)).join('')}${zonder.length || !onderwerpen.length ? onderwerpKaart(s, null) : ''}</div>`
-        : '<p class="leeg">Nog geen losse taken.</p>'
+      onderwerpen.length || zonder
+        ? `<div class="groepen">${onderwerpen.map((o) => onderwerpKaart(s, o)).join('')}${zonder || !onderwerpen.length ? onderwerpKaart(s, null) : ''}</div>`
+        : '<p class="leeg">Nog geen opdrachten of losse taken.</p>'
     }
   </div>`;
 }
@@ -590,23 +566,15 @@ function opdrachtRegel(s, o) {
 }
 
 function vakKaart(s, vak) {
-  const opdrachten = M.opdrachtenVanVak(s, vak?.id || null);
-  const v = M.vandaag();
-  const afgerond = (o) => {
-    const vg = voortgang(M.takenVanOpdracht(s, o.id));
-    return o.deadline && o.deadline < v && vg.klaar === vg.totaal;
-  };
-  const oud = opdrachten.filter(afgerond);
-  const rest = opdrachten.filter((o) => !afgerond(o));
-  return `<section class="kaart groep-kaart opl" style="--klas:${vak?.kleur || 'var(--fuchsia)'}">
-    <header>
-      <span class="bol"></span><h2>${vak ? esc(vak.naam) : 'Zonder opleidingsonderdeel'}</h2>
-      ${vak ? `<button class="knop klein" data-actie="vak-bewerk" data-id="${vak.id}">Bewerken</button>` : ''}
-    </header>
-    ${rest.length ? `<ol class="lessen-lijst">${rest.map((o) => opdrachtRegel(s, o)).join('')}</ol>` : '<p class="leeg">Geen lopende opdrachten.</p>'}
-    ${oud.length ? `<details><summary>Afgerond (${oud.length})</summary><ol class="lessen-lijst">${oud.map((o) => opdrachtRegel(s, o)).join('')}</ol></details>` : ''}
-    ${vak ? `<div class="knoppen"><button class="knop klein" data-actie="nieuwe-opdracht" data-vak="${vak.id}">+ opdracht</button></div>` : ''}
-  </section>`;
+  return werkKaart(s, {
+    titel: vak ? esc(vak.naam) : 'Zonder opleidingsonderdeel',
+    kleur: vak?.kleur || 'var(--fuchsia)',
+    opl: true,
+    opdrachten: M.opdrachtenVanVak(s, vak?.id || null),
+    leeg: 'Geen lopende opdrachten.',
+    kop: vak ? `<button class="knop klein" data-actie="vak-bewerk" data-id="${vak.id}">Bewerken</button>` : '',
+    onder: vak ? `<button class="knop klein" data-actie="nieuwe-opdracht" data-vak="${vak.id}">+ opdracht</button>` : '',
+  });
 }
 
 function viewOpleiding(s) {
@@ -614,12 +582,12 @@ function viewOpleiding(s) {
   const zonder = M.opdrachtenVanVak(s, null);
   const losse = M.losseTaken(s, 'opleiding');
   const losseKaart = losse.length
-    ? losseTakenKaart(s, {
+    ? werkKaart(s, {
         titel: 'Losse taken',
         kleur: 'var(--fuchsia)',
         taken: losse,
         opl: true,
-        knoppen: { onder: '<button class="knop klein" data-actie="nieuwe-taak" data-domein="opleiding">+ taak</button>' },
+        onder: '<button class="knop klein" data-actie="nieuwe-taak" data-domein="opleiding">+ losse taak</button>',
       })
     : '';
   return `<div class="pagina">
@@ -728,6 +696,7 @@ function opWijziging(soort) {
   if (soort === 'data' && M.heeftOpruimwerk(getState())) {
     wijzig((st) => {
       M.zorgHoofdtaken(st);
+      M.losseBlokkenNaarStukken(st);
       M.herstelDeelDeadlines(st);
     });
     return;
@@ -899,11 +868,14 @@ function hoortBijOpties(s, gekozen) {
           .map((l) => optie('les:' + l.id, `${esc(klasLabel(s, l))} · ${esc(l.titel)}${l.datum ? ` (${M.kortDatum(l.datum)})` : ''}`))
           .join('')}</optgroup>`
       : '',
-    opdrachten.length
-      ? `<optgroup label="Opleiding · opdrachten">${opdrachten
-          .map((o) => optie('opd:' + o.id, `🎓 ${esc(o.titel)}${o.deadline ? ` (${M.kortDatum(o.deadline)})` : ''}`))
-          .join('')}</optgroup>`
-      : '',
+    ...['school', 'opleiding'].map((domein) => {
+      const lijst = opdrachten.filter((o) => M.opdrachtDomein(o) === domein);
+      if (!lijst.length) return '';
+      const pet = domein === 'opleiding' ? '🎓 ' : '';
+      return `<optgroup label="${domein === 'school' ? 'School' : 'Opleiding'} · opdrachten">${lijst
+        .map((o) => optie('opd:' + o.id, `${pet}${esc(o.titel)}${o.deadline ? ` (${M.kortDatum(o.deadline)})` : ''}`))
+        .join('')}</optgroup>`;
+    }),
   ].join('');
 }
 
@@ -913,7 +885,7 @@ function leesHoortBij(waarde) {
     lesId: soort === 'les' ? id : null,
     opdrachtId: soort === 'opd' ? id : null,
     onderwerpId: soort === 'ond' ? id : null,
-    domein: soort === 'los' ? id : soort === 'opd' ? 'opleiding' : 'school',
+    domein: soort === 'los' ? id : soort === 'opd' ? M.opdrachtDomein(getState().opdrachten[id]) : 'school',
   };
 }
 
@@ -951,9 +923,11 @@ function openTaak(id, voorinvulling = {}, terug = null) {
     ${
       id && t.deelVan
         ? `<div class="blokken-wrap">${blokkenHtml(s, t)}</div>`
-        : id
+        : id && t.lesId
           ? `<div class="splits"><span>Te groot voor één blok?</span> <button type="button" class="chip" data-splits>Opsplitsen in blokken</button></div>`
-          : ''
+          : id && !t.opdrachtId
+            ? `<div class="splits"><span>Te groot voor één keer?</span> <button type="button" class="chip" data-stukken>Opdelen in stukken</button></div>`
+            : ''
     }
     ${id ? `<div class="timer-wrap">${timerHtml(t)}</div>` : ''}
     <form id="f-taak" class="formulier">
@@ -988,6 +962,12 @@ function openTaak(id, voorinvulling = {}, terug = null) {
         if (!antwoord || !(aantal >= 2 && aantal <= 10)) return;
         wijzig((st) => M.splitsTaak(st, id, aantal));
         sluit();
+      });
+      // Een losse taak wordt een opdracht met stukken; daarna voeg je zelf de stukken toe.
+      $('[data-stukken]', d)?.addEventListener('click', () => {
+        let opd = null;
+        wijzig((st) => (opd = M.maakOpdrachtVanTaak(st, id)));
+        if (opd) openOpdracht(opd.id);
       });
       const bijwerken = () => {
         const bij = leesHoortBij(f.hoort.value);
@@ -1288,21 +1268,35 @@ function vakOpties(s, gekozen) {
     .join('');
 }
 
+function onderwerpOpties(s, gekozen) {
+  return M.lijst(s, 'onderwerpen')
+    .sort(opNaam)
+    .map((o) => `<option value="${o.id}" ${o.id === gekozen ? 'selected' : ''}>${esc(o.naam)}</option>`)
+    .join('');
+}
+
+// Opdracht met stukken: bij de opleiding (per opleidingsonderdeel) of bij school (per onderwerp).
 function openOpdracht(id, voorinvulling = {}) {
   const s = getState();
   const vakken = M.lijst(s, 'vakken');
-  const o = id ? s.opdrachten[id] : { vakId: voorinvulling.vakId || ui.laatsteVak || vakken[0]?.id || '', titel: '', deadline: '' };
+  const o = id
+    ? s.opdrachten[id]
+    : voorinvulling.domein === 'school'
+      ? { domein: 'school', onderwerpId: voorinvulling.onderwerpId || '', titel: '', deadline: '' }
+      : { vakId: voorinvulling.vakId || ui.laatsteVak || vakken[0]?.id || '', titel: '', deadline: '' };
   if (!o || o.del) return;
+  const school = M.opdrachtDomein(o) === 'school';
+  const groepen = school ? M.lijst(s, 'onderwerpen') : vakken;
   dialoog(
-    `<h2>${id ? '🎓 Opdracht' : '🎓 Nieuwe opdracht'}</h2>
+    `<h2>${school ? (id ? 'Opdracht' : 'Nieuwe opdracht') : id ? '🎓 Opdracht' : '🎓 Nieuwe opdracht'}</h2>
     <form id="f-opd" class="formulier">
-      <label>Opleidingsonderdeel<select name="vakId">
-        <option value="">— geen —</option>${vakOpties(s, o.vakId)}
-        <option value="__nieuw" ${vakken.length ? '' : 'selected'}>+ nieuw onderdeel…</option>
+      <label>${school ? 'Onderwerp' : 'Opleidingsonderdeel'}<select name="groep">
+        <option value="">— geen —</option>${school ? onderwerpOpties(s, o.onderwerpId) : vakOpties(s, o.vakId)}
+        <option value="__nieuw" ${groepen.length ? '' : 'selected'}>+ nieuw ${school ? 'onderwerp' : 'onderdeel'}…</option>
       </select></label>
-      <label class="nieuw-vak">Naam nieuw onderdeel<input name="nieuwVak" placeholder="bv. Didactiek 2"></label>
-      <label>Opdracht<input name="titel" required value="${esc(o.titel)}" placeholder="bv. Portfolio stage" ${id ? '' : 'autofocus'}></label>
-      <label>Einddeadline<input type="date" name="deadline" required value="${o.deadline || ''}"></label>
+      <label class="nieuw-vak">Naam nieuw ${school ? 'onderwerp' : 'onderdeel'}<input name="nieuweGroep" placeholder="${school ? 'bv. Stage' : 'bv. Didactiek 2'}"></label>
+      <label>Opdracht<input name="titel" required value="${esc(o.titel)}" placeholder="${school ? 'bv. Stageverslag' : 'bv. Portfolio stage'}" ${id ? '' : 'autofocus'}></label>
+      <label>Einddeadline${school ? ' <small>(optioneel)</small>' : ''}<input type="date" name="deadline" ${school ? '' : 'required'} value="${o.deadline || ''}"></label>
       ${
         id
           ? ''
@@ -1320,32 +1314,34 @@ function openOpdracht(id, voorinvulling = {}) {
     (d) => {
       const f = $('#f-opd', d);
       const toonNieuw = () => {
-        const nieuw = f.vakId.value === '__nieuw';
+        const nieuw = f.groep.value === '__nieuw';
         f.querySelector('.nieuw-vak').hidden = !nieuw;
-        f.nieuwVak.required = nieuw;
+        f.nieuweGroep.required = nieuw;
       };
-      f.vakId.addEventListener('change', toonNieuw);
+      f.groep.addEventListener('change', toonNieuw);
       toonNieuw();
 
       f.addEventListener('submit', (e) => {
         e.preventDefault();
         const w = formWaarden(f);
         wijzig((st) => {
-          let vakId = w.vakId || null;
-          if (vakId === '__nieuw') {
-            vakId = M.zet(st, 'vakken', {
+          const collectie = school ? 'onderwerpen' : 'vakken';
+          const kleuren = school ? M.KLASKLEUREN : M.VAKKLEUREN;
+          let groep = w.groep || null;
+          if (groep === '__nieuw') {
+            groep = M.zet(st, collectie, {
               id: M.nieuwId(),
-              naam: w.nieuwVak.trim(),
-              kleur: M.VAKKLEUREN[M.lijst(st, 'vakken').length % M.VAKKLEUREN.length],
+              naam: w.nieuweGroep.trim(),
+              kleur: kleuren[M.lijst(st, collectie).length % kleuren.length],
             }).id;
           }
-          ui.laatsteVak = vakId;
+          if (!school) ui.laatsteVak = groep;
           const opd = M.zet(st, 'opdrachten', {
             ...(id ? st.opdrachten[id] : {}),
             id: id || M.nieuwId(),
-            vakId,
+            ...(school ? { domein: 'school', onderwerpId: groep, vakId: null } : { vakId: groep }),
             titel: w.titel.trim(),
-            deadline: w.deadline,
+            deadline: w.deadline || null,
             volg: id ? st.opdrachten[id].volg : M.volgendeOpdrachtVolg(st),
           });
           if (!id && w.stukken) {
@@ -1468,8 +1464,8 @@ function openOnderwerp(id) {
       });
       $('[data-sluit]', d).addEventListener('click', sluit);
       $('[data-weg]', d)?.addEventListener('click', () => {
-        const n = M.takenVanOnderwerp(getState(), id).length;
-        if (!confirm(`Onderwerp "${o.naam}" verwijderen?${n ? ` De ${n} ${n === 1 ? 'taak blijft' : 'taken blijven'} bestaan, zonder onderwerp.` : ''}`)) return;
+        const n = M.takenVanOnderwerp(getState(), id).length + M.opdrachtenVanOnderwerp(getState(), id).length;
+        if (!confirm(`Onderwerp "${o.naam}" verwijderen?${n ? ` Wat erbij hoort (${n}) blijft bestaan, zonder onderwerp.` : ''}`)) return;
         wijzig((st) => M.verwijderOnderwerp(st, id));
         sluit();
       });
@@ -1638,7 +1634,7 @@ const acties = {
     openLes(null, { datum: el.dataset.datum || null, klasId: el.dataset.klas || null });
   },
   'nieuwe-opdracht'(el) {
-    openOpdracht(null, { vakId: el.dataset.vak || null });
+    openOpdracht(null, { vakId: el.dataset.vak || null, domein: el.dataset.domein || null, onderwerpId: el.dataset.onderwerp || null });
   },
   verbeteren(el) {
     openVerbeteren(el.dataset.les);
@@ -1859,6 +1855,7 @@ setInterval(() => document.visibilityState === 'visible' && tik(), 1000);
 if (M.heeftOpruimwerk(getState())) {
   wijzig((st) => {
     M.zorgHoofdtaken(st);
+    M.losseBlokkenNaarStukken(st);
     M.herstelDeelDeadlines(st);
   });
 }

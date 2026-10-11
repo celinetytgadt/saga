@@ -149,7 +149,7 @@ test('taak opsplitsen in blokken', () => {
 test('blokken van een opgesplitste taak delen één deadline', () => {
   const s = basis();
   M.zorgHoofdtaken(s);
-  s.taken.c = { id: 'c', titel: 'Cursus', werkdag: null, deadline: { datum: '2026-10-20' }, klaar: false, upd: 1 };
+  s.taken.c = { id: 'c', titel: 'Cursus', lesId: 'l1', werkdag: null, deadline: { datum: '2026-10-20' }, klaar: false, upd: 1 };
   const [b2, b3] = M.splitsTaak(s, 'c', 3);
   s.taken.c = { ...s.taken.c, deadline: { datum: '2026-10-21' } };
   M.deelDeadline(s, 'c');
@@ -494,18 +494,42 @@ test('losse taken per onderwerp; onderwerp verwijderen houdt de taken', () => {
   assert.deepEqual(M.takenVanOnderwerp(s, null).map((t) => t.id).sort(), ['a', 'b']);
 });
 
-test('blokken van een opgesplitste taak behouden hun onderwerp', () => {
+test('vroeger opgesplitste losse taak wordt een opdracht met stukken', () => {
+  const s = basis();
+  M.zorgHoofdtaken(s);
+  s.onderwerpen.o1 = { id: 'o1', naam: 'Stage', kleur: '#5bbba4', upd: 1 };
+  s.taken.a = taak({ id: 'a', lesId: null, titel: 'Stageverslag', onderwerpId: 'o1', deadline: { datum: '2026-11-01' }, werkdag: '2026-10-12', tijd: 60000 });
+  M.splitsTaak(s, 'a', 2);
+  M.zetKlaar(s, 'a', true);
+  assert.equal(M.heeftOpruimwerk(s), true);
+  assert.equal(M.losseBlokkenNaarStukken(s), true);
+  const opd = s.opdrachten['g-a'];
+  assert.deepEqual([opd.titel, opd.domein, opd.onderwerpId, opd.deadline], ['Stageverslag', 'school', 'o1', '2026-11-01']);
+  const stukken = M.takenVanOpdracht(s, 'g-a');
+  assert.deepEqual(stukken.map((t) => [t.titel, t.klaar, t.domein]), [['Deel 1', true, 'school'], ['Deel 2', false, 'school']]);
+  assert.equal(stukken[0].werkdag, '2026-10-12');
+  assert.equal(stukken[0].tijd, 60000);
+  assert.equal(stukken[0].deelGroep, undefined);
+  assert.equal(M.deadlineVan(s, stukken[1]), '2026-11-01');
+  assert.deepEqual(M.opdrachtenVanOnderwerp(s, 'o1').map((o) => o.id), ['g-a']);
+  assert.deepEqual(M.opdrachtenVanVak(s, null), []); // niet bij de opleiding
+  assert.equal(M.domeinVan(stukken[0]), 'school');
+  assert.equal(M.heeftOpruimwerk(s), false);
+});
+
+test('losse taak opdelen in stukken: wordt een opdracht met de taak als eerste stuk', () => {
   const s = basis();
   s.onderwerpen.o1 = { id: 'o1', naam: 'Stage', kleur: '#5bbba4', upd: 1 };
-  s.taken.a = taak({ id: 'a', lesId: null, titel: 'Stageverslag', onderwerpId: 'o1' });
-  const [b] = M.splitsTaak(s, 'a', 2);
-  M.zetKlaar(s, 'a', true);
-  M.zet(s, 'taken', { ...s.taken[b.id], onderwerpId: null });
-  M.deelOnderwerp(s, b.id);
-  assert.equal(s.taken.a.onderwerpId, null);
-  M.zet(s, 'taken', { ...s.taken.a, onderwerpId: 'o1' });
-  M.deelOnderwerp(s, 'a');
-  const ids = M.takenVanOnderwerp(s, 'o1');
-  assert.equal(ids.length, 2);
-  assert.ok(ids.some((t) => t.id === 'a' && t.klaar));
+  s.taken.a = taak({ id: 'a', lesId: null, titel: 'Stageverslag', onderwerpId: 'o1', deadline: { datum: '2026-11-01' }, werkdag: '2026-10-12' });
+  const opd = M.maakOpdrachtVanTaak(s, 'a');
+  assert.deepEqual([opd.titel, opd.domein, opd.onderwerpId, opd.deadline], ['Stageverslag', 'school', 'o1', '2026-11-01']);
+  assert.equal(s.taken.a.opdrachtId, opd.id);
+  assert.equal(s.taken.a.werkdag, '2026-10-12');
+  const [nieuw] = M.maakStukken(s, opd.id, ['Nalezen']);
+  assert.equal(nieuw.domein, 'school');
+  assert.deepEqual(M.takenVanOpdracht(s, opd.id).map((t) => t.titel), ['Stageverslag', 'Nalezen']);
+  assert.equal(M.takenVanOnderwerp(s, 'o1').length, 0); // geen losse taak meer
+  M.verwijderOnderwerp(s, 'o1');
+  assert.equal(s.opdrachten[opd.id].onderwerpId, null);
+  assert.equal(s.opdrachten[opd.id].del, undefined);
 });

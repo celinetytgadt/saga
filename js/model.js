@@ -4,7 +4,7 @@
 // Elk object heeft een `upd` (tijdstempel van laatste wijziging) zodat twee
 // toestellen hun gegevens kunnen samenvoegen. Verwijderen = `del: true`.
 
-export const COLLECTIES = ['klassen', 'lessen', 'taken', 'sjablonen', 'dagen', 'vakken', 'opdrachten', 'afspraken'];
+export const COLLECTIES = ['klassen', 'lessen', 'taken', 'sjablonen', 'dagen', 'vakken', 'opdrachten', 'afspraken', 'onderwerpen'];
 
 export const DAGNAMEN = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'];
 export const MAANDNAMEN = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
@@ -117,6 +117,7 @@ export function leegeState() {
     dagen: {},
     vakken: {},
     opdrachten: {},
+    onderwerpen: {}, // groepeert losse schooltaken (bv. Stage, Vergaderingen)
     afspraken: {}, // komt uit Google Agenda (alleen-lezen, geschreven door het script)
     instellingen: { werkdagen: [2, 5], toonKlaar: false, upd: 0 },
   };
@@ -445,6 +446,16 @@ export function deelDeadline(state, taakId) {
   }
 }
 
+// Ook het onderwerp (en domein) van een losse taak geldt voor alle blokken.
+export function deelOnderwerp(state, taakId) {
+  const t = state.taken[taakId];
+  if (!t || t.del || !t.deelGroep) return;
+  for (const b of blokkenVan(state, t.deelGroep)) {
+    if (b.id !== t.id && ((b.onderwerpId || null) !== (t.onderwerpId || null) || b.domein !== t.domein))
+      zet(state, 'taken', { ...b, onderwerpId: t.onderwerpId || null, domein: t.domein });
+  }
+}
+
 // Opgesplitste taken waarvan de blokken (nog) verschillende deadlines hebben:
 // de laatst gewijzigde deadline geldt voor alle blokken.
 function groepenMetVerschillendeDeadline(state) {
@@ -485,6 +496,29 @@ export function splitsTaak(state, taakId, aantal) {
     );
   }
   return nieuw;
+}
+
+// ---------- losse taken en onderwerpen ----------
+
+// Taken die niet bij een les of opdracht horen, per domein (school of opleiding).
+export function losseTaken(state, domein) {
+  return lijst(state, 'taken').filter((t) => !t.lesId && !t.opdrachtId && domeinVan(t) === domein);
+}
+
+export function onderwerpVan(state, taak) {
+  const o = taak.onderwerpId && state.onderwerpen?.[taak.onderwerpId];
+  return o && !o.del && !taak.lesId && !taak.opdrachtId ? o : null;
+}
+
+// Losse schooltaken van een onderwerp; `null` = zonder (of met een verwijderd) onderwerp.
+export function takenVanOnderwerp(state, onderwerpId) {
+  return losseTaken(state, 'school').filter((t) => (onderwerpVan(state, t)?.id || null) === (onderwerpId || null));
+}
+
+// Een onderwerp verwijderen: de taken blijven, maar zonder onderwerp.
+export function verwijderOnderwerp(state, onderwerpId) {
+  for (const t of takenVanOnderwerp(state, onderwerpId)) zet(state, 'taken', { ...t, onderwerpId: null });
+  wis(state, 'onderwerpen', onderwerpId);
 }
 
 // ---------- tijd bijhouden ----------

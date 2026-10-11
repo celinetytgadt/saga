@@ -759,3 +759,11 @@ dialog::backdrop { background: rgb(15 23 36 / 45%); }
   .timer-balk { max-width: 46vw; }
   .timer-titel { display: none; }
 }
+
+/* ---------- losse taken in School / Opleiding ---------- */
+
+.sectie-kop { margin-top: 28px; }
+.groep-kaart details .les-taken { margin-top: 6px; }
+.les-taken li.huidig { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.blokken-wrap { margin: -4px 0 14px; }
+.blokken-wrap .hint { margin-top: 0; }

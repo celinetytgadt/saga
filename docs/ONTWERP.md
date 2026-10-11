@@ -120,7 +120,7 @@ In het overzicht: "BKH3-K2 + K3" met de kleuren van beide klassen.
 - **Opsplitsen:** een taak kan in 2–10 blokken gesplitst worden (1/3, 2/3, 3/3); de extra blokken komen in het bakje.
 - Agenda-afspraken: enkel de titel, zonder uur.
 - Opleidingskleuren: ook geel.
-- **Losse taken in School en Opleiding:** onder de klassen staat een sectie *Taken* met de losse schooltaken, gegroepeerd per **onderwerp** (`onderwerpen`: `naam`, `kleur`; een taak krijgt `onderwerpId`). Afgevinkte taken staan ingeklapt onder "Klaar", zodat ook een afgewerkt blok terug te vinden is. Een onderwerp verwijderen laat de taken bestaan, zonder onderwerp. Losse opleidingstaken staan in een eigen kaart bij Opleiding.
+- **Losse taken in School en Opleiding:** onder de klassen staat een sectie *Taken* met de losse schooltaken, gegroepeerd per **onderwerp** (`onderwerpen`: `naam`, `kleur`; een taak krijgt `onderwerpId`). Zoals bij Opleiding staan enkel de hoofdtaken in de lijst: een opgesplitste taak is één regel met een voortgangsbalk (1/2 blokken) en opent met alle blokken. Afgewerkte taken staan ingeklapt onder "Klaar". Een onderwerp verwijderen laat de taken bestaan, zonder onderwerp. Losse opleidingstaken staan in een eigen kaart bij Opleiding.
 - **Blokken terugvinden:** het venster van een blok toont alle blokken van die taak (ook de afgevinkte). Blokken delen hun deadline en hun onderwerp.
 - **Tijd bijhouden:** elke taak heeft een timer (start, pauzeren, later verder doen); de tijd telt op over alle keren. Er loopt maar één timer tegelijk, afvinken stopt hem. De lopende timer staat bovenaan in de balk. Vergeten stoppen? "Aanpassen" zet de tijd zelf juist (bv. 45 of 1:30). Bij een les of opdracht staat de opgetelde tijd van haar taken.
 

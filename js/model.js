@@ -281,8 +281,14 @@ export function waarschuwing(state, taak, vandaagDatum = vandaag()) {
   return null;
 }
 
+// Een opdracht met stukken hoort bij de opleiding, of bij school (`domein: 'school'`,
+// gegroepeerd per onderwerp). Stukken dragen het domein van hun opdracht mee.
+export function opdrachtDomein(opd) {
+  return opd?.domein === 'school' ? 'school' : 'opleiding';
+}
+
 export function domeinVan(taak) {
-  if (taak.opdrachtId) return 'opleiding';
+  if (taak.opdrachtId) return taak.domein === 'school' ? 'school' : 'opleiding';
   if (taak.lesId) return 'school';
   return taak.domein || 'school';
 }
@@ -377,6 +383,7 @@ function oudeTakenVanLes(state, lesId, titels) {
 export function heeftOpruimwerk(state) {
   const titels = oudeStandaardTitels(state);
   if (groepenMetVerschillendeDeadline(state).length) return true;
+  if (lijst(state, 'taken').some((t) => t.deelGroep && !t.lesId && !t.opdrachtId)) return true;
   return lijst(state, 'lessen').some((les) => {
     const h = state.taken[hoofdId(les.id)];
     if (!h) return true;
@@ -515,10 +522,72 @@ export function takenVanOnderwerp(state, onderwerpId) {
   return losseTaken(state, 'school').filter((t) => (onderwerpVan(state, t)?.id || null) === (onderwerpId || null));
 }
 
-// Een onderwerp verwijderen: de taken blijven, maar zonder onderwerp.
+// Schoolopdrachten (met stukken) van een onderwerp; `null` = zonder onderwerp.
+export function opdrachtenVanOnderwerp(state, onderwerpId) {
+  return lijst(state, 'opdrachten')
+    .filter((o) => opdrachtDomein(o) === 'school')
+    .filter((o) => {
+      const ond = o.onderwerpId && state.onderwerpen?.[o.onderwerpId];
+      return ((ond && !ond.del ? ond.id : null) || null) === (onderwerpId || null);
+    })
+    .sort(volgordeOpdracht);
+}
+
+// Een onderwerp verwijderen: de taken en opdrachten blijven, maar zonder onderwerp.
 export function verwijderOnderwerp(state, onderwerpId) {
   for (const t of takenVanOnderwerp(state, onderwerpId)) zet(state, 'taken', { ...t, onderwerpId: null });
+  for (const o of opdrachtenVanOnderwerp(state, onderwerpId)) zet(state, 'opdrachten', { ...o, onderwerpId: null });
   wis(state, 'onderwerpen', onderwerpId);
+}
+
+// Een losse taak opdelen in stukken: ze wordt een opdracht (zelfde naam, onderwerp en
+// deadline) met de taak zelf als eerste stuk. Werkdag en bestede tijd blijven bij dat stuk.
+export function maakOpdrachtVanTaak(state, taakId) {
+  const t = state.taken[taakId];
+  if (!t || t.del || t.lesId || t.opdrachtId) return null;
+  const domein = domeinVan(t);
+  const opd = zet(state, 'opdrachten', {
+    id: nieuwId(),
+    titel: t.titel,
+    domein,
+    vakId: null,
+    onderwerpId: domein === 'school' ? onderwerpVan(state, t)?.id || null : null,
+    deadline: deadlineVan(state, t),
+    volg: volgendeOpdrachtVolg(state),
+  });
+  zet(state, 'taken', { ...t, opdrachtId: opd.id, onderwerpId: null, domein, deadline: { eind: true }, volg: 1 });
+  return opd;
+}
+
+// Losse taken die vroeger in blokken opgesplitst werden, worden een opdracht met
+// stukken ("Deel 1", "Deel 2", …). Het id is vast, zodat twee toestellen hetzelfde doen.
+export function losseBlokkenNaarStukken(state) {
+  const groepen = {};
+  for (const t of lijst(state, 'taken')) if (t.deelGroep && !t.lesId && !t.opdrachtId) (groepen[t.deelGroep] ||= []).push(t);
+  for (const [groep, blokken] of Object.entries(groepen)) {
+    blokken.sort((a, b) => (a.deelNr || 0) - (b.deelNr || 0));
+    const eerste = blokken[0];
+    const domein = domeinVan(eerste);
+    const id = 'g-' + groep;
+    const bestaand = state.opdrachten[id];
+    const opd =
+      bestaand && !bestaand.del
+        ? bestaand
+        : zet(state, 'opdrachten', {
+            id,
+            titel: eerste.titel || '(zonder titel)',
+            domein,
+            vakId: null,
+            onderwerpId: domein === 'school' ? onderwerpVan(state, eerste)?.id || null : null,
+            deadline: deadlineVan(state, eerste),
+            volg: volgendeOpdrachtVolg(state),
+          });
+    blokken.forEach((b, i) => {
+      const { deelGroep, deelNr, deelVan, ...rest } = b;
+      zet(state, 'taken', { ...rest, titel: `Deel ${deelNr || i + 1}`, opdrachtId: opd.id, onderwerpId: null, domein, deadline: { eind: true }, volg: deelNr || i + 1 });
+    });
+  }
+  return Object.keys(groepen).length > 0;
 }
 
 // ---------- tijd bijhouden ----------
@@ -608,7 +677,7 @@ export function volgordeOpdracht(a, b) {
 
 export function opdrachtenVanVak(state, vakId) {
   return lijst(state, 'opdrachten')
-    .filter((o) => (o.vakId || null) === (vakId || null))
+    .filter((o) => opdrachtDomein(o) === 'opleiding' && (o.vakId || null) === (vakId || null))
     .sort(volgordeOpdracht);
 }
 
@@ -622,11 +691,13 @@ export function volgendStuk(state, opdrachtId) {
 
 export function maakStukken(state, opdrachtId, titels) {
   let volg = volgendStuk(state, opdrachtId);
+  const domein = opdrachtDomein(state.opdrachten[opdrachtId]);
   return titels.map((titel) =>
     zet(state, 'taken', {
       id: nieuwId(),
       titel,
       opdrachtId,
+      domein,
       werkdag: null,
       deadline: { eind: true },
       vanaf: null,

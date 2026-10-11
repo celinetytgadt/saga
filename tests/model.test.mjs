@@ -477,3 +477,35 @@ test('tijd tonen en inlezen', () => {
   assert.equal(M.leesMinuten('12,5'), 12.5);
   assert.equal(M.leesMinuten('abc'), null);
 });
+
+test('losse taken per onderwerp; onderwerp verwijderen houdt de taken', () => {
+  const s = basis();
+  s.onderwerpen.o1 = { id: 'o1', naam: 'Stage', kleur: '#5bbba4', upd: 1 };
+  s.taken.a = taak({ id: 'a', lesId: null, onderwerpId: 'o1' });
+  s.taken.b = taak({ id: 'b', lesId: null });
+  s.taken.c = taak({ id: 'c', lesId: null, domein: 'opleiding' });
+  s.taken.d = taak({ id: 'd' }); // bij een les
+  assert.deepEqual(M.losseTaken(s, 'school').map((t) => t.id).sort(), ['a', 'b']);
+  assert.deepEqual(M.losseTaken(s, 'opleiding').map((t) => t.id), ['c']);
+  assert.deepEqual(M.takenVanOnderwerp(s, 'o1').map((t) => t.id), ['a']);
+  assert.deepEqual(M.takenVanOnderwerp(s, null).map((t) => t.id), ['b']);
+  M.verwijderOnderwerp(s, 'o1');
+  assert.equal(s.taken.a.del, undefined);
+  assert.deepEqual(M.takenVanOnderwerp(s, null).map((t) => t.id).sort(), ['a', 'b']);
+});
+
+test('blokken van een opgesplitste taak behouden hun onderwerp', () => {
+  const s = basis();
+  s.onderwerpen.o1 = { id: 'o1', naam: 'Stage', kleur: '#5bbba4', upd: 1 };
+  s.taken.a = taak({ id: 'a', lesId: null, titel: 'Stageverslag', onderwerpId: 'o1' });
+  const [b] = M.splitsTaak(s, 'a', 2);
+  M.zetKlaar(s, 'a', true);
+  M.zet(s, 'taken', { ...s.taken[b.id], onderwerpId: null });
+  M.deelOnderwerp(s, b.id);
+  assert.equal(s.taken.a.onderwerpId, null);
+  M.zet(s, 'taken', { ...s.taken.a, onderwerpId: 'o1' });
+  M.deelOnderwerp(s, 'a');
+  const ids = M.takenVanOnderwerp(s, 'o1');
+  assert.equal(ids.length, 2);
+  assert.ok(ids.some((t) => t.id === 'a' && t.klaar));
+});

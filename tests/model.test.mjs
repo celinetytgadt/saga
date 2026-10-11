@@ -421,3 +421,59 @@ test('Code.gs bewaart op Drive met enkel eigen bestanden (nagemaakte Drive-API)'
   bestanden[id].trashed = true;
   assert.notEqual(ctx.haalBestand_(), id);
 });
+
+test('timer: starten, pauzeren en later verder doen telt op', () => {
+  const s = basis();
+  s.taken.t = taak({ id: 't' });
+  M.startTimer(s, 't', 1000);
+  assert.equal(M.bestedeTijd(s.taken.t, 61000), 60000);
+  M.stopTimer(s, 't', 61000);
+  assert.equal(s.taken.t.gestart, null);
+  assert.equal(M.bestedeTijd(s.taken.t, 999999), 60000); // gepauzeerd: telt niet verder
+  M.startTimer(s, 't', 100000);
+  M.stopTimer(s, 't', 130000);
+  assert.equal(s.taken.t.tijd, 90000);
+});
+
+test('timer: maar één tegelijk, afvinken stopt hem', () => {
+  const s = basis();
+  s.taken.a = taak({ id: 'a' });
+  s.taken.b = taak({ id: 'b' });
+  M.startTimer(s, 'a', 1000);
+  M.startTimer(s, 'b', 6000);
+  assert.equal(s.taken.a.gestart, null);
+  assert.equal(s.taken.a.tijd, 5000);
+  assert.equal(M.lopendeTaak(s).id, 'b');
+  M.zetKlaar(s, 'b', true, 9000);
+  assert.equal(s.taken.b.klaar, true);
+  assert.equal(s.taken.b.tijd, 3000);
+  assert.equal(M.lopendeTaak(s), null);
+  M.zetKlaar(s, 'b', false);
+  assert.equal(s.taken.b.tijd, 3000); // terug open: tijd blijft
+});
+
+test('timer: tijd zelf aanpassen en nieuwe blokken beginnen op nul', () => {
+  const s = basis();
+  s.taken.t = taak({ id: 't', titel: 'Groot werk' });
+  M.startTimer(s, 't', 1000);
+  M.zetTijd(s, 't', 30 * 60000, 7200000); // timer 2 uur vergeten: zet op 30 min
+  assert.equal(M.bestedeTijd(s.taken.t, 7200000 + 60000), 31 * 60000); // loopt verder
+  const [blok] = M.splitsTaak(s, 't', 2);
+  assert.equal(blok.tijd, 0);
+  assert.equal(blok.gestart, null);
+});
+
+test('tijd tonen en inlezen', () => {
+  assert.equal(M.klokTekst(0), '0:00');
+  assert.equal(M.klokTekst(65000), '1:05');
+  assert.equal(M.klokTekst(3725000), '1:02:05');
+  assert.equal(M.duurTekst(30000), '< 1 min');
+  assert.equal(M.duurTekst(25 * 60000), '25 min');
+  assert.equal(M.duurTekst(65 * 60000), '1u 05m');
+  assert.equal(M.leesMinuten('45'), 45);
+  assert.equal(M.leesMinuten('1:30'), 90);
+  assert.equal(M.leesMinuten('1u30'), 90);
+  assert.equal(M.leesMinuten('2u'), 120);
+  assert.equal(M.leesMinuten('12,5'), 12.5);
+  assert.equal(M.leesMinuten('abc'), null);
+});

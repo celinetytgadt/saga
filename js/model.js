@@ -476,6 +476,8 @@ export function splitsTaak(state, taakId, aantal) {
         titel: t.titel || (t.lesId && state.lessen[t.lesId]?.titel) || '',
         werkdag: null,
         klaar: false,
+        tijd: 0,
+        gestart: null,
         deelGroep: groep,
         deelNr: i,
         deelVan: aantal,
@@ -483,6 +485,73 @@ export function splitsTaak(state, taakId, aantal) {
     );
   }
   return nieuw;
+}
+
+// ---------- tijd bijhouden ----------
+
+// Een taak houdt bij hoeveel tijd er al aan besteed is: `tijd` (ms van afgesloten
+// periodes) en `gestart` (tijdstempel als de timer nu loopt, anders null).
+// Pauzeren telt de lopende periode bij `tijd`; later verder doen telt verder op.
+export function bestedeTijd(taak, nu = Date.now()) {
+  return (taak.tijd || 0) + (taak.gestart ? Math.max(0, nu - taak.gestart) : 0);
+}
+
+export function lopendeTaak(state) {
+  return lijst(state, 'taken').find((t) => t.gestart) || null;
+}
+
+// Er loopt maar één timer tegelijk: een andere taak starten pauzeert de lopende.
+export function startTimer(state, taakId, nu = Date.now()) {
+  const t = state.taken[taakId];
+  if (!t || t.del || t.gestart) return;
+  for (const andere of lijst(state, 'taken')) if (andere.gestart) stopTimer(state, andere.id, nu);
+  zet(state, 'taken', { ...t, gestart: nu });
+}
+
+export function stopTimer(state, taakId, nu = Date.now()) {
+  const t = state.taken[taakId];
+  if (!t || t.del || !t.gestart) return;
+  zet(state, 'taken', { ...t, tijd: bestedeTijd(t, nu), gestart: null });
+}
+
+// Bestede tijd zelf aanpassen (bv. timer vergeten stoppen). Een lopende timer loopt verder.
+export function zetTijd(state, taakId, ms, nu = Date.now()) {
+  const t = state.taken[taakId];
+  if (!t || t.del) return;
+  zet(state, 'taken', { ...t, tijd: Math.max(0, Math.round(ms)), gestart: t.gestart ? nu : null });
+}
+
+// Afvinken stopt de timer; terug openzetten laat de bestede tijd staan.
+export function zetKlaar(state, taakId, klaar, nu = Date.now()) {
+  if (klaar) stopTimer(state, taakId, nu);
+  const t = state.taken[taakId];
+  if (t && !t.del) zet(state, 'taken', { ...t, klaar });
+}
+
+// 1:05:09 of 4:09 (voor een lopende klok)
+export function klokTekst(ms) {
+  const sec = Math.floor(ms / 1000);
+  const u = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  return u ? `${u}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+}
+
+// 1u 05m, 25 min, < 1 min (voor een totaal)
+export function duurTekst(ms) {
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return '< 1 min';
+  if (min < 60) return `${min} min`;
+  return `${Math.floor(min / 60)}u ${pad(min % 60)}m`;
+}
+
+// Ingegeven tijd lezen: "45" (minuten), "1:30" of "1u30" (uren en minuten). Ongeldig = null.
+export function leesMinuten(tekst) {
+  const s = String(tekst ?? '').trim().toLowerCase().replace(',', '.');
+  let m = s.match(/^(\d+)\s*(?::|u)\s*(\d{0,2})\s*m?$/);
+  if (m) return Number(m[1]) * 60 + Number(m[2] || 0);
+  m = s.match(/^(\d+(?:\.\d+)?)\s*(?:min|m)?$/);
+  return m ? Number(m[1]) : null;
 }
 
 export function verwijderLes(state, lesId) {

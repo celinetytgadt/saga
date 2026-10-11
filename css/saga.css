@@ -738,3 +738,24 @@ dialog::backdrop { background: rgb(15 23 36 / 45%); }
   .lestaak { font-size: .88rem; padding: 3px 8px 3px 9px; }
 }
 .splits { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -4px 0 12px; color: var(--zacht); font-size: .9rem; }
+
+/* ---------- tijd bijhouden ---------- */
+
+.tijd { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tijd.loopt { color: var(--groen-tekst); font-weight: 600; }
+.lestaak .tijd { margin-left: auto; font-size: .9em; }
+
+.timer { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; padding: 10px 12px; background: var(--vlak-2); border-radius: 12px; }
+.timer-klok { font-family: "Quicksand", sans-serif; font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 4.5ch; }
+.timer.loopt .timer-klok { color: var(--groen-tekst); }
+
+.timer-balk { display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 300px; padding: 3px 12px 3px 3px; border-radius: 999px; background: var(--vandaag); border: 1px solid var(--groen); font-weight: 600; }
+.timer-pauze { flex: none; width: 28px; height: 28px; border-radius: 50%; border: none; background: var(--groen); color: #fff; font-size: .7rem; cursor: pointer; padding: 0; }
+.timer-pauze:hover { filter: brightness(1.1); }
+.timer-info { display: flex; align-items: baseline; gap: 6px; min-width: 0; cursor: pointer; }
+.timer-tijd { color: var(--groen-tekst); font-variant-numeric: tabular-nums; }
+.timer-titel { font-size: .85rem; color: var(--zacht); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 760px) {
+  .timer-balk { max-width: 46vw; }
+  .timer-titel { display: none; }
+}

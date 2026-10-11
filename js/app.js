@@ -145,6 +145,27 @@ function voortgang(taken) {
 
 // ---------- bouwstenen ----------
 
+// Bestede tijd bij een taak: een lopende klok (tikt elke seconde mee) of het totaal.
+function tijdLabel(t) {
+  if (t.gestart) return `<span class="tijd loopt" title="timer loopt">⏱ <span data-klok="${t.id}">${M.klokTekst(M.bestedeTijd(t))}</span></span>`;
+  return t.tijd ? `<span class="tijd" title="bestede tijd">⏱ ${M.duurTekst(t.tijd)}</span>` : '';
+}
+
+function totaalTijd(taken) {
+  return taken.reduce((som, t) => som + M.bestedeTijd(t), 0);
+}
+
+// Timer in de taakdialoog: starten, pauzeren en later verder doen.
+function timerHtml(t) {
+  const ms = M.bestedeTijd(t);
+  const knop = t.gestart ? '❚❚ Pauzeren' : ms ? '▶ Verder doen' : '▶ Start';
+  return `<div class="timer ${t.gestart ? 'loopt' : ''}">
+    <span class="timer-klok" data-klok="${t.id}" aria-label="Bestede tijd">${M.klokTekst(ms)}</span>
+    <button type="button" class="knop ${t.gestart ? '' : 'primair'}" data-actie="timer" data-id="${t.id}">${knop}</button>
+    ${ms ? `<button type="button" class="chip" data-actie="tijd-aanpassen" data-id="${t.id}">Aanpassen</button>` : ''}
+  </div>`;
+}
+
 // Naam van een taak: de taak van een les heet zoals de les; blokken krijgen (2/3).
 function taakTitel(s, t) {
   const basis = t.titel || lesVan(s, t)?.titel || '(zonder titel)';
@@ -157,10 +178,11 @@ function lesTaakKaart(s, t) {
   const les = lesVan(s, t);
   const w = M.waarschuwing(s, t);
   const naam = taakTitel(s, t);
-  const tip = [klasLabel(s, les) + ' · ' + les.titel, w?.reden].filter(Boolean).join(' – ');
+  const tijd = M.bestedeTijd(t);
+  const tip = [klasLabel(s, les) + ' · ' + les.titel, w?.reden, tijd && `bestede tijd ${M.duurTekst(tijd)}`].filter(Boolean).join(' – ');
   return `<div class="lestaak ${w ? w.niveau : ''} ${t.klaar ? 'klaar' : ''}" draggable="true" data-sleep="taak:${t.id}" style="${klasStijl(s, les)}" title="${esc(tip)}">
     <button class="vink" data-actie="vink" data-id="${t.id}" aria-label="${t.klaar ? 'Markeer als niet klaar' : 'Markeer als klaar'}">${t.klaar ? '✓' : ''}</button>
-    <span class="les-tekst" role="button" tabindex="0" data-actie="taak" data-id="${t.id}">${esc(naam)}</span>${w ? '<span class="lestaak-let" aria-hidden="true">!</span>' : ''}
+    <span class="les-tekst" role="button" tabindex="0" data-actie="taak" data-id="${t.id}">${esc(naam)}</span>${t.gestart ? tijdLabel(t) : ''}${w ? '<span class="lestaak-let" aria-hidden="true">!</span>' : ''}
   </div>`;
 }
 
@@ -174,6 +196,7 @@ function taakKaart(s, t) {
   if (a.label) sub.push(`<b>${esc(a.label)}</b> ${esc(a.titel)}`);
   else if (opl) sub.push('<b>Opleiding</b>');
   if (dl && !t.klaar && !t.lesId) sub.push(`⚑ ${M.kortDatum(dl)}`);
+  if (t.gestart || t.tijd) sub.push(tijdLabel(t));
   if (w) sub.push(`<span class="reden">${esc(w.reden)}</span>`);
   return `<div class="taak ${opl ? 'opl' : ''} ${w ? w.niveau : ''} ${t.klaar ? 'klaar' : ''}" draggable="true" data-sleep="taak:${t.id}" style="--klas:${a.kleur}">
     <button class="vink" data-actie="vink" data-id="${t.id}" aria-label="${t.klaar ? 'Markeer als niet klaar' : 'Markeer als klaar'}">${t.klaar ? '✓' : ''}</button>
@@ -240,7 +263,7 @@ function groepKaart(s, g, inDag) {
       const eigen = !t.lesId && t.deadline?.datum && !t.klaar ? ` <span class="rij-dl vlag ${t.opdrachtId ? 'opl' : ''}">⚑ ${M.kortDatum(t.deadline.datum)}</span>` : '';
       return `<div class="rij-taak ${w ? w.niveau : ''} ${t.klaar ? 'klaar' : ''}" draggable="true" data-sleep="taak:${t.id}">
         <button class="vink" data-actie="vink" data-id="${t.id}" aria-label="${t.klaar ? 'Markeer als niet klaar' : 'Markeer als klaar'}">${t.klaar ? '✓' : ''}</button>
-        <div class="rij-tekst" role="button" tabindex="0" data-actie="taak" data-id="${t.id}">${esc(t.titel)}${eigen}${w ? `<span class="reden">${esc(w.reden)}</span>` : ''}</div>
+        <div class="rij-tekst" role="button" tabindex="0" data-actie="taak" data-id="${t.id}">${esc(t.titel)}${eigen}${t.gestart ? ' ' + tijdLabel(t) : ''}${w ? `<span class="reden">${esc(w.reden)}</span>` : ''}</div>
       </div>`;
     })
     .join('');
@@ -624,6 +647,28 @@ function tekenStatus() {
   }[sy.status];
 }
 
+// Lopende timer bovenaan, zodat je hem ziet en kunt pauzeren vanop elk scherm.
+function tekenTimer(s) {
+  const balk = $('#timer-balk');
+  const t = M.lopendeTaak(s);
+  balk.hidden = !t;
+  if (!t) return (balk.innerHTML = '');
+  balk.innerHTML = `<button class="timer-pauze" data-actie="timer" data-id="${t.id}" aria-label="Timer pauzeren" title="Pauzeren">❚❚</button>
+    <span class="timer-info" role="button" tabindex="0" data-actie="taak" data-id="${t.id}" title="${esc(taakTitel(s, t))}">
+      <span class="timer-tijd" data-klok="${t.id}">${M.klokTekst(M.bestedeTijd(t))}</span>
+      <span class="timer-titel">${esc(taakTitel(s, t))}</span>
+    </span>`;
+}
+
+// Lopende klokken elke seconde bijwerken, zonder alles opnieuw te tekenen.
+function tik() {
+  const s = getState();
+  for (const el of document.querySelectorAll('[data-klok]')) {
+    const t = s.taken[el.dataset.klok];
+    if (t?.gestart) el.textContent = M.klokTekst(M.bestedeTijd(t));
+  }
+}
+
 function render() {
   const s = getState();
   ui.dag = M.vandaag();
@@ -654,6 +699,7 @@ function render() {
   badge.hidden = !aantal;
 
   tekenStatus();
+  tekenTimer(s);
 
   if ($('#dlg').open && ui.herteken) ui.herteken();
 
@@ -797,6 +843,7 @@ function openTaak(id, voorinvulling = {}, terug = null) {
           ? `<div class="splits"><span>Te groot voor één blok?</span> <button type="button" class="chip" data-splits>Opsplitsen in blokken</button></div>`
           : ''
     }
+    ${id ? `<div class="timer-wrap">${timerHtml(t)}</div>` : ''}
     <form id="f-taak" class="formulier">
       ${
         t.hoofd
@@ -862,6 +909,7 @@ function openTaak(id, voorinvulling = {}, terug = null) {
           }
           if (nieuw.opdrachtId && (!huidig || huidig.opdrachtId !== nieuw.opdrachtId)) nieuw.volg = M.volgendStuk(st, nieuw.opdrachtId);
           M.zet(st, 'taken', nieuw);
+          if (nieuw.klaar) M.stopTimer(st, nieuw.id);
           if (nieuw.deelGroep && 'deadline' in wijzigingen) M.deelDeadline(st, nieuw.id);
         });
 
@@ -894,7 +942,16 @@ function openTaak(id, voorinvulling = {}, terug = null) {
         sluit();
       });
     },
-    { terug }
+    {
+      terug,
+      herteken: id
+        ? () => {
+            const wrap = dlg.querySelector('.timer-wrap');
+            const huidig = getState().taken[id];
+            if (wrap && huidig && !huidig.del) wrap.innerHTML = timerHtml(huidig);
+          }
+        : null,
+    }
   );
 }
 
@@ -906,7 +963,7 @@ function takenLijst(s, taken, terugAttr) {
           const w = M.waarschuwing(s, t);
           const dl = M.deadlineVan(s, t);
           const wd = M.werkdagVan(s, t);
-          const info = [wd ? `gepland: ${M.kortDatum(wd)}${t.hoofd && !t.werkdag ? ' (standaard)' : ''}` : 'in bakje', dl && !t.deadline?.eind && !t.lesId ? `⚑ ${M.kortDatum(dl)}` : ''].filter(Boolean);
+          const info = [wd ? `gepland: ${M.kortDatum(wd)}${t.hoofd && !t.werkdag ? ' (standaard)' : ''}` : 'in bakje', dl && !t.deadline?.eind && !t.lesId ? `⚑ ${M.kortDatum(dl)}` : '', tijdLabel(t)].filter(Boolean);
           return `<li class="${w ? w.niveau : ''} ${t.klaar ? 'klaar' : ''}">
             <button class="vink" data-actie="vink" data-id="${t.id}" aria-label="${t.klaar ? 'Markeer als niet klaar' : 'Markeer als klaar'}">${t.klaar ? '✓' : ''}</button>
             <div class="taak-tekst" role="button" tabindex="0" data-actie="taak" data-id="${t.id}" ${terugAttr}>
@@ -921,7 +978,8 @@ function takenLijst(s, taken, terugAttr) {
 function lesTakenHtml(s, lesId) {
   const les = s.lessen[lesId];
   const taken = M.takenVanLes(s, lesId).sort((a, b) => !!b.hoofd - !!a.hoofd || (a.deelNr || 0) - (b.deelNr || 0) || sorteerTaken(s)(a, b));
-  return `<h3>Taak</h3>
+  const tijd = totaalTijd(taken);
+  return `<h3>Taak${tijd && taken.length > 1 ? ` · ⏱ ${M.duurTekst(tijd)} samen` : ''}</h3>
     ${takenLijst(s, taken, `data-terug-les="${lesId}"`) || '<p class="leeg">Nog geen taak bij deze les.</p>'}
     <div class="chips">
       <button type="button" class="chip" data-actie="nieuwe-taak" data-les="${lesId}">+ extra taak</button>
@@ -1091,7 +1149,8 @@ function opdrachtStukkenHtml(s, opdrachtId) {
   const taken = M.takenVanOpdracht(s, opdrachtId);
   const vg = voortgang(taken);
   const teVerdelen = taken.filter((t) => !t.klaar && !t.werkdag).length;
-  return `<h3>Stukken ${vg.totaal ? `· ${vg.klaar}/${vg.totaal} klaar` : ''}</h3>
+  const tijd = totaalTijd(taken);
+  return `<h3>Stukken ${vg.totaal ? `· ${vg.klaar}/${vg.totaal} klaar` : ''}${tijd ? ` · ⏱ ${M.duurTekst(tijd)}` : ''}</h3>
     ${vg.totaal ? `<div class="voortgang groot" aria-hidden="true"><span style="width:${vg.pct}%"></span></div>` : ''}
     ${takenLijst(s, taken, `data-terug-opdracht="${opdrachtId}"`) || '<p class="leeg">Nog geen stukken. Deel de opdracht op in behapbare stappen.</p>'}
     <div class="chips">
@@ -1376,8 +1435,23 @@ const acties = {
   vink(el) {
     wijzig((s) => {
       const t = s.taken[el.dataset.id];
-      if (t) M.zet(s, 'taken', { ...t, klaar: !t.klaar });
+      if (t) M.zetKlaar(s, t.id, !t.klaar);
     });
+  },
+  timer(el) {
+    const id = el.dataset.id;
+    wijzig((s) => (s.taken[id]?.gestart ? M.stopTimer(s, id) : M.startTimer(s, id)));
+  },
+  'tijd-aanpassen'(el) {
+    const id = el.dataset.id;
+    const t = getState().taken[id];
+    if (!t) return;
+    const nu = Math.floor(M.bestedeTijd(t) / 60000);
+    const antwoord = prompt('Hoeveel tijd heb je hieraan gewerkt? In minuten (bv. 45) of uren en minuten (bv. 1:30).', `${Math.floor(nu / 60)}:${String(nu % 60).padStart(2, '0')}`);
+    if (antwoord === null) return;
+    const min = M.leesMinuten(antwoord);
+    if (min === null) return alert('Dat kon Saga niet lezen. Typ bv. 45 of 1:30.');
+    wijzig((s) => M.zetTijd(s, id, min * 60000));
   },
   taak(el) {
     const { terugLes, terugOpdracht } = el.dataset;
@@ -1619,6 +1693,7 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 setInterval(() => document.visibilityState === 'visible' && sync(), 15 * 60 * 1000);
+setInterval(() => document.visibilityState === 'visible' && tik(), 1000);
 
 if (M.heeftOpruimwerk(getState())) {
   wijzig((st) => {

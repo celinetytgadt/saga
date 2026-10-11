@@ -45,6 +45,8 @@ Eén gebruiker. Werkt op gsm en computer, met dezelfde gegevens.
 | `vanaf` | `{ relatief: +3 }` of leeg | optioneel: vroegst mogelijke dag (bv. verbeteren kan pas na indienen) |
 | `klaar` | `false` | |
 | `notitie` | | vrije tekst |
+| `tijd` | `5400000` | bestede tijd in ms (afgesloten periodes van de timer) |
+| `gestart` | tijdstempel of leeg | de timer loopt sinds dit moment |
 
 ### Standaardtaak (sjabloon)
 Wordt automatisch voorgesteld bij het aanmaken van een les (aanvinken wat van toepassing is).
@@ -118,6 +120,7 @@ In het overzicht: "BKH3-K2 + K3" met de kleuren van beide klassen.
 - **Opsplitsen:** een taak kan in 2–10 blokken gesplitst worden (1/3, 2/3, 3/3); de extra blokken komen in het bakje.
 - Agenda-afspraken: enkel de titel, zonder uur.
 - Opleidingskleuren: ook geel.
+- **Tijd bijhouden:** elke taak heeft een timer (start, pauzeren, later verder doen); de tijd telt op over alle keren. Er loopt maar één timer tegelijk, afvinken stopt hem. De lopende timer staat bovenaan in de balk. Vergeten stoppen? "Aanpassen" zet de tijd zelf juist (bv. 45 of 1:30). Bij een les of opdracht staat de opgetelde tijd van haar taken.
 
 ## 3. Regels
 

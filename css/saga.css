@@ -771,3 +771,143 @@ dialog::backdrop { background: rgb(15 23 36 / 45%); }
 .blokken-rij .voortgang { flex: none; width: 100%; margin: 4px 0 2px; }
 .les-taken li.blokken-rij.klaar .titel { text-decoration: none; opacity: .6; }
 .einde.school { color: var(--vlag); }
+
+/* ---------- filter: domein, klas, enkel lessen ---------- */
+
+.filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-left: auto; }
+.filters .filter { margin-left: 0; }
+.filter-klas {
+  width: auto !important;
+  min-height: 0 !important;
+  border-radius: 999px !important;
+  padding: 4px 10px !important;
+  font-weight: 600 !important;
+  font-size: .85rem;
+  color: var(--zacht);
+}
+.filter-klas.aan { background: var(--accent); color: var(--accent-tekst); border-color: var(--accent); }
+.filter-lessen {
+  border: 1px solid var(--rand-sterk);
+  background: var(--vlak);
+  border-radius: 999px;
+  padding: 4px 11px;
+  font-weight: 600;
+  font-size: .85rem;
+  cursor: pointer;
+  color: var(--zacht);
+}
+.filter-lessen.aan { background: var(--accent); color: var(--accent-tekst); border-color: var(--accent); }
+.bakje-filter .filters { margin-left: 0; }
+@media (max-width: 760px) {
+  .periode-nav .filters { order: 5; margin-left: 0; }
+}
+
+/* ---------- vakanties en afwezigheden ---------- */
+
+.afwezig {
+  font-size: .75rem;
+  font-weight: 600;
+  color: var(--oranje);
+  background: var(--oranje-vlak);
+  border-radius: 6px;
+  padding: 1px 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.afwezig.vak { color: var(--groen-tekst); background: color-mix(in srgb, var(--groen) 14%, var(--vlak)); }
+.dag.vakantie:not(.vandaag) { background: color-mix(in srgb, var(--groen) 6%, var(--vlak)); }
+.les.oranje { background: var(--oranje-vlak); border-color: var(--oranje); }
+.les .lestaak-let { color: var(--oranje); }
+.lesregel.oranje .reden { color: var(--oranje); font-size: .8rem; }
+.afw-klassen.uit { opacity: .45; }
+@media (max-width: 760px) {
+  .afwezig { font-size: .85rem; }
+}
+
+/* ---------- pagina van een klas ---------- */
+
+.kaart-link { color: inherit; text-decoration: none; }
+.kaart-link:hover { text-decoration: underline; }
+.klas-pagina h1 { display: flex; align-items: center; gap: 10px; }
+.klas-pagina h1 .bol { width: 16px; height: 16px; }
+.klas-pagina .groepen { margin-bottom: 14px; }
+.klas-pagina .groepen > .kaart { margin: 0; }
+.klas-pagina h3:first-of-type { margin-top: 6px; }
+.volgende-les { border-top: 4px solid var(--klas); }
+.vl-kop { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; margin: 8px 0; border-radius: 10px; background: color-mix(in srgb, var(--klas) 12%, var(--vlak)); border-left: 4px solid var(--klas); cursor: pointer; }
+.vl-titel { font-weight: 700; font-size: 1.05rem; }
+.vl-datum { color: var(--zacht); font-weight: 600; font-size: .9rem; }
+.volgende-les .timer-wrap .timer { margin-bottom: 8px; }
+.reeks .lessen-lijst + h3 { margin-top: 16px; }
+.reeks-wrap { margin-top: 16px; border-top: 1px solid var(--rand); padding-top: 4px; }
+.reeks-wrap .chips a.chip { text-decoration: none; }
+a.knop { text-decoration: none; color: inherit; }
+a.knop.primair { color: var(--accent-tekst); }
+
+/* ---------- tijd aanpassen ---------- */
+
+.tijd-form { flex-direction: column; align-items: stretch; }
+.tijd-form label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: .9rem; }
+.tijd-form .hint { margin: 0; }
+
+/* ---------- tijdsoverzicht ---------- */
+
+.tijd-filter { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+.tijd-filter .filter { margin-left: 0; }
+.t-tegels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+.t-tegel { background: var(--vlak); border: 1px solid var(--rand); border-radius: var(--radius); padding: 12px 14px; display: flex; flex-direction: column; }
+.t-groot { font-family: Quicksand, system-ui, sans-serif; font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.t-lijst { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.t-label { display: flex; align-items: center; gap: 8px; }
+.t-label a { color: inherit; }
+.t-waarde { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.t-balk { height: 10px; margin: 4px 0 2px; }
+.t-balk span { display: block; height: 100%; background: var(--c); border-radius: 0 4px 4px 0; }
+.t-sub { font-size: .8rem; color: var(--zacht); }
+.t-top { display: flex; align-items: baseline; gap: 8px; }
+.t-top .bol { flex: none; width: 10px; height: 10px; align-self: center; }
+.t-top-titel { min-width: 0; }
+.t-tabel-wrap { overflow-x: auto; }
+.t-tabel { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.t-tabel th, .t-tabel td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--rand); white-space: nowrap; }
+.t-tabel thead th { color: var(--zacht); font-size: .8rem; }
+.t-tabel tbody th { font-weight: 600; }
+.t-num { text-align: right !important; }
+.t-balk-cel { width: 40%; min-width: 80px; }
+.t-balk-cel .t-balk { margin: 0; }
+@media (max-width: 760px) {
+  .t-tegels { grid-template-columns: 1fr; }
+  .t-groot { font-size: 1.25rem; }
+  .t-balk-cel { display: none; }
+}
+
+/* ---------- melding onderaan ---------- */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 10px 12px 10px 16px;
+  border-radius: 12px;
+  background: var(--tekst);
+  color: var(--bg);
+  box-shadow: 0 8px 30px rgb(0 0 0 / 25%);
+  font-weight: 600;
+}
+.toast-knop { flex: none; border: none; background: transparent; color: var(--groen); font-weight: 700; cursor: pointer; padding: 6px 8px; border-radius: 8px; }
+.toast-knop:hover { background: rgb(255 255 255 / 10%); }
+@media (max-width: 760px) {
+  .toast { bottom: calc(76px + env(safe-area-inset-bottom)); width: calc(100vw - 32px); }
+}
+.instellingen .lesregel-datum { width: 170px; }
+@media (max-width: 760px) {
+  .instellingen .lesregel-datum { width: 110px; }
+}

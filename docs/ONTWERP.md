@@ -110,7 +110,7 @@ In het overzicht: "BKH3-K2 + K3" met de kleuren van beide klassen.
 - Taken worden **gebundeld per les of opdracht**: eerst de les (klas + onderwerp + lesdatum), daaronder klein de taken. Bakje: lessen op datum, opdrachten in de volgorde waarin ze ingegeven zijn, stukken in hun volgorde.
 - **Geen vlaggetjes** voor taken bij een les (de lesdatum zegt genoeg); wel voor losse taken en tussendeadlines. Einddeadline van een opdracht blijft als label.
 - Rustiger lettertype (Open Sans voor tekst, Quicksand voor titels) en een instelbare **tekstgrootte** per toestel.
-- Kalender per **maand**: de eerste rij is altijd de week van de 1e; ‹ › verschuift een maand.
+- ~~Kalender per maand~~ → vervangen door een **glijdend venster** (zie "Na de review").
 - Deadlines van de opleiding: groen vlaggetje (school/losse taken: roze-rood).
 - Agenda: enkel de agenda **De Zottekes** (instelbaar in `AGENDA_NAMEN` in Code.gs).
 
@@ -124,6 +124,19 @@ In het overzicht: "BKH3-K2 + K3" met de kleuren van beide klassen.
 - **Opdelen in stukken i.p.v. blokken:** een losse taak kan "opgedeeld worden in stukken": ze wordt een opdracht met dezelfde naam, onderwerp en deadline, met de taak zelf als eerste stuk. Losse taken die vroeger in blokken gesplitst werden, worden automatisch zo'n opdracht met stukken "Deel 1", "Deel 2", … Opsplitsen in blokken blijft enkel voor de taak van een les.
 - **Tijd bijhouden:** elke taak heeft een timer (start, pauzeren, later verder doen); de tijd telt op over alle keren. Er loopt maar één timer tegelijk, afvinken stopt hem. De lopende timer staat bovenaan in de balk. Vergeten stoppen? "Aanpassen" zet de tijd zelf juist (bv. 45 of 1:30). Bij een les of opdracht staat de opgetelde tijd van haar taken.
 
+### Na de review (oktober 2026)
+- **Overzicht = glijdend venster** in plaats van een kalendermaand, zodat je aan het einde van een maand de lessen van volgende week ziet. Computer: 5 volle weken vanaf de maandag van vorige week. Gsm: van 7 dagen terug tot 30 dagen vooruit. ‹ › verschuift 4 weken.
+- **Filter** in twee delen: domein (*Alles · School · Opleiding*) en een **klas** (keuzelijst), plus de knop *Enkel lessen*.
+- **Pagina per klas** (`#/klas/<id>`): volgende les met de timer van de voorbereiding, open werk (verbeteren, opdrachten en taken voor die klas), de lessenreeks, en de tijd die in de klas kroop. Knop *Toon in overzicht* zet de klasfilter.
+- **Taken en schoolopdrachten voor een klas:** een losse schooltaak en een schoolopdracht kunnen (optioneel) `klasIds` krijgen; ze verschijnen dan op de pagina van de klas en in de klasfilter.
+- **Vakanties en afwezigheden** (`afwezigheden`: `reden`, `van`, `tot`, `klasIds`; leeg = alle klassen = vakantie), in te geven bij Instellingen of via + op een dag. Ze staan als balkje op de dag; een les op zo'n dag krijgt een oranje waarschuwing.
+- **Lesrooster gebruiken:** *Inplannen volgens rooster* zet de lessen zonder datum op de volgende lesmomenten (lesdagen van de klas, zonder vakanties/afwezigheden). Bij een les: de reeks één lesmoment **later of vroeger** schuiven.
+- **Ongedaan maken in plaats van "Zeker?":** afvinken, verwijderen, verdelen, inplannen en opschuiven tonen een melding met *Ongedaan maken*. Geen `prompt`/`confirm` meer: opsplitsen kies je met knoppen (2–5 blokken), tijd aanpassen gebeurt in het venster zelf.
+- **Back-up:** *Download* haalt de volledige planning op van Drive. *Samenvoegen* voegt toe; *Terugzetten* maakt de planning weer zoals in de back-up (ook verwijderde dingen komen terug).
+- **Alles bijhouden, het toestel licht houden:** verwijderen markeert enkel (`del: true`), de gegevens (ook de bestede tijd) blijven op Drive. Bij elke synchronisatie krijgt het toestel enkel terug wat de laatste maand nog speelde; afgewerkte taken, voorbije lessen en oude afspraken verdwijnen na een maand van het toestel, niet van Drive (regels in `actief`, zelfde functie in `model.js` en `Code.gs`). Een les en haar taken gaan altijd samen, zodat er nooit een lestaak opnieuw gemaakt wordt.
+- **Tijdsoverzicht** (`#/tijd`): bestede tijd per klas, onderwerp en opleidingsonderdeel, per soort werk (voorbereiding, verbeteren, opdrachten, losse taken), gemiddelde voorbereiding per les, per maand en de top 10, over het schooljaar, deze of vorige maand of de laatste 4 weken. Haalt de volledige planning op van Drive.
+- **Techniek:** `app.js` opgesplitst in modules; tijdens het tekenen een tijdelijke index (taken per les, afspraken per dag, …) zodat Saga vlot blijft met een jaar aan gegevens; het opruimwerk (lestaken aanmaken, oude blokken omzetten) loopt enkel bij het opstarten en na een synchronisatie; een nieuwe versie van de app meldt zich met *Herladen*.
+
 ## 3. Regels
 
 1. **Werkdag schuif ik zelf, deadline volgt de les.** Verschuift een les, dan schuiven de relatieve deadlines (en `vanaf`) mee. Werkdagen blijven staan. Ook als de vaste werkdagen wijzigen of er een extra werkdag bijkomt, worden relatieve deadlines herberekend.
@@ -131,7 +144,7 @@ In het overzicht: "BKH3-K2 + K3" met de kleuren van beide klassen.
    - 🔴 werkdag ligt ná de deadline;
    - 🔴 werkdag ligt vóór `vanaf`;
    - 🟠 taak zonder werkdag met deadline binnen 3 dagen;
-   - 🟠 les gepland op een dag waarop die klas afwezig is.
+   - 🟠 les gepland op een dag waarop die klas afwezig is (of vakantie).
 3. **Reeks opschuiven.** Bij een les: "schuif deze en alle volgende lessen van deze klas één lesmoment op". De nieuwe datums worden berekend uit het lesrooster, afwezigheidsdagen worden overgeslagen. Ook mogelijk: één lesmoment terug.
 4. **Afgevinkte taken** worden grijs en klappen weg (instelbaar zichtbaar).
 
@@ -197,8 +210,8 @@ Afwezigheden beheren, standaardtaken beheren, vaste werkdagen instellen.
 | 1 ✅ | klassen, lessen, taken, standaardtaken, vaste werkdagen, 30-dagenoverzicht, schuiven (slepen + "verplaats naar"), meeschuivende deadlines, waarschuwingen, bakje, afvinken, opslag op Drive, gsm |
 | 1b ✅ | opleiding (onderdelen, opdrachten, stukken, verdelen), filter, lessen met meerdere klassen |
 | 2a ✅ | agenda-sync met code (`#s`, `#sw`), dagelijks + knop "agenda nu vernieuwen" |
-| 2b | afwezigheden |
-| 3 | lesrooster per klas + reeks opschuiven |
+| 2b ✅ | vakanties en afwezigheden |
+| 3 ✅ | lesrooster per klas: inplannen volgens rooster, reeks opschuiven; pagina per klas; tijdsoverzicht |
 
 ## 8. Beslist
 

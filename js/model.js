@@ -4,7 +4,7 @@
 // Elk object heeft een `upd` (tijdstempel van laatste wijziging) zodat twee
 // toestellen hun gegevens kunnen samenvoegen. Verwijderen = `del: true`.
 
-export const COLLECTIES = ['klassen', 'lessen', 'taken', 'sjablonen', 'dagen', 'vakken', 'opdrachten', 'afspraken', 'onderwerpen'];
+export const COLLECTIES = ['klassen', 'lessen', 'taken', 'sjablonen', 'dagen', 'vakken', 'opdrachten', 'afspraken', 'onderwerpen', 'afwezigheden'];
 
 export const DAGNAMEN = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'];
 export const MAANDNAMEN = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
@@ -62,30 +62,26 @@ export function maandagVan(s) {
   return plusDagen(s, -((weekdag(s) + 6) % 7));
 }
 
-// Eerste dag van de maand van `s`, verschoven met `offset` maanden.
-export function eersteVanMaand(s, offset = 0) {
-  const d = parseDatum(s);
-  return isoDatum(new Date(d.getFullYear(), d.getMonth() + offset, 1));
-}
+export const VENSTER_STAP = 28; // ‹ › verschuift 4 weken
 
-export function laatsteVanMaand(eerste) {
-  const d = parseDatum(eerste);
-  return isoDatum(new Date(d.getFullYear(), d.getMonth() + 1, 0));
-}
-
-// Dagen van een maandkalender: van de maandag van de week van de 1e
-// tot de zondag van de week van de laatste dag.
-export function maandRaster(eerste) {
-  const van = maandagVan(eerste);
-  const tot = plusDagen(maandagVan(laatsteVanMaand(eerste)), 6);
+// Glijdend overzicht van ongeveer 30 dagen: vanaf vorige week tot 4 weken verder,
+// zodat de komende lessen altijd zichtbaar zijn, ook aan het einde van een maand.
+// Raster (computer): 5 volle weken vanaf de maandag van vorige week.
+// Lijst (gsm): van 7 dagen terug tot 30 dagen vooruit.
+export function venster(vandaagDatum, offset = 0, raster = true) {
+  const schuif = offset * VENSTER_STAP;
+  const van = raster ? plusDagen(maandagVan(vandaagDatum), -7 + schuif) : plusDagen(vandaagDatum, -7 + schuif);
+  const tot = raster ? plusDagen(van, 34) : plusDagen(vandaagDatum, 30 + schuif);
   const dagen = [];
   for (let d = van; d <= tot; d = plusDagen(d, 1)) dagen.push(d);
-  return dagen;
+  return { van, tot, dagen };
 }
 
-export function maandNaam(eerste) {
-  const d = parseDatum(eerste);
-  return `${MAANDNAMEN_LANG[d.getMonth()]} ${d.getFullYear()}`;
+export function vensterNaam(van, tot) {
+  const a = parseDatum(van);
+  const b = parseDatum(tot);
+  const jaar = a.getFullYear() !== b.getFullYear() ? ` ${a.getFullYear()}` : '';
+  return `${a.getDate()} ${MAANDNAMEN[a.getMonth()]}${jaar} – ${b.getDate()} ${MAANDNAMEN[b.getMonth()]} ${b.getFullYear()}`;
 }
 
 export function kortDatum(s) {
@@ -119,6 +115,7 @@ export function leegeState() {
     opdrachten: {},
     onderwerpen: {}, // groepeert losse schooltaken (bv. Stage, Vergaderingen)
     afspraken: {}, // komt uit Google Agenda (alleen-lezen, geschreven door het script)
+    afwezigheden: {}, // vakanties (alle klassen) en afwezigheden van één of meer klassen
     instellingen: { werkdagen: [2, 5], toonKlaar: false, upd: 0 },
   };
 }
@@ -157,12 +154,51 @@ export function zet(state, collectie, obj) {
   return obj;
 }
 
+// Verwijderen = enkel markeren: de gegevens (bv. de bestede tijd) blijven bewaard op Drive.
+// Een lopende timer wordt eerst gestopt.
 export function wis(state, collectie, id) {
-  state[collectie][id] = { id, del: true, upd: Date.now() };
+  const oud = state[collectie][id] || {};
+  const tijd = oud.gestart ? { tijd: bestedeTijd(oud), gestart: null } : {};
+  state[collectie][id] = { ...oud, ...tijd, id, del: true, upd: Date.now() };
+}
+
+// ---------- tijdelijke index ----------
+// Tijdens het tekenen verandert er niets aan de gegevens. `metCache` onthoudt dan
+// opzoeklijsten (taken per les, afspraken per dag, …) zodat ze maar één keer berekend
+// worden. Buiten `metCache` wordt alles telkens opnieuw berekend (veilig bij wijzigingen).
+let cache = null;
+
+export function metCache(f) {
+  if (cache) return f();
+  cache = new Map();
+  try {
+    return f();
+  } finally {
+    cache = null;
+  }
+}
+
+function onthoud(naam, bron, bouw) {
+  if (!cache || !bron) return bouw();
+  let m = cache.get(naam);
+  if (!m) cache.set(naam, (m = new WeakMap()));
+  if (!m.has(bron)) m.set(bron, bouw());
+  return m.get(bron);
+}
+
+function groepeer(lijstje, sleutel) {
+  const m = new Map();
+  for (const o of lijstje) {
+    const k = sleutel(o);
+    if (k == null) continue;
+    if (!m.has(k)) m.set(k, []);
+    m.get(k).push(o);
+  }
+  return m;
 }
 
 export function lijst(state, collectie) {
-  return Object.values(state[collectie] || {}).filter((o) => !o.del);
+  return onthoud('lijst', state[collectie], () => Object.values(state[collectie] || {}).filter((o) => !o.del)).slice();
 }
 
 // ---------- werkdagen ----------
@@ -175,12 +211,57 @@ export function isWerkdag(state, datum) {
   return state.instellingen.werkdagen.includes(weekdag(datum));
 }
 
+// Een dag manueel werkdag maken of net niet. Komt het resultaat overeen met wat
+// de dag zonder manuele aanduiding is (vaste werkdag of #sw), dan valt de aanduiding weg.
+export function wisselWerkdag(state, datum) {
+  const werk = isWerkdag(state, datum);
+  const vanzelf = afsprakenOp(state, datum).some((a) => a.werk) || state.instellingen.werkdagen.includes(weekdag(datum));
+  zet(state, 'dagen', { id: datum, werkdag: !werk === vanzelf ? null : !werk });
+}
+
 // ---------- agenda ----------
 
+function afsprakenPerDag(state) {
+  return onthoud('afsprakenPerDag', state.afspraken, () => {
+    const m = new Map();
+    const alle = lijst(state, 'afspraken').sort((a, b) => ((a.tijd || '') < (b.tijd || '') ? -1 : 1));
+    for (const a of alle) {
+      if (!a.datum) continue;
+      const eind = a.eindDatum && a.eindDatum > a.datum ? a.eindDatum : a.datum;
+      for (let d = a.datum, i = 0; d <= eind && i < 400; d = plusDagen(d, 1), i++) {
+        if (!m.has(d)) m.set(d, []);
+        m.get(d).push(a);
+      }
+    }
+    return m;
+  });
+}
+
 export function afsprakenOp(state, datum) {
-  return lijst(state, 'afspraken')
-    .filter((a) => a.datum <= datum && datum <= (a.eindDatum || a.datum))
-    .sort((a, b) => (a.tijd || '') < (b.tijd || '') ? -1 : 1);
+  return (afsprakenPerDag(state).get(datum) || []).slice();
+}
+
+// ---------- vakanties en afwezigheden ----------
+// Een afwezigheid zonder klassen (`klasIds` leeg) geldt voor alle klassen: een vakantie.
+
+export function afwezighedenOp(state, datum) {
+  return lijst(state, 'afwezigheden')
+    .filter((a) => a.van && a.van <= datum && datum <= (a.tot || a.van))
+    .sort((a, b) => (a.klasIds || []).length - (b.klasIds || []).length);
+}
+
+export const isVakantie = (afw) => !(afw.klasIds || []).length;
+
+// Afwezigheid die geldt voor (minstens één van) deze klassen op die dag, of null.
+export function klasAfwezig(state, datum, klasIds) {
+  return afwezighedenOp(state, datum).find((a) => isVakantie(a) || a.klasIds.some((k) => klasIds.includes(k))) || null;
+}
+
+// Waarschuwing voor een les op een dag waarop de klas er niet is.
+export function lesWaarschuwing(state, les) {
+  if (!les.datum) return null;
+  const a = klasAfwezig(state, les.datum, klassenVanLes(les));
+  return a ? { niveau: 'oranje', reden: `${a.reden || (isVakantie(a) ? 'vakantie' : 'klas afwezig')}` } : null;
 }
 
 // ---------- deadlines ----------
@@ -257,6 +338,25 @@ export function zetWerkdag(state, taakId, datum) {
   }
 }
 
+// Een taak opslaan vanuit het taakvenster. `basis` is de nieuwe taak (zonder id) of
+// wordt genegeerd als de taak al bestaat. Regelt ook: de standaarddag van een lestaak,
+// de volgorde binnen een opdracht, de timer bij afvinken en de blokken van een opgesplitste taak.
+export function bewaarTaak(state, id, wijzigingen, basis = {}) {
+  const huidig = id ? state.taken[id] : null;
+  const nieuw = { ...(huidig || basis), id: id || nieuwId(), ...wijzigingen };
+  if (nieuw.hoofd && 'werkdag' in wijzigingen) {
+    if (!nieuw.werkdag) Object.assign(nieuw, { werkdag: standaardWerkdag(state, nieuw), manueel: false });
+    else if (nieuw.werkdag !== huidig?.werkdag) nieuw.manueel = true;
+  }
+  if (nieuw.opdrachtId && (!huidig || huidig.opdrachtId !== nieuw.opdrachtId)) nieuw.volg = volgendStuk(state, nieuw.opdrachtId);
+  if (nieuw.lesId || nieuw.opdrachtId || nieuw.domein === 'opleiding') delete nieuw.klasIds;
+  if (nieuw.klaar && nieuw.gestart) Object.assign(nieuw, { tijd: bestedeTijd(nieuw), gestart: null });
+  zet(state, 'taken', nieuw);
+  if (nieuw.deelGroep && 'deadline' in wijzigingen) deelDeadline(state, nieuw.id);
+  if (nieuw.deelGroep && !nieuw.lesId && !nieuw.opdrachtId) deelOnderwerp(state, nieuw.id);
+  return nieuw;
+}
+
 // Les naar een andere dag (of zonder datum). De taak van de les verhuist mee,
 // tenzij je ze zelf al naar een andere dag verplaatst had.
 export function verplaatsLes(state, lesId, datum) {
@@ -312,14 +412,26 @@ export function groepNaam(namen) {
   return namen[0] + namen.slice(1).map((n) => ' + ' + n.slice(knip + 1)).join('');
 }
 
+const opLesdatum = (a, b) => {
+  if (a.datum && b.datum && a.datum !== b.datum) return a.datum < b.datum ? -1 : 1;
+  if (!!a.datum !== !!b.datum) return a.datum ? -1 : 1;
+  return (a.volg || 0) - (b.volg || 0);
+};
+
+function lessenPerKlas(state) {
+  return onthoud('lessenPerKlas', state.lessen, () => {
+    const m = new Map();
+    for (const l of lijst(state, 'lessen').sort(opLesdatum))
+      for (const k of klassenVanLes(l)) {
+        if (!m.has(k)) m.set(k, []);
+        m.get(k).push(l);
+      }
+    return m;
+  });
+}
+
 export function lessenVanKlas(state, klasId) {
-  return lijst(state, 'lessen')
-    .filter((l) => klassenVanLes(l).includes(klasId))
-    .sort((a, b) => {
-      if (a.datum && b.datum && a.datum !== b.datum) return a.datum < b.datum ? -1 : 1;
-      if (!!a.datum !== !!b.datum) return a.datum ? -1 : 1;
-      return (a.volg || 0) - (b.volg || 0);
-    });
+  return (lessenPerKlas(state).get(klasId) || []).slice();
 }
 
 export function volgendeVolg(state, klasId) {
@@ -345,7 +457,103 @@ export function volgendeLesNa(state, klasIds, datum) {
 }
 
 export function takenVanLes(state, lesId) {
-  return lijst(state, 'taken').filter((t) => t.lesId === lesId);
+  return (onthoud('takenPerLes', state.taken, () => groepeer(lijst(state, 'taken'), (t) => t.lesId || null)).get(lesId) || []).slice();
+}
+
+// Klassen waarvoor een taak is: via haar les, haar opdracht, of zelf aangeduid (losse schooltaak).
+export function klassenVanTaak(state, t) {
+  const les = t.lesId && state.lessen[t.lesId];
+  if (les && !les.del) return klassenVanLes(les);
+  const opd = t.opdrachtId && state.opdrachten[t.opdrachtId];
+  if (opd && !opd.del) return opd.klasIds || [];
+  return t.lesId || t.opdrachtId ? [] : t.klasIds || [];
+}
+
+// Verbeterwerk: taak bij een les die na het indienen komt.
+export function isVerbeteren(t) {
+  return t.soort === 'verbeteren' || (!t.hoofd && !!t.lesId && /^verbeter/i.test(t.titel || ''));
+}
+
+// Een les opslaan (nieuw of gewijzigd). Een nieuwe les krijgt haar taak;
+// een verplaatste les neemt haar taak mee (tenzij die zelf verplaatst werd).
+export function bewaarLes(state, id, { klasIds, titel, datum }) {
+  const huidig = id ? state.lessen[id] : null;
+  const les = zet(state, 'lessen', {
+    ...(huidig || {}),
+    id: id || nieuwId(),
+    klasId: undefined,
+    klasIds,
+    titel,
+    datum: datum || null,
+    volg: huidig?.volg ?? volgendeVolg(state, klasIds[0]),
+  });
+  if (!huidig) zorgHoofdtaken(state);
+  else if ((huidig.datum || null) !== les.datum) verplaatsLes(state, les.id, les.datum);
+  return les;
+}
+
+// ---------- lesrooster ----------
+
+// Een lesmoment: een lesdag van de klas waarop de klas niet afwezig is.
+export function isLesmoment(state, klasId, datum) {
+  const k = state.klassen[klasId];
+  return !!k && !k.del && (k.rooster || []).includes(weekdag(datum)) && !klasAfwezig(state, datum, [klasId]);
+}
+
+// Volgend (richting 1) of vorig (richting -1) lesmoment na/vóór `datum`, of null.
+export function volgendLesmoment(state, klasId, datum, richting = 1) {
+  for (let i = 1; i <= 400; i++) {
+    const d = plusDagen(datum, i * richting);
+    if (isLesmoment(state, klasId, d)) return d;
+  }
+  return null;
+}
+
+// Voorstel om de lessen zonder datum van een klas in te plannen op de volgende
+// lesmomenten (na de laatst geplande les, en niet vóór vandaag). Geeft [{ les, datum }].
+export function planVolgensRooster(state, klasId, vandaagDatum = vandaag()) {
+  const lessen = lessenVanKlas(state, klasId);
+  const zonder = lessen.filter((l) => !l.datum);
+  const bezet = new Set(lessen.filter((l) => l.datum).map((l) => l.datum));
+  const laatste = [...bezet].sort().at(-1);
+  let d = laatste && laatste >= vandaagDatum ? laatste : plusDagen(vandaagDatum, -1);
+  const plan = [];
+  for (const les of zonder) {
+    do d = volgendLesmoment(state, klasId, d);
+    while (d && bezet.has(d));
+    if (!d) break;
+    bezet.add(d);
+    plan.push({ les, datum: d });
+  }
+  return plan;
+}
+
+// Deze les en alle volgende lessen van de klas één lesmoment later (1) of vroeger (-1).
+// Geeft het plan [{ les, datum }], of null als het niet kan (geen lesrooster, of de
+// plaats vóór de eerste les is al bezet).
+export function reeksPlan(state, lesId, klasId, richting = 1) {
+  const les = state.lessen[lesId];
+  if (!les || les.del || !les.datum) return null;
+  const alle = lessenVanKlas(state, klasId).filter((l) => l.datum);
+  const reeks = alle.filter((l) => l.datum >= les.datum);
+  const plan = [];
+  let vorige = richting > 0 ? null : undefined;
+  for (const l of reeks) {
+    let d = volgendLesmoment(state, klasId, l.datum, richting);
+    if (richting > 0 && vorige && d && d <= vorige) d = volgendLesmoment(state, klasId, vorige, 1);
+    if (!d) return null;
+    plan.push({ les: l, datum: d });
+    vorige = d;
+  }
+  if (richting < 0 && plan.length) {
+    const eerste = plan[0].datum;
+    if (alle.some((l) => l.datum === eerste && !reeks.includes(l))) return null;
+  }
+  return plan.length ? plan : null;
+}
+
+export function pasLesplanToe(state, plan) {
+  for (const p of plan) verplaatsLes(state, p.les.id, p.datum);
 }
 
 // Haalt een klas uit alle lessen; lessen zonder klas verdwijnen (met hun taken).
@@ -373,14 +581,18 @@ function oudeStandaardTitels(state) {
   return titels;
 }
 
-function oudeTakenVanLes(state, lesId, titels) {
-  return takenVanLes(state, lesId).filter(
+function oudeTakenVanLes(taken, titels) {
+  return (taken || []).filter(
     (t) => !t.hoofd && !t.deelGroep && titels.has((t.titel || '').trim().toLowerCase())
   );
 }
 
 // Is er nog opruimwerk: een les zonder taak, of oude standaardtaken naast de lestaak?
 export function heeftOpruimwerk(state) {
+  return metCache(() => opruimwerk(state));
+}
+
+function opruimwerk(state) {
   const titels = oudeStandaardTitels(state);
   if (groepenMetVerschillendeDeadline(state).length) return true;
   if (lijst(state, 'taken').some((t) => t.deelGroep && !t.lesId && !t.opdrachtId)) return true;
@@ -388,7 +600,7 @@ export function heeftOpruimwerk(state) {
     const h = state.taken[hoofdId(les.id)];
     if (!h) return true;
     if (h.del) return false;
-    return oudeTakenVanLes(state, les.id, titels).length > 0 || (!h.werkdag && !!les.datum);
+    return oudeTakenVanLes(takenVanLes(state, les.id), titels).length > 0 || (!h.werkdag && !!les.datum);
   });
 }
 
@@ -398,12 +610,14 @@ export function heeftOpruimwerk(state) {
 // Geeft true als er iets veranderde.
 export function zorgHoofdtaken(state) {
   const titels = oudeStandaardTitels(state);
+  // eenmalig opzoeken: in de lus veranderen enkel de taken van de les zelf
+  const perLes = groepeer(lijst(state, 'taken'), (t) => t.lesId || null);
   let veranderd = false;
   for (const les of lijst(state, 'lessen')) {
     const id = hoofdId(les.id);
     const h = state.taken[id];
     if (h && h.del) continue; // bewust verwijderd
-    const oude = oudeTakenVanLes(state, les.id, titels);
+    const oude = oudeTakenVanLes(perLes.get(les.id), titels);
     if (h && !oude.length && (h.werkdag || !les.datum)) continue;
     const voorkeur = (t) => ['lesvoorbereiding', 'lvb'].includes(t.titel.trim().toLowerCase());
     const metDag = oude.filter((t) => t.werkdag).sort((a, b) => voorkeur(b) - voorkeur(a))[0];
@@ -440,7 +654,7 @@ export function zorgHoofdtaken(state) {
 const zelfdeDeadline = (a, b) => JSON.stringify(a.deadline || null) === JSON.stringify(b.deadline || null);
 
 export function blokkenVan(state, deelGroep) {
-  return lijst(state, 'taken').filter((t) => t.deelGroep === deelGroep);
+  return (onthoud('takenPerGroep', state.taken, () => groepeer(lijst(state, 'taken'), (t) => t.deelGroep || null)).get(deelGroep) || []).slice();
 }
 
 // De blokken van één opgesplitste taak delen één deadline. Na een wijziging
@@ -665,9 +879,20 @@ export function verwijderLes(state, lesId) {
 // ---------- opleiding ----------
 
 export function takenVanOpdracht(state, opdrachtId) {
-  return lijst(state, 'taken')
-    .filter((t) => t.opdrachtId === opdrachtId)
-    .sort((a, b) => (a.volg || 0) - (b.volg || 0));
+  const m = onthoud('takenPerOpdracht', state.taken, () => {
+    const g = groepeer(lijst(state, 'taken'), (t) => t.opdrachtId || null);
+    for (const v of g.values()) v.sort((a, b) => (a.volg || 0) - (b.volg || 0));
+    return g;
+  });
+  return (m.get(opdrachtId) || []).slice();
+}
+
+// Een voorstel van verdelen (zie verdeelOpdracht) uitvoeren.
+export function pasVerdelingToe(state, plan) {
+  for (const p of plan) {
+    const t = state.taken[p.taak.id];
+    if (t && !t.del) zet(state, 'taken', { ...t, werkdag: p.datum });
+  }
 }
 
 // Opdrachten in de volgorde waarin ze ingegeven zijn (`volg`, anders het id, dat met de tijd begint).
@@ -743,5 +968,193 @@ export function verdeelOpdracht(state, opdrachtId, vandaagDatum = vandaag()) {
     const eigen = deadlineVan(state, taak);
     if (eigen && datum > eigen) datum = eigen < van ? van : eigen;
     return { taak, datum };
+  });
+}
+
+// ---------- ongedaan maken ----------
+
+// Momentopname vóór een wijziging (enkel verwijzingen, de objecten zelf worden nooit aangepast).
+export function momentopname(state) {
+  const foto = {};
+  for (const k of Object.keys(state)) foto[k] = isCollectie(state[k]) && k !== 'instellingen' ? { ...state[k] } : state[k];
+  return foto;
+}
+
+// Alles wat sinds de momentopname veranderde, terugzetten (met een nieuwe tijdstempel,
+// zodat het ook op de andere toestellen terugkomt). Wat nieuw was, wordt verwijderd.
+export function zetTerug(state, foto) {
+  for (const k of Object.keys(state)) {
+    if (k === 'instellingen') {
+      if (foto.instellingen && state.instellingen !== foto.instellingen) state.instellingen = { ...foto.instellingen, upd: Date.now() };
+      continue;
+    }
+    if (!isCollectie(state[k])) continue;
+    const voor = foto[k] || {};
+    for (const id of Object.keys(state[k])) {
+      if (state[k][id] === voor[id]) continue;
+      if (voor[id]) zet(state, k, { ...voor[id] });
+      else wis(state, k, id);
+    }
+  }
+}
+
+// Een back-up écht terugzetten: alles uit de back-up wint (nieuwe tijdstempel) en
+// wat er sindsdien bijkwam, wordt verwijderd. Agenda-afspraken blijven van het script.
+export function herstelNaar(state, data) {
+  const nu = Date.now();
+  for (const k of Object.keys(data || {})) {
+    if (k === 'instellingen' || k === 'afspraken' || !isCollectie(data[k])) continue;
+    state[k] = { ...(state[k] || {}) };
+    for (const [id, o] of Object.entries(data[k])) state[k][id] = { ...o, upd: nu };
+  }
+  for (const k of Object.keys(state)) {
+    if (k === 'instellingen' || k === 'afspraken' || !isCollectie(state[k])) continue;
+    for (const id of Object.keys(state[k])) if (!data?.[k]?.[id] && !state[k][id].del) wis(state, k, id);
+  }
+  if (data?.instellingen) state.instellingen = { ...data.instellingen, upd: nu };
+}
+
+// ---------- archief: wat het toestel nog nodig heeft ----------
+
+// Alles wordt bewaard op Drive. Op het toestel blijft enkel wat de laatste maand
+// (ACTIEF_DAGEN) nog speelde: afgewerkte taken, voorbije lessen, oude afspraken en
+// afwezigheden verdwijnen er na een maand. Een les blijft zolang één van haar taken
+// blijft (en omgekeerd: blijft een les, dan blijven al haar taken), zodat Saga nooit
+// een lestaak opnieuw aanmaakt die nog op Drive staat. Hetzelfde voor opdrachten.
+// Wat recent gewijzigd werd (of na `bewaardTot`, nog niet op Drive) blijft altijd.
+// (Dezelfde functie staat ook in apps-script/Code.gs.)
+export const ACTIEF_DAGEN = 31;
+
+export function actief(state, vandaagDatum, nu, bewaardTot) {
+  const d = new Date(Number(vandaagDatum.slice(0, 4)), Number(vandaagDatum.slice(5, 7)) - 1, Number(vandaagDatum.slice(8, 10)) - ACTIEF_DAGEN);
+  const z = (n) => String(n).padStart(2, '0');
+  const grens = d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate());
+  let grensMs = nu - ACTIEF_DAGEN * 86400000;
+  if (typeof bewaardTot === 'number' && bewaardTot < grensMs) grensMs = bewaardTot;
+  const recent = (o) => (o.upd || 0) > grensMs;
+  const taken = state.taken || {};
+  const metStukken = {};
+  Object.keys(taken).forEach((id) => {
+    const t = taken[id];
+    if (t && !t.del && t.opdrachtId) metStukken[t.opdrachtId] = true;
+  });
+  const eigenOud = (k, o) => {
+    if (!o || typeof o !== 'object') return false;
+    if (o.del) return !recent(o);
+    if (k === 'taken') return !recent(o) && !!o.klaar && (o.werkdag || '') < grens;
+    if (k === 'lessen') return !recent(o) && !!o.datum && o.datum < grens;
+    if (k === 'opdrachten') return !recent(o) && (o.deadline ? o.deadline < grens : !!metStukken[o.id]);
+    if (k === 'afspraken') return (o.eindDatum || o.datum || '') < grens;
+    if (k === 'dagen') return String(o.id || '') < grens;
+    if (k === 'afwezigheden') return !recent(o) && (o.tot || o.van || '') < grens;
+    return false;
+  };
+  const levend = { lessen: {}, opdrachten: {} };
+  Object.keys(taken).forEach((id) => {
+    const t = taken[id];
+    if (eigenOud('taken', t)) return;
+    if (t.lesId) levend.lessen[t.lesId] = true;
+    if (t.opdrachtId) levend.opdrachten[t.opdrachtId] = true;
+  });
+  const ouderBlijft = (k, id) => {
+    const o = state[k] && state[k][id];
+    return !!o && (!!levend[k][id] || !eigenOud(k, o));
+  };
+  const r = {};
+  Object.keys(state).forEach((k) => {
+    const c = state[k];
+    if (k === 'instellingen' || !c || typeof c !== 'object' || Array.isArray(c)) {
+      r[k] = c;
+      return;
+    }
+    const nieuw = {};
+    let weg = false;
+    Object.keys(c).forEach((id) => {
+      const o = c[id];
+      let blijft;
+      if (k === 'lessen' || k === 'opdrachten') blijft = ouderBlijft(k, id);
+      else if (k === 'taken')
+        blijft = !eigenOud(k, o) || (!!o.lesId && ouderBlijft('lessen', o.lesId)) || (!!o.opdrachtId && ouderBlijft('opdrachten', o.opdrachtId));
+      else blijft = !eigenOud(k, o);
+      if (blijft) nieuw[id] = o;
+      else weg = true;
+    });
+    r[k] = weg ? nieuw : c;
+  });
+  return r;
+}
+
+// ---------- waar gaat mijn tijd naartoe ----------
+
+export const SOORTEN = { les: 'Lesvoorbereiding', verbeteren: 'Verbeteren', opdracht: 'Opdrachten', los: 'Losse taken' };
+
+// Begin van het schooljaar (1 september) waarin `datum` valt.
+export function schooljaarStart(datum) {
+  const j = Number(datum.slice(0, 4));
+  return datum.slice(5) >= '09-01' ? `${j}-09-01` : `${j - 1}-09-01`;
+}
+
+// Dag waaraan de bestede tijd van een taak toegeschreven wordt.
+export function tijdDatum(state, t) {
+  return t.werkdag || deadlineVan(state, t) || (t.upd ? isoDatum(new Date(t.upd)) : null);
+}
+
+// Bestede tijd tussen `van` en `tot` (inbegrepen), opgeteld per groep (klas, onderwerp,
+// opleidingsonderdeel), per soort werk, per maand en per les/opdracht.
+export function tijdRapport(state, van, tot, nu = Date.now()) {
+  return metCache(() => {
+    const r = { totaal: 0, school: 0, opleiding: 0, groepen: {}, maanden: {}, items: {} };
+    for (const t of lijst(state, 'taken')) {
+      const ms = bestedeTijd(t, nu);
+      if (!ms) continue;
+      const datum = tijdDatum(state, t);
+      if (!datum || datum < van || datum > tot) continue;
+      const domein = domeinVan(t);
+      const les = t.lesId && state.lessen[t.lesId];
+      const opd = t.opdrachtId && state.opdrachten[t.opdrachtId];
+      const soort = t.lesId ? (isVerbeteren(t) ? 'verbeteren' : 'les') : t.opdrachtId ? 'opdracht' : 'los';
+      const klassen = klassenVanTaak(state, t)
+        .map((id) => state.klassen[id])
+        .filter(Boolean);
+      let g;
+      if (klassen.length) {
+        g = { sleutel: 'klas:' + klassen.map((k) => k.id).sort().join('+'), naam: groepNaam(klassen.map((k) => k.naam)), kleur: klassen[0].kleur, klasIds: klassen.map((k) => k.id) };
+      } else {
+        const ond = (opd && opd.onderwerpId && state.onderwerpen[opd.onderwerpId]) || (!opd && !les && t.onderwerpId && state.onderwerpen[t.onderwerpId]);
+        const vak = opd && opd.vakId && state.vakken[opd.vakId];
+        if (ond) g = { sleutel: 'ond:' + ond.id, naam: ond.naam, kleur: ond.kleur };
+        else if (vak) g = { sleutel: 'vak:' + vak.id, naam: vak.naam, kleur: vak.kleur };
+        else g = { sleutel: 'overig:' + domein, naam: domein === 'opleiding' ? 'Opleiding, overig' : 'School, overig', kleur: null };
+      }
+      const groep = (r.groepen[g.sleutel] ||= { ...g, domein, totaal: 0, soorten: {}, lessen: {} });
+      groep.totaal += ms;
+      groep.soorten[soort] = (groep.soorten[soort] || 0) + ms;
+      if (soort === 'les') groep.lessen[t.lesId] = true;
+      const maand = (r.maanden[datum.slice(0, 7)] ||= { maand: datum.slice(0, 7), school: 0, opleiding: 0 });
+      maand[domein] += ms;
+      r.totaal += ms;
+      r[domein] += ms;
+      const ik = les ? 'les:' + t.lesId : opd ? 'opd:' + t.opdrachtId : 'taak:' + t.id;
+      const titel = les ? les.titel : opd ? opd.titel : t.titel;
+      const item = (r.items[ik] ||= { sleutel: ik, titel: titel || '(zonder titel)', groep: g.naam, kleur: g.kleur, ms: 0, datum });
+      item.ms += ms;
+      if (datum > item.datum) item.datum = datum;
+    }
+    const groepen = Object.values(r.groepen)
+      .map((g) => {
+        const aantal = Object.keys(g.lessen).length;
+        return { ...g, aantalLessen: aantal, perLes: aantal ? Math.round((g.soorten.les || 0) / aantal) : 0 };
+      })
+      .sort((a, b) => b.totaal - a.totaal);
+    return {
+      totaal: r.totaal,
+      school: r.school,
+      opleiding: r.opleiding,
+      groepen,
+      maanden: Object.values(r.maanden).sort((a, b) => (a.maand < b.maand ? -1 : 1)),
+      top: Object.values(r.items)
+        .sort((a, b) => b.ms - a.ms)
+        .slice(0, 10),
+    };
   });
 }

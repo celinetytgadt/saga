@@ -39,7 +39,8 @@ export function leesFilter(f) {
 export const ui = {
   view: 'dagen',
   id: null, // bv. de klas bij #/klas/<id>
-  vensterOffset: 0, // overzicht: aantal stappen van 4 weken vooruit (+) of terug (-)
+  wekenTerug: 1, // overzicht: aantal weken vóór deze week
+  wekenVooruit: M.WEKEN_START, // overzicht: aantal weken na deze week (groeit bij het scrollen)
   naarVandaag: true, // na het tekenen naar vandaag scrollen (gsm)
   filter: leesFilter(lokaal('saga.filter', 'alles')),
   laatsteKlassen: lokaal('saga.laatsteKlassen', []),

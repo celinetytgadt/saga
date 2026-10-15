@@ -34,6 +34,12 @@ function afwezigLabel(s, a) {
   return M.isVakantie(a) ? `🏖 ${a.reden || 'Vakantie'}` : `🚫 ${klassenNaam(s, a.klasIds)}${a.reden ? `: ${a.reden}` : ''}`;
 }
 
+// "1 november", en bij januari met het jaar: "1 januari 2027"
+function eersteVanMaand(datum) {
+  const m = Number(datum.slice(5, 7));
+  return `1 ${M.MAANDNAMEN_LANG[m - 1]}${m === 1 ? ' ' + datum.slice(0, 4) : ''}`;
+}
+
 function dagBlok(s, idx, datum, v, raster) {
   const werk = M.isWerkdag(s, datum);
   const weekend = [0, 6].includes(M.weekdag(datum));
@@ -56,7 +62,7 @@ function dagBlok(s, idx, datum, v, raster) {
   ].filter(Boolean);
   return `<section class="${klassen.join(' ')}" data-drop="${datum}">
     <header class="dag-kop">
-      <span class="dag-datum">${raster ? dagKort(datum) : M.kortDatum(datum)}</span>
+      <span class="dag-datum">${raster ? (datum.endsWith('-01') ? eersteVanMaand(datum) : dagKort(datum)) : M.kortDatum(datum)}</span>
       ${werk ? `<span class="label-werk" title="werkdag">${raster ? '' : 'werk'}</span>` : ''}
       <button class="dag-plus" data-actie="dag" data-datum="${datum}" aria-label="Acties voor ${M.kortDatum(datum)}">+</button>
     </header>
@@ -136,19 +142,30 @@ export function bakjeInhoud(s) {
     <p class="hint">${mobiel.matches ? 'Tik op een taak om ze naar een dag te verplaatsen.' : 'Sleep blokjes naar een dag, of terug naar hier.'}</p>`;
 }
 
-function periodeNav(s, van, tot) {
+function periodeNav(s) {
   return `<div class="periode-nav">
-    <button class="knop klein" data-actie="venster" data-d="-1" aria-label="4 weken terug">‹</button>
-    <button class="knop klein" data-actie="venster" data-d="0">Vandaag</button>
-    <button class="knop klein" data-actie="venster" data-d="1" aria-label="4 weken verder">›</button>
-    <span class="periode">${M.vensterNaam(van, tot)}</span>
+    <button class="knop klein" data-actie="naar-vandaag">Vandaag</button>
     ${filterKnoppen(s)}
   </div>`;
 }
 
+// Bovenaan: eerdere weken bijladen. Onderaan: vanzelf meer weken bij het scrollen
+// (de knop is er voor als dat niet lukt).
+function eerderKnop() {
+  return ui.wekenTerug < M.WEKEN_TERUG_MAX
+    ? `<div class="weken-meer boven"><button class="knop klein" data-actie="eerdere-weken">↑ Eerdere weken</button></div>`
+    : '';
+}
+
+function meerKnop() {
+  return ui.wekenVooruit < M.WEKEN_MAX
+    ? `<div class="weken-meer" data-meer-weken><button class="knop klein" data-actie="meer-weken">Meer weken</button></div>`
+    : '<p class="hint weken-meer">Einde van het overzicht (een jaar vooruit).</p>';
+}
+
 export function viewRaster(s) {
   const v = M.vandaag();
-  const { van, tot, dagen } = M.venster(v, ui.vensterOffset, true);
+  const { dagen } = M.venster(v, ui.wekenTerug, ui.wekenVooruit);
   const idx = indexeer(s);
   const zb = ui.zijbalk;
   const zien = (t) => toonTaak(s, t);
@@ -160,22 +177,30 @@ export function viewRaster(s) {
         : `<aside class="bakje zijbalk" data-drop="bakje" data-scroll="bakje">${bakjeInhoud(s)}</aside><div class="sleepgreep" data-greep title="Sleep om het bakje breder of smaller te maken"></div>`
     }
     <div class="raster-wrap">
-      ${periodeNav(s, van, tot)}
-      <div class="raster-kop">${WEEK.map((d) => `<div>${M.DAGNAMEN[d]}</div>`).join('')}</div>
+      <div class="raster-top">
+        ${periodeNav(s)}
+        <div class="raster-kop">${WEEK.map((d) => `<div>${M.DAGNAMEN[d]}</div>`).join('')}</div>
+      </div>
+      ${eerderKnop()}
       <div class="raster">${dagen.map((d) => dagBlok(s, idx, d, v, true)).join('')}</div>
+      ${meerKnop()}
     </div>
   </div>`;
 }
 
 export function viewLijst(s) {
   const v = M.vandaag();
-  const { van, tot, dagen } = M.venster(v, ui.vensterOffset, false);
+  const { dagen } = M.venster(v, ui.wekenTerug, ui.wekenVooruit);
   const idx = indexeer(s);
   const liggen = blijvenLiggen(s, v).filter((t) => toonTaak(s, t)).length;
+  // een kop bij elke nieuwe maand, zodat je weet waar je bent tijdens het scrollen
+  const maandKop = (d, i) => (i === 0 || d.endsWith('-01') ? `<h2 class="maand-kop">${M.maandNaam(d)}</h2>` : '');
   return `<div class="lijst">
-    ${periodeNav(s, van, tot)}
+    ${periodeNav(s)}
     ${liggen ? `<a class="melding" href="#/bakje">${liggen} ${liggen === 1 ? 'taak blijft' : 'taken blijven'} liggen →</a>` : ''}
-    ${dagen.map((d) => dagBlok(s, idx, d, v, false)).join('')}
+    ${eerderKnop()}
+    ${dagen.map((d, i) => maandKop(d, i) + dagBlok(s, idx, d, v, false)).join('')}
+    ${meerKnop()}
   </div>`;
 }
 

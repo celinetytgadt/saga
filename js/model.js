@@ -62,26 +62,28 @@ export function maandagVan(s) {
   return plusDagen(s, -((weekdag(s) + 6) % 7));
 }
 
-export const VENSTER_STAP = 28; // ‹ › verschuift 4 weken
+// Overzicht: één doorlopende lijst van weken om naar beneden te scrollen.
+// Bij het openen: vorige week, deze week en WEKEN_START weken vooruit; bij het scrollen
+// komen er weken bij (tot WEKEN_MAX). Naar boven kan tot WEKEN_TERUG_MAX weken terug
+// (ouder staat niet meer op het toestel, wel op Drive).
+export const WEKEN_START = 10;
+export const WEKEN_MAX = 52;
+export const WEKEN_TERUG_MAX = 4;
 
-// Glijdend overzicht van ongeveer 30 dagen: vanaf vorige week tot 4 weken verder,
-// zodat de komende lessen altijd zichtbaar zijn, ook aan het einde van een maand.
-// Raster (computer): 5 volle weken vanaf de maandag van vorige week.
-// Lijst (gsm): van 7 dagen terug tot 30 dagen vooruit.
-export function venster(vandaagDatum, offset = 0, raster = true) {
-  const schuif = offset * VENSTER_STAP;
-  const van = raster ? plusDagen(maandagVan(vandaagDatum), -7 + schuif) : plusDagen(vandaagDatum, -7 + schuif);
-  const tot = raster ? plusDagen(van, 34) : plusDagen(vandaagDatum, 30 + schuif);
+// Dagen van de maandag `terug` weken vóór deze week tot de zondag `vooruit` weken na deze week.
+export function venster(vandaagDatum, terug = 1, vooruit = WEKEN_START) {
+  const maandag = maandagVan(vandaagDatum);
+  const van = plusDagen(maandag, -7 * terug);
+  const tot = plusDagen(maandag, 7 * vooruit + 6);
   const dagen = [];
   for (let d = van; d <= tot; d = plusDagen(d, 1)) dagen.push(d);
   return { van, tot, dagen };
 }
 
-export function vensterNaam(van, tot) {
-  const a = parseDatum(van);
-  const b = parseDatum(tot);
-  const jaar = a.getFullYear() !== b.getFullYear() ? ` ${a.getFullYear()}` : '';
-  return `${a.getDate()} ${MAANDNAMEN[a.getMonth()]}${jaar} – ${b.getDate()} ${MAANDNAMEN[b.getMonth()]} ${b.getFullYear()}`;
+// "november 2026"
+export function maandNaam(s) {
+  const d = parseDatum(s);
+  return `${MAANDNAMEN_LANG[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 export function kortDatum(s) {

@@ -1,6 +1,6 @@
 // Saga – service worker: app werkt snel en ook zonder netwerk.
 // Strategie: toon wat in de cache zit, haal ondertussen de nieuwste versie op.
-const CACHE = 'saga-v27';
+const CACHE = 'saga-v28';
 const SCHIL = [
   './',
   'index.html',
@@ -8,13 +8,23 @@ const SCHIL = [
   'js/app.js',
   'js/model.js',
   'js/store.js',
+  'js/ui.js',
+  'js/weergave.js',
+  'js/dialogen.js',
+  'js/views/overzicht.js',
+  'js/views/school.js',
+  'js/views/klas.js',
+  'js/views/opleiding.js',
+  'js/views/instellingen.js',
+  'js/views/tijd.js',
   'manifest.webmanifest',
   'icons/icon.svg',
   'icons/icon-192.png',
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SCHIL)));
+  // cache: 'reload' haalt de nieuwe versie op, niet wat de browser nog bewaarde
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SCHIL.map((u) => new Request(u, { cache: 'reload' })))));
   self.skipWaiting();
 });
 

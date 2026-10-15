@@ -1,10 +1,10 @@
 // Saga – bewaren op dit toestel en synchroniseren met Google Drive (via Apps Script).
 
-import { leegeState, merge } from './model.js';
+import { leegeState, merge, actief, vandaag, momentopname, zetTerug } from './model.js';
 
 const LS_STATE = 'saga.state.v1';
 const LS_SYNC = 'saga.sync.v1';
-const SCRIPT_VERSIE = 6; // minimaal vereiste versie van apps-script/Code.gs
+const SCRIPT_VERSIE = 7; // minimaal vereiste versie van apps-script/Code.gs
 
 let state = laadState();
 let syncCfg = laadJson(LS_SYNC) || { url: '', token: '' };
@@ -32,7 +32,8 @@ function bewaar() {
   }
 }
 
-// soort: 'data' (de planning veranderde) of 'status' (enkel de synchronisatiestatus).
+// soort: 'data' (de planning veranderde hier), 'sync' (er kwam iets binnen van een
+// ander toestel of uit een back-up) of 'status' (enkel de synchronisatiestatus).
 function melden(soort = 'data') {
   for (const f of luisteraars) f(soort);
 }
@@ -46,18 +47,27 @@ export function abonneer(f) {
 }
 
 // Alle wijzigingen gaan via deze functie: bewaren, scherm vernieuwen, synchroniseren.
+// Geeft terug wat `f` teruggeeft.
 export function wijzig(f) {
-  f(state);
+  const r = f(state);
   bewaar();
   melden();
   planSync();
+  return r;
 }
 
-// Een volledige back-up (bv. een geïmporteerd bestand) samenvoegen met wat er al is.
+// Zelfde als wijzig, maar geeft ook een functie die alles weer ongedaan maakt.
+export function wijzigOngedaan(f) {
+  const foto = momentopname(state);
+  const resultaat = wijzig(f);
+  return { resultaat, ongedaan: () => wijzig((st) => zetTerug(st, foto)) };
+}
+
+// Een back-up (bv. een geïmporteerd bestand) samenvoegen met wat er al is.
 export function voegSamen(data) {
   state = merge(state, data);
   bewaar();
-  melden();
+  melden('sync');
   planSync(200);
 }
 
@@ -114,8 +124,34 @@ function iets(voor, na) {
   if (voor.instellingen !== na.instellingen) return true;
   return Object.keys(na).some((k) => {
     if (k === 'instellingen' || !na[k] || typeof na[k] !== 'object') return false;
+    if (Object.keys(na[k]).length !== Object.keys(voor[k] || {}).length) return true; // er viel iets weg
     return Object.keys(na[k]).some((id) => na[k][id] !== voor[k]?.[id]);
   });
+}
+
+// text/plain vermijdt een CORS-preflight, die Apps Script niet ondersteunt.
+async function post(verzoek) {
+  const antwoord = await fetch(syncCfg.url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ ...verzoek, token: syncCfg.token }),
+  });
+  const j = await antwoord.json();
+  if (!j.ok) throw new Error(j.fout === 'onbekende actie' ? 'script verouderd' : j.fout || 'onbekende fout');
+  return j;
+}
+
+// De volledige planning, ook wat enkel nog op Drive staat (voor het tijdsoverzicht en
+// de back-up). Zonder synchronisatie: wat op dit toestel staat.
+export async function haalAlles() {
+  if (!syncCfg.url || !syncCfg.token) return { data: state, volledig: false };
+  try {
+    const j = await post({ actie: 'alles', data: state });
+    if ((j.scriptVersie || 1) < SCRIPT_VERSIE) throw new Error('script verouderd');
+    return { data: merge(state, j.data), volledig: true };
+  } catch (e) {
+    throw new Error(e.message === 'script verouderd' ? 'het Google-script is verouderd (zie installatiegids, "Het script bijwerken").' : uitleg(e));
+  }
 }
 
 let timer = null;
@@ -157,19 +193,14 @@ export async function sync({ agenda = false } = {}) {
   bezig = true;
   zetStatus('bezig');
   try {
-    // text/plain vermijdt een CORS-preflight, die Apps Script niet ondersteunt.
-    const antwoord = await fetch(syncCfg.url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ actie: 'sync', token: syncCfg.token, data: state, agenda }),
-    });
-    const j = await antwoord.json();
-    if (!j.ok) throw new Error(j.fout || 'onbekende fout');
+    const verzonden = Date.now();
+    const j = await post({ actie: 'sync', data: state, agenda });
     // Wijzigingen die tijdens het wachten gebeurden zitten al in `state` en zijn recenter.
+    // Wat ouder is dan een maand en al op Drive staat, mag van het toestel (zie actief).
     const voor = state;
-    state = merge(state, j.data);
+    state = actief(merge(state, j.data), vandaag(), Date.now(), verzonden);
     bewaar();
-    if (iets(voor, state)) melden('data');
+    if (iets(voor, state)) melden('sync');
     syncStatus.agenda = j.agendaInfo || null;
     if ((j.scriptVersie || 1) < SCRIPT_VERSIE) {
       zetStatus('fout', 'je planning is bewaard, maar het Google-script is verouderd. Plak de nieuwe Code.gs, voer "installeer" opnieuw uit en maak een nieuwe versie (zie installatiegids, "Het script bijwerken").');

@@ -69,14 +69,17 @@ Doe dit op je laptop én op je gsm.
 ## Goed om te weten
 
 - **Back-ups:** het script bewaart elke dag automatisch een kopie in de map Saga op je Drive (de laatste 14 dagen).
-  Via Instellingen → Back-up kun je ook zelf een bestand downloaden.
+  Via Instellingen → Back-up kun je ook zelf je volledige planning downloaden.
+- **Alles blijft op Drive:** ook afgewerkte en verwijderde taken (met hun bestede tijd), zodat het tijdsoverzicht
+  het hele schooljaar toont. Op je toestellen blijft enkel wat de laatste maand nog speelde; dat houdt Saga snel.
 - **Zonder internet:** Saga blijft werken. Wijzigingen worden doorgestuurd zodra je weer online bent.
 - **Sleutel kwijt of gelekt?** Open het script → **Projectinstellingen** (tandwiel links) → **Scripteigenschappen**,
   verwijder `SAGA_TOKEN` en voer **installeer** opnieuw uit. Vul de nieuwe sleutel in op je toestellen.
 
 ## Het script bijwerken
 
-Als er een nieuwe versie van `Code.gs` is (Saga meldt dan "het Google-script is verouderd"):
+Als er een nieuwe versie van `Code.gs` is (Saga meldt dan "het Google-script is verouderd").
+Dat is nu het geval: **versie 7** is nodig voor het tijdsoverzicht en de volledige back-up.
 
 1. Open je project op <https://script.google.com>.
 2. Wis alles in `Code.gs`, plak de nieuwe inhoud van [`apps-script/Code.gs`](../apps-script/Code.gs) en klik op het **diskette-icoon**.

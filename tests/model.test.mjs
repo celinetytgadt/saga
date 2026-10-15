@@ -533,3 +533,247 @@ test('losse taak opdelen in stukken: wordt een opdracht met de taak als eerste s
   assert.equal(s.opdrachten[opd.id].onderwerpId, null);
   assert.equal(s.opdrachten[opd.id].del, undefined);
 });
+
+// ---------- archief, rooster, vakanties, tijd ----------
+
+test('overzicht: glijdend venster, ook over de maandgrens', () => {
+  const r = M.venster('2026-10-29'); // donderdag
+  assert.equal(r.van, '2026-10-19'); // maandag van vorige week
+  assert.equal(r.dagen.length, 35);
+  assert.ok(r.dagen.includes('2026-11-20'));
+  const l = M.venster('2026-10-29', 0, false);
+  assert.equal(l.van, '2026-10-22');
+  assert.equal(l.tot, '2026-11-28');
+  assert.equal(M.venster('2026-10-29', 1).van, '2026-11-16');
+  assert.equal(M.vensterNaam('2026-12-28', '2027-01-31'), '28 dec 2026 – 31 jan 2027');
+});
+
+test('verwijderen bewaart de gegevens en stopt de timer', () => {
+  const s = basis();
+  s.taken.t = taak({ id: 't', tijd: 60000, gestart: Date.now() - 60000 });
+  M.wis(s, 'taken', 't');
+  assert.equal(s.taken.t.del, true);
+  assert.equal(s.taken.t.titel, 'x');
+  assert.equal(s.taken.t.gestart, null);
+  assert.ok(s.taken.t.tijd >= 120000);
+  assert.equal(M.lijst(s, 'taken').length, 0);
+});
+
+test('index tijdens het tekenen geeft hetzelfde als zonder', () => {
+  const s = basis();
+  M.zorgHoofdtaken(s);
+  s.afspraken.a = { id: 'a', titel: 'Kamp', datum: '2026-10-13', eindDatum: '2026-10-15', werk: true, upd: 1 };
+  const zonder = [M.takenVanLes(s, 'l1').length, M.afsprakenOp(s, '2026-10-14').length, M.lessenVanKlas(s, 'k1').length, M.isWerkdag(s, '2026-10-14')];
+  const met = M.metCache(() => [M.takenVanLes(s, 'l1').length, M.afsprakenOp(s, '2026-10-14').length, M.lessenVanKlas(s, 'k1').length, M.isWerkdag(s, '2026-10-14')]);
+  assert.deepEqual(met, zonder);
+  assert.deepEqual(zonder, [1, 1, 1, true]);
+});
+
+test('werkdag wisselen houdt rekening met #sw', () => {
+  const s = basis();
+  s.afspraken.sw = { id: 'sw', titel: 'Studiedag', datum: '2026-10-14', werk: true, upd: 1 }; // woensdag
+  M.wisselWerkdag(s, '2026-10-14');
+  assert.equal(M.isWerkdag(s, '2026-10-14'), false);
+  M.wisselWerkdag(s, '2026-10-14');
+  assert.equal(M.isWerkdag(s, '2026-10-14'), true);
+  assert.equal(s.dagen['2026-10-14'].werkdag, null);
+});
+
+test('taak opslaan: lestaak manueel of terug standaard, afvinken stopt timer', () => {
+  const s = basis();
+  M.zorgHoofdtaken(s);
+  const id = M.hoofdId('l1');
+  M.bewaarTaak(s, id, { werkdag: '2026-10-11' });
+  assert.equal(s.taken[id].manueel, true);
+  M.bewaarTaak(s, id, { werkdag: null });
+  assert.equal(s.taken[id].werkdag, '2026-10-14');
+  assert.equal(s.taken[id].manueel, false);
+  M.startTimer(s, id);
+  M.bewaarTaak(s, id, { klaar: true });
+  assert.equal(s.taken[id].gestart, null);
+  const los = M.bewaarTaak(s, null, { titel: 'Toets', klasIds: ['k1'] }, { domein: 'school' });
+  assert.deepEqual(M.klassenVanTaak(s, los), ['k1']);
+  const naarLes = M.bewaarTaak(s, los.id, { lesId: 'l1' });
+  assert.equal(naarLes.klasIds, undefined);
+});
+
+test('les opslaan: nieuwe les krijgt taak, verplaatste les neemt ze mee', () => {
+  const s = basis();
+  const les = M.bewaarLes(s, null, { klasIds: ['k1'], titel: 'Nieuw', datum: '2026-10-22' });
+  assert.equal(s.taken[M.hoofdId(les.id)].werkdag, '2026-10-21');
+  M.bewaarLes(s, les.id, { klasIds: ['k1'], titel: 'Nieuw', datum: '2026-10-29' });
+  assert.equal(s.taken[M.hoofdId(les.id)].werkdag, '2026-10-28');
+});
+
+test('vakantie en afwezigheid: waarschuwing bij een les', () => {
+  const s = basis();
+  s.klassen.k2 = { id: 'k2', naam: 'BKH3', rooster: [4], upd: 1 };
+  s.afwezigheden.v = { id: 'v', reden: 'Herfstvakantie', van: '2026-10-26', tot: '2026-11-08', klasIds: [], upd: 1 };
+  s.afwezigheden.u = { id: 'u', reden: 'Uitstap', van: '2026-10-15', tot: '2026-10-15', klasIds: ['k2'], upd: 1 };
+  assert.equal(M.lesWaarschuwing(s, s.lessen.l1), null); // uitstap is van een andere klas
+  s.lessen.l1.klasIds = ['k1', 'k2'];
+  assert.equal(M.lesWaarschuwing(s, s.lessen.l1).reden, 'Uitstap');
+  assert.equal(M.lesWaarschuwing(s, { klasIds: ['k1'], datum: '2026-10-29' }).reden, 'Herfstvakantie');
+  assert.equal(M.isLesmoment(s, 'k1', '2026-10-29'), false);
+  assert.equal(M.isLesmoment(s, 'k1', '2026-11-09'), true);
+});
+
+test('lessen inplannen volgens rooster, vakantie overslaan', () => {
+  const s = basis(); // k1: ma en do, les l1 op do 15/10
+  s.afwezigheden.v = { id: 'v', reden: 'Herfstvakantie', van: '2026-10-26', tot: '2026-11-08', upd: 1 };
+  for (let i = 2; i <= 5; i++) s.lessen['l' + i] = { id: 'l' + i, klasIds: ['k1'], titel: 'Les ' + i, datum: null, volg: i, upd: 1 };
+  const plan = M.planVolgensRooster(s, 'k1', '2026-10-10');
+  assert.deepEqual(
+    plan.map((p) => [p.les.id, p.datum]),
+    [['l2', '2026-10-19'], ['l3', '2026-10-22'], ['l4', '2026-11-09'], ['l5', '2026-11-12']]
+  );
+});
+
+test('reeks opschuiven: één lesmoment later of vroeger', () => {
+  const s = basis();
+  s.lessen.l2 = { id: 'l2', klasIds: ['k1'], titel: 'Twee', datum: '2026-10-19', volg: 2, upd: 1 };
+  s.lessen.l3 = { id: 'l3', klasIds: ['k1'], titel: 'Drie', datum: '2026-10-22', volg: 3, upd: 1 };
+  M.zorgHoofdtaken(s);
+  const later = M.reeksPlan(s, 'l2', 'k1', 1);
+  assert.deepEqual(later.map((p) => p.datum), ['2026-10-22', '2026-10-26']);
+  assert.equal(M.reeksPlan(s, 'l2', 'k1', -1), null); // do 15/10 is bezet door l1
+  M.pasLesplanToe(s, later);
+  assert.equal(s.lessen.l3.datum, '2026-10-26');
+  assert.equal(s.taken[M.hoofdId('l3')].werkdag, '2026-10-25');
+  const terug = M.reeksPlan(s, 'l2', 'k1', -1);
+  assert.deepEqual(terug.map((p) => p.datum), ['2026-10-19', '2026-10-22']);
+});
+
+test('ongedaan maken zet alles terug, ook verwijderde lessen', () => {
+  const s = basis();
+  M.zorgHoofdtaken(s);
+  const foto = M.momentopname(s);
+  M.verwijderLes(s, 'l1');
+  M.zet(s, 'taken', { id: 'nieuw', titel: 'nieuw' });
+  M.zetTerug(s, foto);
+  assert.equal(M.lijst(s, 'lessen').length, 1);
+  assert.equal(M.takenVanLes(s, 'l1').length, 1);
+  assert.equal(s.taken.nieuw.del, true);
+});
+
+test('back-up terugzetten: back-up wint, nieuwere dingen verdwijnen', () => {
+  const s = basis();
+  const backup = JSON.parse(JSON.stringify(s));
+  M.wis(s, 'lessen', 'l1');
+  M.zet(s, 'taken', { id: 'later', titel: 'later' });
+  M.herstelNaar(s, backup);
+  assert.equal(M.lijst(s, 'lessen').length, 1);
+  assert.equal(s.taken.later.del, true);
+  assert.ok(M.merge(backup, s).lessen.l1.upd > 1);
+});
+
+test('archief: oude, afgewerkte dingen verdwijnen van het toestel, lessen en taken samen', () => {
+  const v = '2026-12-15';
+  const nu = new Date(2026, 11, 15).getTime();
+  const s = basis(); // les l1 op 15/10
+  s.lessen.nieuw = { id: 'nieuw', klasIds: ['k1'], titel: 'Nieuw', datum: '2026-12-01', upd: 1 };
+  s.lessen.zonder = { id: 'zonder', klasIds: ['k1'], titel: 'Zonder datum', datum: null, upd: 1 };
+  M.zorgHoofdtaken(s);
+  const h = M.hoofdId('l1');
+  for (const t of Object.values(s.taken)) t.upd = 1;
+  s.taken[h].klaar = true;
+  s.taken.open = { id: 'open', titel: 'Open, oud', werkdag: '2026-09-01', klaar: false, upd: 1 };
+  s.taken.af = { id: 'af', titel: 'Af, oud', werkdag: '2026-09-01', klaar: true, upd: 1 };
+  s.taken.afRecent = { id: 'afRecent', titel: 'Af, net gewijzigd', werkdag: '2026-09-01', klaar: true, upd: nu - 1000 };
+  s.taken.weg = { id: 'weg', del: true, upd: 1 };
+  s.afspraken.oud = { id: 'oud', titel: 'x', datum: '2026-10-01', upd: nu };
+  s.dagen['2026-10-01'] = { id: '2026-10-01', werkdag: true, upd: 1 };
+  s.afwezigheden.herfst = { id: 'herfst', van: '2026-10-26', tot: '2026-11-08', upd: 1 };
+  s.opdrachten.o = { id: 'o', titel: 'Oud', deadline: '2026-10-01', upd: 1 };
+  s.taken.st = { id: 'st', titel: 'stuk', opdrachtId: 'o', klaar: true, werkdag: '2026-09-20', upd: 1 };
+  s.opdrachten.o2 = { id: 'o2', titel: 'Oud maar open', deadline: '2026-10-01', upd: 1 };
+  s.taken.st2 = { id: 'st2', titel: 'open stuk', opdrachtId: 'o2', klaar: false, upd: 1 };
+  s.taken.st3 = { id: 'st3', titel: 'af stuk', opdrachtId: 'o2', klaar: true, werkdag: '2026-09-20', upd: 1 };
+
+  const r = M.actief(s, v, nu);
+  assert.equal(r.lessen.l1, undefined);
+  assert.equal(r.taken[h], undefined);
+  assert.ok(r.lessen.nieuw && r.lessen.zonder);
+  assert.ok(r.taken.open && r.taken.afRecent);
+  assert.equal(r.taken.af, undefined);
+  assert.equal(r.taken.weg, undefined);
+  assert.equal(r.afspraken.oud, undefined);
+  assert.equal(r.dagen['2026-10-01'], undefined);
+  assert.equal(r.afwezigheden.herfst, undefined);
+  assert.equal(r.opdrachten.o, undefined);
+  assert.equal(r.taken.st, undefined);
+  assert.ok(r.opdrachten.o2 && r.taken.st2 && r.taken.st3); // open stuk houdt de opdracht en al haar stukken
+  assert.ok(r.klassen.k1 && r.instellingen);
+  assert.equal(M.zorgHoofdtaken(r), false); // er wordt geen lestaak opnieuw gemaakt
+
+  // een open taak bij een oude les houdt de les en de lestaak vast
+  s.taken.verb = { id: 'verb', titel: 'Verbeteren', lesId: 'l1', klaar: false, upd: 1 };
+  const r2 = M.actief(s, v, nu);
+  assert.ok(r2.lessen.l1 && r2.taken[h] && r2.taken.verb);
+
+  // nog niet doorgestuurd: blijft
+  assert.ok(M.actief(s, v, nu, 0).taken.af);
+});
+
+test('tijdrapport per klas, soort en maand', () => {
+  const s = basis();
+  s.onderwerpen.st = { id: 'st', naam: 'Stage', kleur: '#000', upd: 1 };
+  s.vakken.d = { id: 'd', naam: 'Didactiek', kleur: '#f00', upd: 1 };
+  s.opdrachten.p = { id: 'p', titel: 'Portfolio', vakId: 'd', deadline: '2026-11-10', upd: 1 };
+  s.lessen.l2 = { id: 'l2', klasIds: ['k1'], titel: 'Twee', datum: '2026-10-22', upd: 1 };
+  s.taken.a = { id: 'a', lesId: 'l1', hoofd: true, titel: '', werkdag: '2026-10-14', tijd: 3600000, upd: 1 };
+  s.taken.b = { id: 'b', lesId: 'l2', hoofd: true, titel: '', werkdag: '2026-10-21', tijd: 1800000, upd: 1 };
+  s.taken.c = { id: 'c', lesId: 'l1', titel: 'Verbeteren toets', werkdag: '2026-10-20', tijd: 600000, upd: 1 };
+  s.taken.d = { id: 'd', titel: 'Stageverslag lezen', onderwerpId: 'st', werkdag: '2026-11-02', tijd: 900000, upd: 1 };
+  s.taken.e = { id: 'e', titel: 'Hfst 1', opdrachtId: 'p', domein: 'opleiding', deadline: { eind: true }, tijd: 1200000, upd: 1 };
+  s.taken.f = { id: 'f', titel: 'Oud', werkdag: '2025-10-01', tijd: 999999, upd: 1 };
+  const r = M.tijdRapport(s, M.schooljaarStart('2026-10-15'), '2027-08-31');
+  assert.equal(M.schooljaarStart('2026-10-15'), '2026-09-01');
+  assert.equal(M.schooljaarStart('2027-03-01'), '2026-09-01');
+  assert.equal(r.totaal, 3600000 + 1800000 + 600000 + 900000 + 1200000);
+  assert.equal(r.opleiding, 1200000);
+  const klas = r.groepen.find((g) => g.naam === 'BKH4');
+  assert.equal(klas.soorten.les, 5400000);
+  assert.equal(klas.soorten.verbeteren, 600000);
+  assert.equal(klas.perLes, 2700000);
+  assert.ok(r.groepen.find((g) => g.naam === 'Stage'));
+  assert.ok(r.groepen.find((g) => g.naam === 'Didactiek'));
+  assert.deepEqual(r.maanden.map((m) => m.maand), ['2026-10', '2026-11']);
+  assert.equal(r.top[0].titel, 'Aankoopfactuur');
+  assert.equal(r.top[0].ms, 4200000);
+});
+
+test('Code.gs: zelfde archiefregels; sync geeft enkel actieve data, "alles" de volledige', () => {
+  const ctx = {
+    PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => (k === 'SAGA_TOKEN' ? 'geheim' : null), setProperty: () => {} }) },
+    LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
+    ContentService: { createTextOutput: (t) => ({ setMimeType: () => JSON.parse(t) }), MimeType: { JSON: 'json' } },
+    Utilities: { formatDate: () => '2026-12-15' },
+    Session: { getScriptTimeZone: () => 'Europe/Brussels' },
+  };
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(new URL('../apps-script/Code.gs', import.meta.url), 'utf8'), ctx);
+  const s = basis();
+  M.zorgHoofdtaken(s);
+  for (const t of Object.values(s.taken)) Object.assign(t, { klaar: true, upd: 1 });
+  s.taken.open = { id: 'open', titel: 'open', klaar: false, upd: 1 };
+  const nu = new Date(2026, 11, 15).getTime();
+  for (const tot of [undefined, 0]) {
+    assert.deepEqual(JSON.parse(JSON.stringify(ctx.actief(s, '2026-12-15', nu, tot))), JSON.parse(JSON.stringify(M.actief(s, '2026-12-15', nu, tot))));
+  }
+
+  let bewaard = JSON.stringify(s);
+  ctx.haalBestand_ = () => 'f';
+  ctx.leesData_ = () => JSON.parse(bewaard);
+  ctx.schrijfBestand_ = (id, tekst) => (bewaard = tekst);
+  ctx.maakDagelijkseBackup_ = () => {};
+  ctx.agendaInfo_ = () => null;
+  const post = (actie) => ctx.doPost({ postData: { contents: JSON.stringify({ actie, token: 'geheim', data: { taken: { nieuw: { id: 'nieuw', titel: 'n', upd: 5 } } } }) } });
+  const sync = post('sync');
+  assert.equal(sync.scriptVersie, 7);
+  assert.equal(sync.data.lessen.l1, undefined); // oude les blijft op Drive, niet op het toestel
+  assert.ok(sync.data.taken.open && sync.data.taken.nieuw);
+  const alles = post('alles');
+  assert.ok(alles.data.lessen.l1 && alles.data.taken[M.hoofdId('l1')]);
+  assert.ok(JSON.parse(bewaard).lessen.l1);
+});

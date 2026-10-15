@@ -12,6 +12,11 @@
  * afspraken over met #s (tonen) of #sw (tonen + telt als werkdag) in de
  * titel of beschrijving. Het script schrijft nooit in de agenda.
  *
+ * Alles blijft bewaard in het bestand (ook afgewerkte en verwijderde dingen), zodat je
+ * achteraf kunt zien waar je tijd naartoe ging. Bij het synchroniseren krijgt een toestel
+ * enkel terug wat de laatste maand nog speelde (zie actief, dezelfde regels als in js/model.js);
+ * met de actie "alles" krijgt het de volledige planning (voor het tijdsoverzicht en de back-up).
+ *
  * Installatie: zie docs/INSTALLATIE.md.
  */
 
@@ -20,7 +25,7 @@ const BESTAND_NAAM = 'saga-data.json';
 const BACKUPS_HOUDEN = 14;
 
 // Verhogen bij elke wijziging die de app moet kennen; de app waarschuwt bij een oudere versie.
-const SCRIPT_VERSIE = 6;
+const SCRIPT_VERSIE = 7;
 
 // Welke agenda('s) gelezen worden, op naam (hoofdletters maken niet uit).
 // Leeg laten ([]) = alle agenda's die je in Google Agenda ziet.
@@ -71,7 +76,7 @@ function doPost(e) {
   try {
     const bestand = haalBestand_();
     const opgeslagen = leesData_(bestand);
-    if (verzoek.actie === 'sync') {
+    if (verzoek.actie === 'sync' || verzoek.actie === 'alles') {
       const samen = merge(opgeslagen, verzoek.data || {});
       if (verzoek.agenda) samen.afspraken = bewaarAgendaInfo_(leesAgenda_(samen.afspraken || {}));
       const tekst = JSON.stringify(samen);
@@ -79,7 +84,9 @@ function doPost(e) {
         maakDagelijkseBackup_(bestand);
         schrijfBestand_(bestand, tekst);
       }
-      return json_({ ok: true, data: samen, scriptVersie: SCRIPT_VERSIE, agendaInfo: agendaInfo_() });
+      const vandaag = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+      const data = verzoek.actie === 'alles' ? samen : actief(samen, vandaag, Date.now());
+      return json_({ ok: true, data: data, scriptVersie: SCRIPT_VERSIE, agendaInfo: agendaInfo_() });
     }
     return json_({ ok: false, fout: 'onbekende actie' });
   } finally {
@@ -238,6 +245,71 @@ function merge(a, b) {
   const ia = a.instellingen;
   const ib = b.instellingen;
   r.instellingen = !ia || (ib && (ib.upd || 0) > (ia.upd || 0)) ? ib : ia;
+  return r;
+}
+
+/**
+ * Wat een toestel nog nodig heeft: enkel wat de laatste maand nog speelde.
+ * (Zelfde functie als in js/model.js; de tests controleren dat ze hetzelfde doen.)
+ */
+const ACTIEF_DAGEN = 31;
+
+function actief(state, vandaagDatum, nu, bewaardTot) {
+  const d = new Date(Number(vandaagDatum.slice(0, 4)), Number(vandaagDatum.slice(5, 7)) - 1, Number(vandaagDatum.slice(8, 10)) - ACTIEF_DAGEN);
+  const z = (n) => String(n).padStart(2, '0');
+  const grens = d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate());
+  let grensMs = nu - ACTIEF_DAGEN * 86400000;
+  if (typeof bewaardTot === 'number' && bewaardTot < grensMs) grensMs = bewaardTot;
+  const recent = (o) => (o.upd || 0) > grensMs;
+  const taken = state.taken || {};
+  const metStukken = {};
+  Object.keys(taken).forEach((id) => {
+    const t = taken[id];
+    if (t && !t.del && t.opdrachtId) metStukken[t.opdrachtId] = true;
+  });
+  const eigenOud = (k, o) => {
+    if (!o || typeof o !== 'object') return false;
+    if (o.del) return !recent(o);
+    if (k === 'taken') return !recent(o) && !!o.klaar && (o.werkdag || '') < grens;
+    if (k === 'lessen') return !recent(o) && !!o.datum && o.datum < grens;
+    if (k === 'opdrachten') return !recent(o) && (o.deadline ? o.deadline < grens : !!metStukken[o.id]);
+    if (k === 'afspraken') return (o.eindDatum || o.datum || '') < grens;
+    if (k === 'dagen') return String(o.id || '') < grens;
+    if (k === 'afwezigheden') return !recent(o) && (o.tot || o.van || '') < grens;
+    return false;
+  };
+  const levend = { lessen: {}, opdrachten: {} };
+  Object.keys(taken).forEach((id) => {
+    const t = taken[id];
+    if (eigenOud('taken', t)) return;
+    if (t.lesId) levend.lessen[t.lesId] = true;
+    if (t.opdrachtId) levend.opdrachten[t.opdrachtId] = true;
+  });
+  const ouderBlijft = (k, id) => {
+    const o = state[k] && state[k][id];
+    return !!o && (!!levend[k][id] || !eigenOud(k, o));
+  };
+  const r = {};
+  Object.keys(state).forEach((k) => {
+    const c = state[k];
+    if (k === 'instellingen' || !c || typeof c !== 'object' || Array.isArray(c)) {
+      r[k] = c;
+      return;
+    }
+    const nieuw = {};
+    let weg = false;
+    Object.keys(c).forEach((id) => {
+      const o = c[id];
+      let blijft;
+      if (k === 'lessen' || k === 'opdrachten') blijft = ouderBlijft(k, id);
+      else if (k === 'taken')
+        blijft = !eigenOud(k, o) || (!!o.lesId && ouderBlijft('lessen', o.lesId)) || (!!o.opdrachtId && ouderBlijft('opdrachten', o.opdrachtId));
+      else blijft = !eigenOud(k, o);
+      if (blijft) nieuw[id] = o;
+      else weg = true;
+    });
+    r[k] = weg ? nieuw : c;
+  });
   return r;
 }
 

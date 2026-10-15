@@ -61,6 +61,8 @@ export function viewInstellingen(s) {
         .join('')}</div>
       <p></p>
       <label class="check"><input type="checkbox" data-instelling="toonKlaar" ${s.instellingen.toonKlaar ? 'checked' : ''}> Afgevinkte taken blijven zichtbaar in het overzicht</label>
+      <label class="check"><input type="checkbox" data-lokaal="verbergAfspraken" ${ui.verbergAfspraken ? 'checked' : ''}> Persoonlijke afspraken verbergen op dit toestel</label>
+      <p class="hint">Handig op een schoolcomputer of als je je scherm projecteert. Afspraken met #sw tellen nog altijd als werkdag. Ook via de knop "Afspraken verbergen" bij het overzicht.</p>
     </section>
 
     <section class="kaart">

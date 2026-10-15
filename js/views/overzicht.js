@@ -41,7 +41,8 @@ function dagBlok(s, idx, datum, v, raster) {
   const taken = (idx.taken[datum] || []).filter((t) => s.instellingen.toonKlaar || !t.klaar);
   const dls = idx.deadlines[datum] || [];
   const eindes = idx.eindes[datum] || [];
-  const afspraken = M.afsprakenOp(s, datum).filter((a) => !a.werk); // #sw: enkel de werkdag-rand, geen blokje
+  // #sw: enkel de werkdag-rand, geen blokje. Verborgen afspraken tellen wel nog als werkdag.
+  const afspraken = ui.verbergAfspraken ? [] : M.afsprakenOp(s, datum).filter((a) => !a.werk);
   const afw = M.afwezighedenOp(s, datum).filter((a) => !ui.filter.klasId || M.isVakantie(a) || a.klasIds.includes(ui.filter.klasId));
   const vakantie = afw.some(M.isVakantie);
   const klassen = [
@@ -104,6 +105,7 @@ export function filterKnoppen(s) {
         : ''
     }
     <button class="filter-lessen ${f.lessen ? 'aan' : ''}" data-actie="filter-lessen" aria-pressed="${f.lessen}" title="Enkel de lessen, zonder taken en deadlines">Enkel lessen</button>
+    <button class="filter-lessen ${ui.verbergAfspraken ? 'aan' : ''}" data-actie="afspraken-verbergen" aria-pressed="${ui.verbergAfspraken}" title="Persoonlijke afspraken uit je agenda verbergen op dit toestel (bv. als je je scherm projecteert)">Afspraken verbergen</button>
   </div>`;
 }
 

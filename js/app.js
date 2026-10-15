@@ -130,10 +130,17 @@ function teken() {
 
   if (dlg.open && ui.herteken) ui.herteken();
 
+  // hoogte van de balk, voor wat eronder blijft plakken (dagnamen van het raster)
+  document.documentElement.style.setProperty('--balk-h', $('.balk').offsetHeight + 'px');
+  if (view === 'dagen') volgOnderkant();
+  else kijker?.disconnect();
+
+  // gsm: naar vandaag scrollen; computer: bovenaan staat vorige week, dus naar boven
   if (ui.naarVandaag && view === 'dagen') {
     ui.naarVandaag = false;
     const el = mobiel.matches && $('.dag.vandaag');
     if (el) window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - $('.balk').offsetHeight - 8);
+    else window.scrollTo(0, 0);
   }
 }
 
@@ -168,6 +175,27 @@ async function laadTijd(opnieuw = false) {
     t.bezig = false;
     if (ui.view === 'tijd') render();
   }
+}
+
+// ---------- doorlopend overzicht ----------
+
+// Bijna onderaan het overzicht? Dan komen er weken bij.
+function meerWeken() {
+  if (ui.view !== 'dagen' || ui.wekenVooruit >= M.WEKEN_MAX) return;
+  ui.wekenVooruit = Math.min(M.WEKEN_MAX, ui.wekenVooruit + 6);
+  if (ui.sleept) ui.tekenStraks = true;
+  else render();
+}
+
+const kijker =
+  'IntersectionObserver' in window
+    ? new IntersectionObserver((items) => items.some((i) => i.isIntersecting) && meerWeken(), { rootMargin: '0px 0px 600px 0px' })
+    : null;
+
+function volgOnderkant() {
+  kijker?.disconnect();
+  const el = $('[data-meer-weken]');
+  if (el) kijker?.observe(el);
 }
 
 // ---------- acties ----------
@@ -297,15 +325,23 @@ const acties = {
   // Vanop de pagina van een klas: het overzicht met enkel die klas.
   'filter-klas'(el) {
     zetFilter({ klasId: el.dataset.klas, lessen: false });
-    ui.vensterOffset = 0;
     location.hash = '#/dagen';
   },
-  venster(el) {
-    const d = Number(el.dataset.d);
-    ui.vensterOffset = d === 0 ? 0 : ui.vensterOffset + d;
-    ui.naarVandaag = d === 0;
+  'naar-vandaag'() {
+    ui.wekenTerug = 1;
+    ui.wekenVooruit = M.WEKEN_START;
+    ui.naarVandaag = true;
     render();
-    if (d !== 0) window.scrollTo(0, 0);
+  },
+  'meer-weken'() {
+    meerWeken();
+  },
+  // Eerdere weken komen bovenaan bij; de weken die je zag blijven op hun plaats.
+  'eerdere-weken'() {
+    const hoogte = document.documentElement.scrollHeight;
+    ui.wekenTerug = Math.min(M.WEKEN_TERUG_MAX, ui.wekenTerug + 2);
+    render();
+    window.scrollBy(0, document.documentElement.scrollHeight - hoogte);
   },
   'tijd-periode'(el) {
     ui.tijd.periode = el.dataset.p;

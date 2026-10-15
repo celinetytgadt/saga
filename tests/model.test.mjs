@@ -536,16 +536,16 @@ test('losse taak opdelen in stukken: wordt een opdracht met de taak als eerste s
 
 // ---------- archief, rooster, vakanties, tijd ----------
 
-test('overzicht: glijdend venster, ook over de maandgrens', () => {
+test('overzicht: doorlopende weken, ook over de maandgrens', () => {
   const r = M.venster('2026-10-29'); // donderdag
   assert.equal(r.van, '2026-10-19'); // maandag van vorige week
-  assert.equal(r.dagen.length, 35);
+  assert.equal(r.tot, '2027-01-10'); // zondag, 10 weken na deze week
+  assert.equal(r.dagen.length, 12 * 7);
   assert.ok(r.dagen.includes('2026-11-20'));
-  const l = M.venster('2026-10-29', 0, false);
-  assert.equal(l.van, '2026-10-22');
-  assert.equal(l.tot, '2026-11-28');
-  assert.equal(M.venster('2026-10-29', 1).van, '2026-11-16');
-  assert.equal(M.vensterNaam('2026-12-28', '2027-01-31'), '28 dec 2026 – 31 jan 2027');
+  const meer = M.venster('2026-10-29', 3, 20);
+  assert.equal(meer.van, '2026-10-05');
+  assert.equal(meer.dagen.length, 24 * 7);
+  assert.equal(M.weekdag(meer.tot), 0);
 });
 
 test('verwijderen bewaart de gegevens en stopt de timer', () => {

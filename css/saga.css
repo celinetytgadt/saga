@@ -221,7 +221,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   border: 1px solid var(--rand);
   border-radius: var(--radius);
   padding: 6px;
-  min-height: 130px;
+  min-height: 84px; /* lager, voor meer weken op één scherm; groeit mee met de taken */
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -910,4 +910,23 @@ a.knop.primair { color: var(--accent-tekst); }
 .instellingen .lesregel-datum { width: 170px; }
 @media (max-width: 760px) {
   .instellingen .lesregel-datum { width: 110px; }
+}
+
+/* ---------- doorlopend overzicht ---------- */
+
+.raster-top {
+  position: sticky;
+  top: var(--balk-h, 57px);
+  z-index: 5;
+  background: var(--bg);
+  padding-top: 10px;
+  margin-top: -10px;
+}
+.dag.eerste .dag-datum { color: var(--groen-tekst); }
+.weken-meer { display: flex; justify-content: center; padding: 14px 0 4px; }
+.weken-meer.boven { padding: 0 0 8px; }
+.maand-kop { font-size: 1rem; color: var(--zacht); margin: 10px 0 0; text-transform: capitalize; }
+.maand-kop:first-of-type { margin-top: 0; }
+@media (max-width: 760px) {
+  .weken-meer { padding: 8px 0; }
 }

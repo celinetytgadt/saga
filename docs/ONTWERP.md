@@ -110,7 +110,7 @@ In het overzicht: "BKH3-K2 + K3" met de kleuren van beide klassen.
 - Taken worden **gebundeld per les of opdracht**: eerst de les (klas + onderwerp + lesdatum), daaronder klein de taken. Bakje: lessen op datum, opdrachten in de volgorde waarin ze ingegeven zijn, stukken in hun volgorde.
 - **Geen vlaggetjes** voor taken bij een les (de lesdatum zegt genoeg); wel voor losse taken en tussendeadlines. Einddeadline van een opdracht blijft als label.
 - Rustiger lettertype (Open Sans voor tekst, Quicksand voor titels) en een instelbare **tekstgrootte** per toestel.
-- ~~Kalender per maand~~ → vervangen door een **glijdend venster** (zie "Na de review").
+- ~~Kalender per maand~~ → vervangen door **doorlopende weken** (zie "Na de review").
 - Deadlines van de opleiding: groen vlaggetje (school/losse taken: roze-rood).
 - Agenda: enkel de agenda **De Zottekes** (instelbaar in `AGENDA_NAMEN` in Code.gs).
 
@@ -125,7 +125,7 @@ In het overzicht: "BKH3-K2 + K3" met de kleuren van beide klassen.
 - **Tijd bijhouden:** elke taak heeft een timer (start, pauzeren, later verder doen); de tijd telt op over alle keren. Er loopt maar één timer tegelijk, afvinken stopt hem. De lopende timer staat bovenaan in de balk. Vergeten stoppen? "Aanpassen" zet de tijd zelf juist (bv. 45 of 1:30). Bij een les of opdracht staat de opgetelde tijd van haar taken.
 
 ### Na de review (oktober 2026)
-- **Overzicht = glijdend venster** in plaats van een kalendermaand, zodat je aan het einde van een maand de lessen van volgende week ziet. Computer: 5 volle weken vanaf de maandag van vorige week. Gsm: van 7 dagen terug tot 30 dagen vooruit. ‹ › verschuift 4 weken.
+- **Overzicht = doorlopende weken** in plaats van een kalendermaand: gewoon naar beneden scrollen, zo zie je ook het verloop van de lessen. Bij het openen: vorige week, deze week en 10 weken vooruit; bij het scrollen komen er vanzelf weken bij (tot een jaar vooruit). Bovenaan "↑ Eerdere weken" (tot 4 weken terug). "Vandaag" springt terug. De dagnamen en filters blijven bovenaan staan; de 1e van een maand toont de maandnaam (gsm: een maandkop). Dagen zijn standaard lager (meer weken op één scherm) en groeien mee met de taken.
 - **Filter** in twee delen: domein (*Alles · School · Opleiding*) en een **klas** (keuzelijst), plus de knop *Enkel lessen*.
 - **Pagina per klas** (`#/klas/<id>`): volgende les met de timer van de voorbereiding, open werk (verbeteren, opdrachten en taken voor die klas), de lessenreeks, en de tijd die in de klas kroop. Knop *Toon in overzicht* zet de klasfilter.
 - **Taken en schoolopdrachten voor een klas:** een losse schooltaak en een schoolopdracht kunnen (optioneel) `klasIds` krijgen; ze verschijnen dan op de pagina van de klas en in de klasfilter.

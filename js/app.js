@@ -172,6 +172,13 @@ async function laadTijd(opnieuw = false) {
 
 // ---------- acties ----------
 
+// Persoonlijke afspraken tonen of verbergen: een voorkeur van dit toestel.
+function zetVerbergAfspraken(aan) {
+  ui.verbergAfspraken = aan;
+  bewaarLokaal('saga.verbergAfspraken', aan);
+  render();
+}
+
 const acties = {
   vink(el) {
     const id = el.dataset.id;
@@ -280,6 +287,9 @@ const acties = {
     zetFilter({ domein: el.dataset.domein, klasId: null });
     render();
   },
+  'afspraken-verbergen'() {
+    zetVerbergAfspraken(!ui.verbergAfspraken);
+  },
   'filter-lessen'() {
     zetFilter({ lessen: !ui.filter.lessen });
     render();
@@ -371,6 +381,8 @@ document.addEventListener('change', (e) => {
     wijzig((s) => {
       s.instellingen = { ...s.instellingen, [el.dataset.instelling]: el.checked, upd: Date.now() };
     });
+  } else if (el.dataset.lokaal === 'verbergAfspraken') {
+    zetVerbergAfspraken(el.checked);
   } else if (el.matches('[data-filter-klas]')) {
     zetFilter({ klasId: el.value || null });
     render();

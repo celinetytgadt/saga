@@ -32,7 +32,7 @@ const ui = {
   view: 'dagen',
   maandOffset: 0,
   naarVandaag: true, // na het tekenen naar vandaag scrollen (gsm)
-  filter: lokaal('saga.filter', 'alles'), // alles | school | opleiding
+  filter: lokaal('saga.filter', 'alles'), // alles | school | opleiding | lessen
   laatsteKlassen: lokaal('saga.laatsteKlassen', []),
   laatsteVak: null,
   tekst: lokaal('saga.tekst', 'normaal'), // klein | normaal | groot
@@ -103,6 +103,7 @@ function anker(s, taak) {
   return { kleur: M.domeinVan(taak) === 'opleiding' ? 'var(--fuchsia)' : 'var(--rand-sterk)', label: '', titel: '' };
 }
 
+// 'lessen': enkel de lessen zelf, zonder gelinkte taken, opdrachten of deadlines.
 const toonTaak = (t) => ui.filter === 'alles' || M.domeinVan(t) === ui.filter;
 const toonSchool = () => ui.filter !== 'opleiding';
 
@@ -363,6 +364,7 @@ function filterKnoppen() {
     ['alles', 'Alles'],
     ['school', 'School'],
     ['opleiding', '🎓 Opleiding'],
+    ['lessen', 'Lessen'],
   ];
   return `<div class="filter" role="group" aria-label="Toon">${opties
     .map(([f, label]) => `<button class="${ui.filter === f ? 'aan' : ''}" data-actie="filter" data-f="${f}" aria-pressed="${ui.filter === f}">${label}</button>`)
@@ -391,7 +393,7 @@ function bakjeInhoud(s) {
     ${liggen.length ? `<h3 class="kop-rood">Blijven liggen</h3>${kaarten(liggen)}` : ''}
     ${school.length ? `${ui.filter === 'alles' || liggen.length ? '<h3>School</h3>' : ''}${kaarten(school)}` : ''}
     ${opl.length ? `${ui.filter === 'alles' || liggen.length ? '<h3 class="kop-opl">🎓 Opleiding</h3>' : ''}${kaarten(opl)}` : ''}
-    ${!liggen.length && !open.length ? '<p class="leeg">Alles staat ingepland. 🌿</p>' : ''}
+    ${!liggen.length && !open.length && ui.filter !== 'lessen' ? '<p class="leeg">Alles staat ingepland. 🌿</p>' : ''}
     ${lessen.length ? `<h3>Lessen zonder datum</h3>${lessen.map((l) => lesKaart(s, l)).join('')}` : ''}
     <p class="hint">${mobiel.matches ? 'Tik op een taak om ze naar een dag te verplaatsen.' : 'Sleep blokjes naar een dag, of terug naar hier.'}</p>`;
 }

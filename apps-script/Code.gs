@@ -17,6 +17,10 @@
  * enkel terug wat de laatste maand nog speelde (zie actief, dezelfde regels als in js/model.js);
  * met de actie "alles" krijgt het de volledige planning (voor het tijdsoverzicht en de back-up).
  *
+ * Elke ochtend (rond 6 uur) stuurt het script, als je dat aanzette in Saga (Instellingen →
+ * Ochtendmail), een korte mail naar jezelf: wat vandaag gepland staat, welke lessen je moet
+ * voorbereiden, wat er ingediend wordt en wat bleef liggen.
+ *
  * Installatie: zie docs/INSTALLATIE.md.
  */
 
@@ -25,11 +29,14 @@ const BESTAND_NAAM = 'saga-data.json';
 const BACKUPS_HOUDEN = 14;
 
 // Verhogen bij elke wijziging die de app moet kennen; de app waarschuwt bij een oudere versie.
-const SCRIPT_VERSIE = 7;
+const SCRIPT_VERSIE = 8;
 
 // Welke agenda('s) gelezen worden, op naam (hoofdletters maken niet uit).
 // Leeg laten ([]) = alle agenda's die je in Google Agenda ziet.
 const AGENDA_NAMEN = ['De Zottekes'];
+
+// Link in de ochtendmail.
+const APP_URL = 'https://celinetytgadt.github.io/saga/#/vandaag';
 
 const AGENDA_DAGEN_TERUG = 7;
 const AGENDA_DAGEN_VOORUIT = 75;
@@ -53,6 +60,10 @@ function installeer() {
     .filter(function (t) { return t.getHandlerFunction() === 'verversAgenda'; })
     .forEach(function (t) { ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger('verversAgenda').timeBased().everyDays(1).atHour(5).create();
+  ScriptApp.getProjectTriggers()
+    .filter(function (t) { return t.getHandlerFunction() === 'ochtendMail'; })
+    .forEach(function (t) { ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('ochtendMail').timeBased().everyDays(1).atHour(6).create();
   verversAgenda();
   Logger.log('Saga is klaar. Je geheime sleutel is:\n\n%s\n\nKopieer die naar Instellingen → Synchronisatie in Saga.', token);
 }
@@ -107,6 +118,126 @@ function verversAgenda() {
   } finally {
     slot.releaseLock();
   }
+}
+
+/** Dagelijks (trigger): een korte mail met de dag, als die aanstaat in Saga. */
+function ochtendMail() {
+  const data = leesData_(haalBestand_());
+  if (!data.instellingen || !data.instellingen.ochtendmail) return;
+  const vandaag = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const brief = dagBriefje_(data, vandaag);
+  if (!brief) return;
+  MailApp.sendEmail(Session.getEffectiveUser().getEmail(), 'Saga · ' + brief.onderwerp, brief.tekst);
+}
+
+/** Om te testen vanuit de editor: stuurt de ochtendmail meteen (ook als ze uitstaat). */
+function testOchtendMail() {
+  const data = leesData_(haalBestand_());
+  const vandaag = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const brief = dagBriefje_(data, vandaag) || { onderwerp: 'niets gepland', tekst: 'Niets gepland vandaag.' };
+  MailApp.sendEmail(Session.getEffectiveUser().getEmail(), 'Saga · ' + brief.onderwerp, brief.tekst);
+  Logger.log(brief.tekst);
+}
+
+// ---------- ochtendmail: de dag in een paar regels ----------
+// Dezelfde regels als in de app (js/model.js), in het kort.
+
+const DAGEN_ = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'];
+const MAANDEN_ = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
+
+function datum_(s) {
+  return new Date(Number(s.slice(0, 4)), Number(s.slice(5, 7)) - 1, Number(s.slice(8, 10)));
+}
+
+function iso_(d) {
+  const z = function (n) { return String(n).padStart(2, '0'); };
+  return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate());
+}
+
+function plusDagen_(s, n) {
+  const d = datum_(s);
+  d.setDate(d.getDate() + n);
+  return iso_(d);
+}
+
+function kortDatum_(s) {
+  const d = datum_(s);
+  return DAGEN_[d.getDay()] + ' ' + d.getDate() + ' ' + MAANDEN_[d.getMonth()];
+}
+
+function levend_(c) {
+  return Object.keys(c || {}).map(function (id) { return c[id]; }).filter(function (o) { return o && !o.del; });
+}
+
+function isWerkdag_(data, d) {
+  const m = (data.dagen || {})[d];
+  if (m && !m.del && typeof m.werkdag === 'boolean') return m.werkdag;
+  const sw = levend_(data.afspraken).some(function (a) { return a.werk && a.datum <= d && d <= (a.eindDatum || a.datum); });
+  return sw || ((data.instellingen || {}).werkdagen || []).indexOf(datum_(d).getDay()) !== -1;
+}
+
+function werkdagVan_(t) {
+  return t.werkdag || (t.indien ? plusDagen_(t.indien, 1) : null);
+}
+
+function titel_(data, t) {
+  if (t.soort === 'verbeteren' && t.indien) return 'Verbeteren CR: ' + t.titel;
+  const les = t.lesId && data.lessen && data.lessen[t.lesId];
+  return t.titel || (les && les.titel) || '(zonder titel)';
+}
+
+function klasNamen_(data, ids) {
+  return (ids || []).map(function (id) { return data.klassen && data.klassen[id] && data.klassen[id].naam; }).filter(Boolean).join(' + ');
+}
+
+// { onderwerp, tekst } of null als er niets te melden is.
+function dagBriefje_(data, vandaag) {
+  const taken = levend_(data.taken).filter(function (t) { return !t.klaar; });
+  const lessen = levend_(data.lessen);
+  const regels = [];
+
+  const gepland = taken.filter(function (t) { return werkdagVan_(t) === vandaag; });
+  if (gepland.length) {
+    regels.push('Gepland voor vandaag:');
+    gepland.forEach(function (t) { regels.push('  ○ ' + titel_(data, t)); });
+  }
+
+  const werkdagen = [];
+  for (let i = 1; i <= 21 && werkdagen.length < 2; i++) {
+    const d = plusDagen_(vandaag, i);
+    if (isWerkdag_(data, d)) werkdagen.push(d);
+  }
+  const voorbereiden = lessen
+    .filter(function (l) { return werkdagen.indexOf(l.datum) !== -1; })
+    .filter(function (l) { return taken.some(function (t) { return t.lesId === l.id && t.hoofd; }); })
+    .sort(function (a, b) { return a.datum < b.datum ? -1 : 1; });
+  if (voorbereiden.length) {
+    regels.push('', 'Nog voor te bereiden:');
+    voorbereiden.forEach(function (l) { regels.push('  ○ ' + kortDatum_(l.datum) + ' · ' + klasNamen_(data, l.klasIds || [l.klasId]) + ' · ' + l.titel); });
+  }
+
+  const indienen = taken.filter(function (t) { return t.indien === vandaag; });
+  if (indienen.length) {
+    regels.push('', 'Vandaag ingediend:');
+    indienen.forEach(function (t) { regels.push('  ⚑ ' + t.titel); });
+  }
+
+  const liggen = taken.filter(function (t) {
+    const wd = werkdagVan_(t);
+    if (!wd || wd >= vandaag) return false;
+    const les = t.hoofd && data.lessen && data.lessen[t.lesId];
+    return !(les && les.datum && les.datum < vandaag);
+  });
+  if (liggen.length) regels.push('', liggen.length + (liggen.length === 1 ? ' blokje bleef' : ' blokjes bleven') + ' liggen. In Saga kun je ze in één keer herplannen.');
+
+  if (!regels.length) return null;
+  regels.push('', 'Open Saga: ' + APP_URL);
+  const delen = [];
+  if (gepland.length) delen.push(gepland.length + ' gepland');
+  if (voorbereiden.length) delen.push(voorbereiden.length + (voorbereiden.length === 1 ? ' les' : ' lessen') + ' voor te bereiden');
+  if (!delen.length && liggen.length) delen.push(liggen.length + ' bleef liggen');
+  if (!delen.length) delen.push('vandaag ingediend');
+  return { onderwerp: kortDatum_(vandaag) + ' · ' + delen.join(', '), tekst: regels.join('\n') };
 }
 
 /** Handig om te testen vanuit de editor: toont welke agenda's er zijn en wat Saga zou overnemen. */

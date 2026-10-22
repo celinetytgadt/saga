@@ -73,8 +73,20 @@ export function viewVandaag(s) {
   const b = bakje(s, undefined, v);
   const kiezen = [...b.school, ...b.opleiding.flatMap((g) => g.taken)];
 
+  const last = M.dagLast(s, v);
+  const gedaan = M.gedaanOp(s, v);
   return `<div class="pagina vandaag-pagina">
-    <div class="pagina-kop"><h1>Vandaag <small class="zacht">${M.kortDatum(v)}</small></h1></div>
+    <div class="pagina-kop"><h1>Vandaag <small class="zacht">${M.kortDatum(v)}</small></h1>
+      ${last.ms ? `<span class="last groot ${last.vol ? 'vol' : ''}" title="Geschatte tijd van wat vandaag nog gepland staat">± ${M.duurKort(last.ms)} gepland</span>` : ''}
+    </div>
+    ${
+      gedaan.length
+        ? `<div class="gedaan"><b>✓ Vandaag al ${gedaan.length} afgevinkt</b>${gedaan
+            .slice(0, 6)
+            .map((t) => `<span class="gedaan-chip">${esc(taakTitel(s, t))}</span>`)
+            .join('')}${gedaan.length > 6 ? `<span class="gedaan-chip">+${gedaan.length - 6}</span>` : ''}</div>`
+        : ''
+    }
     ${snelInvoerHtml()}
 
     <section class="kaart">

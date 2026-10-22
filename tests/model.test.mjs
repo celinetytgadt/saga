@@ -770,7 +770,7 @@ test('Code.gs: zelfde archiefregels; sync geeft enkel actieve data, "alles" de v
   ctx.agendaInfo_ = () => null;
   const post = (actie) => ctx.doPost({ postData: { contents: JSON.stringify({ actie, token: 'geheim', data: { taken: { nieuw: { id: 'nieuw', titel: 'n', upd: 5 } } } }) } });
   const sync = post('sync');
-  assert.equal(sync.scriptVersie, 7);
+  assert.equal(sync.scriptVersie, 8);
   assert.equal(sync.data.lessen.l1, undefined); // oude les blijft op Drive, niet op het toestel
   assert.ok(sync.data.taken.open && sync.data.taken.nieuw);
   const alles = post('alles');
@@ -849,4 +849,88 @@ test('voorbereiding van een gegeven les: geen waarschuwing meer', () => {
   const h = s.taken[M.hoofdId('l1')];
   assert.equal(M.waarschuwing(s, h, '2026-10-20'), null);
   assert.ok(M.waarschuwing(s, h, '2026-10-15'));
+});
+
+// ---------- daglast, timer, gedaan ----------
+
+test('schatting: gemiddelde van gelijkaardige afgewerkte taken, anders 30 minuten', () => {
+  const s = basis();
+  s.lessen.l2 = { id: 'l2', klasIds: ['k1'], titel: 'Volgende', datum: '2026-10-22', upd: 1 };
+  M.zorgHoofdtaken(s);
+  const open = s.taken[M.hoofdId('l2')];
+  assert.equal(M.schatting(s, open), 30 * 60000);
+  s.taken[M.hoofdId('l1')] = { ...s.taken[M.hoofdId('l1')], klaar: true, tijd: 90 * 60000 };
+  assert.equal(M.schatting(s, open), 90 * 60000);
+  // al bestede tijd gaat eraf, een blok is een deel
+  assert.equal(M.schatting(s, { ...open, tijd: 30 * 60000 }), 60 * 60000);
+  assert.equal(M.schatting(s, { ...open, deelVan: 3 }), 30 * 60000);
+  // een to do zonder vergelijkbare taken
+  assert.equal(M.schatting(s, { id: 'x', titel: 'x', domein: 'school' }), 30 * 60000);
+});
+
+test('daglast: som van wat open staat, vol boven de grens', () => {
+  const s = basis(); // werkdagen di en vr
+  for (let i = 0; i < 9; i++) s.taken['t' + i] = { id: 't' + i, titel: 'x', domein: 'school', werkdag: '2026-10-17', klaar: false, upd: 1 };
+  const za = M.dagLast(s, '2026-10-17');
+  assert.equal(za.ms, 9 * 30 * 60000);
+  assert.equal(za.vol, true); // 4u30 > 4u
+  s.instellingen = { ...s.instellingen, daggrens: 300 };
+  assert.equal(M.dagLast(s, '2026-10-17').vol, false);
+  s.taken.w = { id: 'w', titel: 'x', domein: 'school', werkdag: '2026-10-20', klaar: false, upd: 1 };
+  s.taken.w2 = { id: 'w2', titel: 'x', domein: 'school', werkdag: '2026-10-20', klaar: false, upd: 1 };
+  s.taken.w3 = { id: 'w3', titel: 'x', domein: 'school', werkdag: '2026-10-20', klaar: false, upd: 1 };
+  assert.equal(M.dagLast(s, '2026-10-20').vol, true); // werkdag: vanaf 1 uur
+  assert.equal(M.duurKort(150 * 60000), '2u30');
+  assert.equal(M.duurKort(120 * 60000), '2u');
+  assert.equal(M.duurKort(44 * 60000), '45m');
+});
+
+test('vergeten timer: eerst vragen, na 5 minuten stoppen op het moment van de vraag', () => {
+  const s = basis();
+  const start = 1_000_000_000;
+  s.taken.t = taak({ id: 't', lesId: null });
+  M.startTimer(s, 't', start);
+  const t = () => s.taken.t;
+  assert.equal(M.timerCheck(t(), start + 89 * 60000), null);
+  assert.equal(M.timerCheck(t(), start + 91 * 60000).stand, 'vraag');
+  const stop = M.timerCheck(t(), start + 96 * 60000);
+  assert.deepEqual(stop, { stand: 'stop', tot: start + 90 * 60000 });
+  // "ja, loopt nog": opnieuw 90 minuten
+  M.bevestigTimer(s, 't', start + 92 * 60000);
+  assert.equal(M.timerCheck(t(), start + 100 * 60000), null);
+  assert.equal(M.timerCheck(t(), start + 183 * 60000).stand, 'vraag');
+  M.stopTimer(s, 't', stop.tot);
+  assert.equal(t().tijd, 90 * 60000);
+  assert.equal(M.timerCheck(t(), start + 999 * 60000), null);
+});
+
+test('afvinken onthoudt wanneer, voor "vandaag gedaan"', () => {
+  const s = basis();
+  s.taken.t = taak({ id: 't', lesId: null });
+  const nu = new Date(2026, 9, 20, 14).getTime();
+  M.zetKlaar(s, 't', true, nu);
+  assert.equal(s.taken.t.klaarOp, nu);
+  assert.deepEqual(M.gedaanOp(s, '2026-10-20').map((t) => t.id), ['t']);
+  M.zetKlaar(s, 't', false);
+  assert.equal(s.taken.t.klaarOp, null);
+  M.bewaarTaak(s, 't', { klaar: true });
+  assert.ok(s.taken.t.klaarOp);
+});
+
+test('ochtendmail: de dag in een paar regels (Code.gs)', () => {
+  const ctx = {};
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(new URL('../apps-script/Code.gs', import.meta.url), 'utf8'), ctx);
+  const s = basis(); // werkdagen di en vr, les l1 op do 15 okt
+  s.lessen.l2 = { id: 'l2', klasIds: ['k1'], titel: 'Verkoopfactuur', datum: '2026-10-16', upd: 1 }; // vrijdag = werkdag
+  M.zorgHoofdtaken(s);
+  M.bewaarLeerlingTaak(s, null, { titel: 'Oefening', lesId: 'l1', indien: '2026-10-14' });
+  s.taken.oud = { id: 'oud', titel: 'Mails', domein: 'school', werkdag: '2026-10-10', klaar: false, upd: 1 };
+  const brief = ctx.dagBriefje_(JSON.parse(JSON.stringify(s)), '2026-10-15');
+  // de voorbereiding van vrijdag staat op donderdag (dag vóór de les, geen werkdag)
+  assert.match(brief.tekst, /Gepland voor vandaag:\n {2}○ Verkoopfactuur\n {2}○ Verbeteren CR: Oefening/);
+  assert.match(brief.tekst, /Nog voor te bereiden:\n {2}○ vr 16 okt · BKH4 · Verkoopfactuur/);
+  assert.match(brief.tekst, /2 blokjes bleven liggen/); // to do + voorbereiding van de les van vandaag
+  assert.equal(brief.onderwerp, 'do 15 okt · 2 gepland, 1 les voor te bereiden');
+  assert.equal(ctx.dagBriefje_({ instellingen: { werkdagen: [] } }, '2026-10-15'), null);
 });

@@ -94,3 +94,13 @@ test('bakje: opleiding in de volgorde van de pagina Opleiding', () => {
   assert.deepEqual(b.opleiding[0].taken.map((t) => t.id), ['a1', 'a2', 'b1', 'c1', 'c2']);
   assert.deepEqual(b.opleiding[1].taken.map((t) => t.id), ['los']); // losse to do: groep zonder onderdeel
 });
+
+test('afspraak op Vandaag: met het uur als dat er is', async () => {
+  const { afspraakUur } = await import('../js/views/vandaag.js');
+  assert.equal(afspraakUur({ datum: V, tijd: '14:00', eindTijd: '15:30' }, V), '14:00–15:30');
+  assert.equal(afspraakUur({ datum: V, tijd: '09:00' }, V), '09:00'); // oud script: zonder einduur
+  assert.equal(afspraakUur({ datum: V, tijd: null }, V), 'hele dag');
+  assert.equal(afspraakUur({ datum: V, eindDatum: plus(2), tijd: '18:00', eindTijd: '10:00' }, V), 'vanaf 18:00');
+  assert.equal(afspraakUur({ datum: plus(-2), eindDatum: V, tijd: '18:00', eindTijd: '10:00' }, V), 'tot 10:00');
+  assert.equal(afspraakUur({ datum: plus(-1), eindDatum: plus(1), tijd: '18:00', eindTijd: '10:00' }, V), 'hele dag');
+});

@@ -79,7 +79,8 @@ Doe dit op je laptop én op je gsm.
 ## Het script bijwerken
 
 Als er een nieuwe versie van `Code.gs` is (Saga meldt dan "het Google-script is verouderd").
-Dat is nu het geval: **versie 8** is nodig voor de **ochtendmail** (versie 7 volstaat voor de rest).
+Dat is nu het geval: de nieuwste is **versie 9**. Versie 8 is nodig voor de **ochtendmail**, versie 9 leest ook het **einduur**
+van een afspraak (op Vandaag zie je dan "14:00–15:30" in plaats van "14:00"). Versie 7 volstaat voor de rest.
 Bij **installeer** vraagt Google dan ook toestemming om *e-mail te versturen als jou* (enkel naar jezelf, voor de ochtendmail)
 en om *je e-mailadres te zien* (om te weten naar waar).
 

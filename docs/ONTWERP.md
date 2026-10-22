@@ -166,11 +166,10 @@ In het overzicht: "BKH3-K2 + K3" met de kleuren van beide klassen.
 - opleiding: per opleidingsonderdeel de volgende 5;
 - lessen zonder datum: ingeklapt.
 
-**Vandaag** (`#/vandaag`, het startscherm, ook op de computer; daar compact in twee kolommen)
-- Bovenaan, kaart **Vandaag**: ✓ *Gedaan* (wat je vandaag afvinkte, laatst afgevinkt eerst; terug openzetten kan), ⚑ *Deadline vandaag* (to do's, stukken en opdrachten met deadline vandaag) en *Gepland*.
-- Opleiding staat in *Mag* (en in het bakje) in de volgorde van de pagina Opleiding: opdrachten zoals ingegeven, daarin de stukken op volgorde.
-- **Moet**: de lessen van de volgende 2 werkdagen (vanaf morgen) met hun voorbereiding: afvinken of de timer starten.
-- **Mag**: wat bleef liggen en wat in het bakje zit, met een knop *Vandaag* om het vandaag te doen.
+**Vandaag** (`#/vandaag`, het startscherm op elk toestel). Op de computer drie kolommen, op de gsm onder elkaar:
+1. **Belangrijk**: *Voorbereiding* (de lessen van de volgende 2 werkdagen, vanaf morgen, die nog niet voorbereid zijn), *⚑ Deadline vandaag* (to do's, stukken en opdrachten) en *Gepland vandaag*. Alles in dezelfde rijen: afvinken, timer starten.
+2. **Magjes**: wat bleef liggen (met *Alles herplannen*) en het bakje, met een knop *Vandaag*. Opleiding in de volgorde van de pagina Opleiding.
+3. **Gedaan**: wat je vandaag afvinkte (laatst afgevinkt eerst; terug openzetten kan).
 - Teller op het tabblad: enkel wat bleef liggen.
 
 **Snel noteren**: bovenaan Vandaag en het bakje, of met de toets **N** op elk scherm. Eén regel = één to do in het bakje; een geplakte lijst geeft meerdere to do's.

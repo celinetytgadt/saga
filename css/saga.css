@@ -1085,12 +1085,15 @@ a.knop.primair { color: var(--accent-tekst); }
 
 /* ---------- vandaag: compact, twee kolommen op de computer ---------- */
 
-.pagina.vandaag-pagina { max-width: 1240px; padding-top: 14px; }
+.pagina.vandaag-pagina { max-width: 1500px; padding-top: 14px; }
 .vandaag-pagina .pagina-kop { margin-bottom: 8px; }
 .vandaag-kolommen { display: grid; gap: 14px; align-items: start; }
-@media (min-width: 900px) {
-  .vandaag-kolommen { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+@media (min-width: 1000px) {
+  .vandaag-kolommen { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, .8fr); }
 }
+.belangrijk { border-top: 3px solid var(--accent); }
+.belangrijk h3 small { font-weight: 400; margin-left: 4px; }
+.gedaan-kaart { background: color-mix(in srgb, var(--groen) 6%, var(--vlak)); }
 .vandaag-kolommen .kaart { margin-bottom: 0; }
 .vandaag-kolommen > div.kolom { display: flex; flex-direction: column; gap: 14px; }
 .vandaag-pagina .moetje-tekst { font-size: .92rem; }

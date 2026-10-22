@@ -290,6 +290,7 @@ export function deadlineVan(state, taak) {
 }
 
 export function vanafVan(state, taak) {
+  if (taak.indien) return taak.indien;
   return berekenRelatief(state, taak, taak.vanaf);
 }
 
@@ -321,6 +322,7 @@ export function deadlineLabel(deadline) {
 // verschuift als er later een werkdag bijkomt; enkel een verplaatste les zet ze opnieuw.
 export function werkdagVan(state, taak) {
   if (taak.werkdag) return taak.werkdag;
+  if (taak.indien) return verbeterDag(taak.indien);
   return taak.hoofd ? standaardWerkdag(state, taak) : null;
 }
 
@@ -367,6 +369,10 @@ export function verplaatsLes(state, lesId, datum) {
   zet(state, 'lessen', { ...les, datum: datum || null });
   const h = state.taken[hoofdId(lesId)];
   if (h && !h.del && !h.manueel) zet(state, 'taken', { ...h, werkdag: datum ? standaardWerkdag(state, h) : null });
+  // de indiendag van een taak voor leerlingen schuift mee, tenzij je ze zelf koos
+  if (datum)
+    for (const t of takenVanLes(state, lesId))
+      if (isLeerlingTaak(t) && !t.indienManueel && t.indien !== vrijdagVanaf(datum)) zet(state, 'taken', { ...t, indien: vrijdagVanaf(datum) });
 }
 
 // Waarschuwing voor een taak: { niveau: 'rood' | 'oranje', reden } of null.
@@ -474,6 +480,47 @@ export function klassenVanTaak(state, t) {
 // Verbeterwerk: taak bij een les die na het indienen komt.
 export function isVerbeteren(t) {
   return t.soort === 'verbeteren' || (!t.hoofd && !!t.lesId && /^verbeter/i.test(t.titel || ''));
+}
+
+// ---------- taken voor leerlingen ----------
+// Een taak die leerlingen maken en ik verbeter. Ze hoort (optioneel) bij een les en
+// heeft een indiendag (`indien`), standaard de vrijdag van de lesweek. Het verbeteren
+// staat vanzelf op mijn planning, de dag na het indienen, tot ik het zelf verschuif.
+// (Oudere verbetertaken hebben geen `indien` en blijven gewone taken.)
+
+export const isLeerlingTaak = (t) => t.soort === 'verbeteren' && !!t.indien;
+
+export const verbeterDag = (indien) => plusDagen(indien, 1);
+
+// Eerste vrijdag op of na `datum`.
+export function vrijdagVanaf(datum) {
+  return plusDagen(datum, (5 - weekdag(datum) + 7) % 7);
+}
+
+// Voorstel voor de indiendag: de vrijdag van de lesweek (zonder les: deze week).
+export function standaardIndien(state, lesId, vandaagDatum = vandaag()) {
+  const les = lesId && state.lessen[lesId];
+  return vrijdagVanaf(les && !les.del && les.datum ? les.datum : vandaagDatum);
+}
+
+export function bewaarLeerlingTaak(state, id, { titel, lesId = null, klasIds = [], indien, werkdag = null, notitie = '', klaar = false }) {
+  const huidig = id ? state.taken[id] : null;
+  const nieuw = {
+    ...(huidig || { klaar: false, deadline: null, vanaf: null }),
+    id: id || nieuwId(),
+    soort: 'verbeteren',
+    domein: 'school',
+    titel,
+    lesId: lesId || null,
+    klasIds: lesId ? undefined : klasIds,
+    indien,
+    indienManueel: indien !== standaardIndien(state, lesId),
+    werkdag: werkdag && werkdag !== verbeterDag(indien) ? werkdag : null,
+    notitie,
+    klaar,
+  };
+  if (nieuw.klaar && nieuw.gestart) Object.assign(nieuw, { tijd: bestedeTijd(nieuw), gestart: null });
+  return zet(state, 'taken', nieuw);
 }
 
 // Een les opslaan (nieuw of gewijzigd). Een nieuwe les krijgt haar taak;
@@ -1088,7 +1135,7 @@ export function actief(state, vandaagDatum, nu, bewaardTot) {
 
 // ---------- waar gaat mijn tijd naartoe ----------
 
-export const SOORTEN = { les: 'Lesvoorbereiding', verbeteren: 'Verbeteren', opdracht: 'Opdrachten', los: 'Losse taken' };
+export const SOORTEN = { les: 'Lesvoorbereiding', verbeteren: 'Verbeteren', opdracht: 'Opdrachten en stukken', los: "To do's" };
 
 // Begin van het schooljaar (1 september) waarin `datum` valt.
 export function schooljaarStart(datum) {
@@ -1114,7 +1161,7 @@ export function tijdRapport(state, van, tot, nu = Date.now()) {
       const domein = domeinVan(t);
       const les = t.lesId && state.lessen[t.lesId];
       const opd = t.opdrachtId && state.opdrachten[t.opdrachtId];
-      const soort = t.lesId ? (isVerbeteren(t) ? 'verbeteren' : 'les') : t.opdrachtId ? 'opdracht' : 'los';
+      const soort = isVerbeteren(t) ? 'verbeteren' : t.lesId ? 'les' : t.opdrachtId ? 'opdracht' : 'los';
       const klassen = klassenVanTaak(state, t)
         .map((id) => state.klassen[id])
         .filter(Boolean);

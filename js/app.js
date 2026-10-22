@@ -6,15 +6,15 @@
 import * as M from './model.js';
 import { getState, abonneer, wijzig, getSync, zetSyncCfg, sync, syncAlsNodig, vernieuwAgenda, voegSamen, haalAlles } from './store.js';
 import { $, esc, ui, mobiel, bewaarLokaal, zetFilter, melding } from './ui.js';
-import { blijvenLiggen, inTePlannen, taakTitel, tijdFormHtml, timerHtml } from './weergave.js';
-import { viewRaster, viewLijst, viewBakje } from './views/overzicht.js';
+import { taakTitel, tijdFormHtml, timerHtml } from './weergave.js';
+import { viewRaster, viewLijst, viewBakje, bakjeVoorFilter } from './views/overzicht.js';
 import { viewKlassen } from './views/school.js';
 import { viewKlas } from './views/klas.js';
 import { viewOpleiding } from './views/opleiding.js';
 import { viewInstellingen } from './views/instellingen.js';
 import { viewTijd } from './views/tijd.js';
 import {
-  dlg, metOngedaan, sluit, openTaak, openLes, openOpdracht, openDag, openNieuw, openVerbeteren, openStukkenPlakken, openKlas, openVak,
+  dlg, metOngedaan, sluit, openTaak, openLes, openOpdracht, openDag, openNieuw, openLeerlingTaak, openStukkenPlakken, openKlas, openVak,
   openOnderwerp, openPlakken, openAfwezigheid,
 } from './dialogen.js';
 
@@ -120,7 +120,7 @@ function teken() {
   for (const a of document.querySelectorAll('[data-nav]')) {
     a.classList.toggle('actief', a.dataset.nav === (NAV[view] || view));
   }
-  const aantal = inTePlannen(s).length + blijvenLiggen(s).length;
+  const aantal = bakjeVoorFilter(s).aantal;
   const badge = $('#bakje-teller');
   badge.textContent = aantal;
   badge.hidden = !aantal;
@@ -269,8 +269,10 @@ const acties = {
     const domein = el.dataset.domein === 'school' ? 'school' : null;
     openOpdracht(null, { vakId: el.dataset.vak || null, domein, onderwerpId: el.dataset.onderwerp || null, klasId: el.dataset.klas || null });
   },
-  verbeteren(el) {
-    openVerbeteren(el.dataset.les);
+  // Taak voor leerlingen, bij een les of voor een klas.
+  'nieuwe-leerlingtaak'(el) {
+    const lesId = el.dataset.les || null;
+    openLeerlingTaak(null, { lesId, klasIds: el.dataset.klas ? [el.dataset.klas] : [] }, lesId ? () => openLes(lesId) : null);
   },
   'stukken-plakken'(el) {
     openStukkenPlakken(el.dataset.opdracht);
@@ -315,12 +317,10 @@ const acties = {
     zetFilter({ domein: el.dataset.domein, klasId: null });
     render();
   },
-  'afspraken-verbergen'() {
-    zetVerbergAfspraken(!ui.verbergAfspraken);
-  },
-  'filter-lessen'() {
-    zetFilter({ lessen: !ui.filter.lessen });
-    render();
+  // Alles weer tonen: geen klas, alle domeinen, ook taken en afspraken.
+  'filter-wis'() {
+    zetFilter({ domein: 'alles', klasId: null, lessen: false });
+    zetVerbergAfspraken(false);
   },
   // Vanop de pagina van een klas: het overzicht met enkel die klas.
   'filter-klas'(el) {
@@ -391,6 +391,9 @@ const acties = {
 };
 
 document.addEventListener('click', (e) => {
+  // klik buiten het menu "Weergave": menu dicht
+  const menu = $('.weergave-menu[open]');
+  if (menu && !e.target.closest('.weergave-menu')) menu.open = false;
   if (e.target.closest('[data-sluit-dlg]') && dlg.open) {
     ui.terug = null;
     sluit();
@@ -419,6 +422,9 @@ document.addEventListener('change', (e) => {
     });
   } else if (el.dataset.lokaal === 'verbergAfspraken') {
     zetVerbergAfspraken(el.checked);
+  } else if (el.dataset.weergave === 'lessen') {
+    zetFilter({ lessen: el.checked });
+    render();
   } else if (el.matches('[data-filter-klas]')) {
     zetFilter({ klasId: el.value || null });
     render();
@@ -441,6 +447,15 @@ document.addEventListener('change', (e) => {
       .finally(() => (el.value = ''));
   }
 });
+
+// Het menu "Weergave" blijft open na het tekenen, zolang je het niet zelf sluit.
+document.addEventListener(
+  'toggle',
+  (e) => {
+    if (e.target.matches?.('.weergave-menu')) ui.weergaveOpen = e.target.open;
+  },
+  true
+);
 
 document.addEventListener('submit', (e) => {
   if (e.target.id === 'f-sync') {

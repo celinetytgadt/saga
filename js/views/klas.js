@@ -29,16 +29,16 @@ function volgendeLesKaart(s, k, les) {
     ${takenLijst(s, taken.filter((t) => !t.klaar && !t.hoofd), `data-terug-les="${les.id}"`)}
     <div class="chips">
       ${hoofd && !hoofd.klaar ? `<button type="button" class="chip" data-actie="vink" data-id="${hoofd.id}">✓ Voorbereiding klaar</button>` : ''}
-      <button type="button" class="chip" data-actie="verbeteren" data-les="${les.id}">+ verbeteren</button>
+      <button type="button" class="chip" data-actie="nieuwe-leerlingtaak" data-les="${les.id}">+ taak voor leerlingen</button>
     </div>
   </section>`;
 }
 
 function openWerkKaart(s, k) {
   const v = M.vandaag();
-  const lessen = M.lessenVanKlas(s, k.id);
-  const verbeteren = lessen.flatMap((l) => M.takenVanLes(s, l.id)).filter((t) => !t.klaar && M.isVerbeteren(t));
-  const losse = M.lijst(s, 'taken').filter((t) => !t.lesId && !t.opdrachtId && !t.klaar && (t.klasIds || []).includes(k.id));
+  const vanKlas = M.lijst(s, 'taken').filter((t) => !t.klaar && !t.opdrachtId && M.klassenVanTaak(s, t).includes(k.id));
+  const verbeteren = vanKlas.filter((t) => M.isVerbeteren(t));
+  const losse = vanKlas.filter((t) => !t.lesId && !M.isVerbeteren(t));
   const opdrachten = M.lijst(s, 'opdrachten')
     .filter((o) => (o.klasIds || []).includes(k.id))
     .filter((o) => {
@@ -46,17 +46,19 @@ function openWerkKaart(s, k) {
       return !(vg.totaal && vg.klaar === vg.totaal && (!o.deadline || o.deadline < v));
     })
     .sort(M.volgordeOpdracht);
-  const sorteer = (a, b) => (M.deadlineVan(s, a) || '9') < (M.deadlineVan(s, b) || '9') ? -1 : 1;
+  const wanneer = (t) => M.werkdagVan(s, t) || M.deadlineVan(s, t) || '9';
+  const sorteer = (a, b) => (wanneer(a) < wanneer(b) ? -1 : 1);
   const leeg = !verbeteren.length && !losse.length && !opdrachten.length;
   return `<section class="kaart">
     <h2>Open werk</h2>
     ${leeg ? '<p class="leeg">Niets open voor deze klas. 🌿</p>' : ''}
-    ${verbeteren.length ? `<h3>Te verbeteren</h3>${takenLijst(s, verbeteren.sort(sorteer), '')}` : ''}
-    ${opdrachten.length ? `<h3>Opdrachten</h3><ol class="lessen-lijst">${opdrachten.map((o) => opdrachtRegel(s, o)).join('')}</ol>` : ''}
-    ${losse.length ? `<h3>Taken</h3>${takenLijst(s, losse.sort(sorteer), '')}` : ''}
+    ${verbeteren.length ? `<h3>Taken: te verbeteren</h3>${takenLijst(s, verbeteren.sort(sorteer), '')}` : ''}
+    ${opdrachten.length ? `<h3>To do's met stukken</h3><ol class="lessen-lijst">${opdrachten.map((o) => opdrachtRegel(s, o)).join('')}</ol>` : ''}
+    ${losse.length ? `<h3>To do's</h3>${takenLijst(s, losse.sort(sorteer), '')}` : ''}
     <div class="knoppen">
-      <button class="knop klein" data-actie="nieuwe-taak" data-domein="school" data-klas="${k.id}">+ taak voor ${esc(k.naam)}</button>
-      <button class="knop klein" data-actie="nieuwe-opdracht" data-domein="school" data-klas="${k.id}">+ opdracht</button>
+      <button class="knop klein" data-actie="nieuwe-leerlingtaak" data-klas="${k.id}">+ taak voor leerlingen</button>
+      <button class="knop klein" data-actie="nieuwe-taak" data-domein="school" data-klas="${k.id}">+ to do</button>
+      <button class="knop klein" data-actie="nieuwe-opdracht" data-domein="school" data-klas="${k.id}">+ met stukken</button>
     </div>
   </section>`;
 }

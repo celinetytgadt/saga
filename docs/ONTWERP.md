@@ -138,6 +138,34 @@ In het overzicht: "BKH3-K2 + K3" met de kleuren van beide klassen.
 - **Afspraken verbergen** (per toestel, bv. schoolcomputer of projecteren): knop "Afspraken verbergen" bij het overzicht en een vinkje bij Instellingen → Weergave. Afspraken met #sw tellen nog altijd als werkdag.
 - **Techniek:** `app.js` opgesplitst in modules; tijdens het tekenen een tijdelijke index (taken per les, afspraken per dag, …) zodat Saga vlot blijft met een jaar aan gegevens; het opruimwerk (lestaken aanmaken, oude blokken omzetten) loopt enkel bij het opstarten en na een synchronisatie; een nieuwe versie van de app meldt zich met *Herladen*.
 
+### Tweede review (oktober 2026)
+
+**Benamingen**
+- **Les**: wat ik geef. Elke les heeft haar **voorbereiding** (de lestaak van hierboven).
+- **Taak**: een taak voor leerlingen die ik moet **verbeteren** (niet zelf maken).
+- **Opdracht**: wat ik krijg vanuit de opleiding en zelf moet maken (met stukken).
+- **To do**: alles wat ik moet regelen. Losse to do's per onderwerp; iets groters wordt een *to do met stukken* (technisch een schoolopdracht).
+
+**Taken voor leerlingen** (`soort: 'verbeteren'`, `indien`)
+- Hoort optioneel bij een les (anders bij een of meer klassen). Niet elke les heeft een taak.
+- `indien`: de dag waarop leerlingen indienen. Standaard de **vrijdag van de lesweek** (eerste vrijdag op of na de les), vrij aan te passen. Verschuift de les, dan schuift de indiendag mee, tenzij je ze zelf koos (`indienManueel`).
+- Op de indiendag staat een vlaggetje "⚑ Indienen: …". De dag erna staat **"Verbeteren CR: …"** op de planning (werkdag leeg = automatisch de dag na indienen); zelf verschuiven kan, "Standaard" zet het terug.
+- Klaarzetten in Classroom hoort bij de lesvoorbereiding (geen apart blokje).
+- Oudere verbetertaken (zonder `indien`) blijven gewone taken.
+
+**Overzicht**
+- Vlaggetjes (einddeadlines, indiendagen, deadlines) staan **altijd onderaan** de dag.
+- Filterbalk: domein, klas, en een menu **Weergave** met *Enkel lessen* en *Afspraken verbergen*. Staat er een filter aan, dan zie je "Filter: … ✕".
+- *Enkel lessen* toont onder elke les haar voorbereiding en taken.
+
+**Bakje** (toont enkel wat binnenkort speelt; de rest staat bij School en Opleiding)
+- blijven liggen: altijd;
+- bij een les: enkel voor lessen in de komende 2 weken;
+- verbeteren: enkel als het in de komende 2 weken moet gebeuren;
+- to do's: deadline binnen 2 weken, of zonder deadline;
+- opleiding: per opleidingsonderdeel de volgende 5;
+- lessen zonder datum: ingeklapt.
+
 ## 3. Regels
 
 1. **Werkdag schuif ik zelf, deadline volgt de les.** Verschuift een les, dan schuiven de relatieve deadlines (en `vanaf`) mee. Werkdagen blijven staan. Ook als de vaste werkdagen wijzigen of er een extra werkdag bijkomt, worden relatieve deadlines herberekend.

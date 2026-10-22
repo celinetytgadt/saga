@@ -777,3 +777,47 @@ test('Code.gs: zelfde archiefregels; sync geeft enkel actieve data, "alles" de v
   assert.ok(alles.data.lessen.l1 && alles.data.taken[M.hoofdId('l1')]);
   assert.ok(JSON.parse(bewaard).lessen.l1);
 });
+
+// ---------- taken voor leerlingen ----------
+
+test('taak voor leerlingen: indienen op vrijdag van de lesweek, verbeteren de dag erna', () => {
+  const s = basis(); // les op do 15 okt
+  assert.equal(M.vrijdagVanaf('2026-10-15'), '2026-10-16');
+  assert.equal(M.vrijdagVanaf('2026-10-16'), '2026-10-16');
+  assert.equal(M.vrijdagVanaf('2026-10-17'), '2026-10-23'); // zaterdag → volgende vrijdag
+  assert.equal(M.standaardIndien(s, 'l1'), '2026-10-16');
+  assert.equal(M.standaardIndien(s, null, '2026-10-19'), '2026-10-23');
+
+  const t = M.bewaarLeerlingTaak(s, null, { titel: 'Oefening factuur', lesId: 'l1', indien: '2026-10-16' });
+  assert.ok(M.isLeerlingTaak(t) && M.isVerbeteren(t));
+  assert.equal(t.indienManueel, false);
+  assert.equal(M.werkdagVan(s, t), '2026-10-17');
+  assert.equal(M.vanafVan(s, t), '2026-10-16');
+  assert.equal(M.waarschuwing(s, t, '2026-10-10'), null);
+
+  // zelf verschoven verbeteren blijft staan, "standaard" zet het terug
+  M.zetWerkdag(s, t.id, '2026-10-20');
+  assert.equal(M.werkdagVan(s, s.taken[t.id]), '2026-10-20');
+  M.zetWerkdag(s, t.id, null);
+  assert.equal(M.werkdagVan(s, s.taken[t.id]), '2026-10-17');
+});
+
+test('taak voor leerlingen schuift mee met de les, tenzij de indiendag zelf gekozen is', () => {
+  const s = basis();
+  const a = M.bewaarLeerlingTaak(s, null, { titel: 'A', lesId: 'l1', indien: '2026-10-16' });
+  const b = M.bewaarLeerlingTaak(s, null, { titel: 'B', lesId: 'l1', indien: '2026-10-21' });
+  assert.equal(b.indienManueel, true);
+  M.verplaatsLes(s, 'l1', '2026-10-22');
+  assert.equal(s.taken[a.id].indien, '2026-10-23');
+  assert.equal(s.taken[b.id].indien, '2026-10-21');
+});
+
+test('taak voor leerlingen zonder les hoort bij een klas', () => {
+  const s = basis();
+  const t = M.bewaarLeerlingTaak(s, null, { titel: 'Toets', klasIds: ['k1'], indien: '2026-10-16', werkdag: '2026-10-17' });
+  assert.equal(t.werkdag, null); // gelijk aan de standaard: niet vastgezet
+  assert.deepEqual(M.klassenVanTaak(s, t), ['k1']);
+  assert.equal(M.domeinVan(t), 'school');
+  const r = M.tijdRapport({ ...s, taken: { [t.id]: { ...t, tijd: 600000 } } }, '2026-09-01', '2027-08-31');
+  assert.equal(r.groepen[0].soorten.verbeteren, 600000);
+});

@@ -106,6 +106,49 @@ export function blijvenLiggen(s, v = M.vandaag()) {
   });
 }
 
+// ---------- bakje ----------
+// Het bakje toont enkel wat binnenkort speelt; de rest staat bij School en Opleiding.
+// - blijven liggen: altijd;
+// - bij een les: enkel voor lessen in de komende 2 weken;
+// - verbeteren: enkel als het in de komende 2 weken moet gebeuren;
+// - to do's: deadline binnen 2 weken, of zonder deadline;
+// - opleiding: per opleidingsonderdeel de volgende 5.
+export const BAKJE_DAGEN = 14;
+export const OPL_PER_ONDERDEEL = 5;
+
+function bakjeDatum(s, t) {
+  if (M.isVerbeteren(t)) return M.vanafVan(s, t) || M.deadlineVan(s, t);
+  const les = lesVan(s, t);
+  if (les) return les.datum;
+  return M.deadlineVan(s, t);
+}
+
+export function bakje(s, zien = () => true, v = M.vandaag()) {
+  const grens = M.plusDagen(v, BAKJE_DAGEN);
+  const liggen = blijvenLiggen(s, v).filter(zien).sort(sorteerTaken(s));
+  const school = [];
+  const perVak = new Map();
+  let later = 0;
+  for (const t of inTePlannen(s).filter(zien).sort(sorteerTaken(s))) {
+    if (M.domeinVan(t) === 'opleiding') {
+      const vak = vakVan(s, opdrachtVan(s, t));
+      const sleutel = vak?.id || '';
+      if (!perVak.has(sleutel)) perVak.set(sleutel, { vak, taken: [], meer: 0 });
+      const g = perVak.get(sleutel);
+      if (g.taken.length < OPL_PER_ONDERDEEL) g.taken.push(t);
+      else g.meer++;
+      continue;
+    }
+    const d = bakjeDatum(s, t);
+    if (!d || d <= grens) school.push(t);
+    else later++;
+  }
+  const opleiding = [...perVak.values()].sort((a, b) => (a.vak?.naam || '~').localeCompare(b.vak?.naam || '~'));
+  later += opleiding.reduce((n, g) => n + g.meer, 0);
+  const aantal = liggen.length + school.length + opleiding.reduce((n, g) => n + g.taken.length, 0);
+  return { liggen, school, opleiding, later, aantal };
+}
+
 export function dagKort(datum) {
   const d = M.parseDatum(datum);
   return `${d.getDate()} ${M.MAANDNAMEN[d.getMonth()]}`;
@@ -158,8 +201,10 @@ export function tijdFormHtml(t) {
   </form>`;
 }
 
-// Naam van een taak: de taak van een les heet zoals de les; blokken krijgen (2/3).
+// Naam van een taak: de taak van een les heet zoals de les; blokken krijgen (2/3);
+// een taak voor leerlingen staat op de planning als "Verbeteren CR: …".
 export function taakTitel(s, t) {
+  if (M.isLeerlingTaak(t)) return `Verbeteren CR: ${t.titel || '(zonder titel)'}`;
   const basis = t.titel || lesVan(s, t)?.titel || '(zonder titel)';
   return t.deelVan ? `${basis} (${t.deelNr}/${t.deelVan})` : basis;
 }
@@ -198,8 +243,23 @@ export function taakKaart(s, t) {
   </div>`;
 }
 
+// Wat bij een les hoort, in één regel per taak: de voorbereiding en de taken voor leerlingen.
+function lesTakenRegels(s, l) {
+  const taken = M.takenVanLes(s, l.id).filter((t) => !t.deelNr || t.deelNr === 1);
+  if (!taken.length) return '';
+  const regel = (t) => {
+    const wd = M.werkdagVan(s, t);
+    const naam = t.hoofd ? 'Voorbereiding' + (t.deelVan ? ` (${t.deelVan} blokken)` : '') : M.isLeerlingTaak(t) ? `📝 ${esc(t.titel)}` : esc(taakTitel(s, t));
+    const wanneer = M.isLeerlingTaak(t) ? `indienen ${M.kortDatum(t.indien)}` : wd ? M.kortDatum(wd) : 'in bakje';
+    return `<span class="les-sub ${t.klaar ? 'af' : ''}">${t.klaar ? '✓' : '○'} ${naam} <small>${wanneer}</small></span>`;
+  };
+  const volgorde = (t) => (t.hoofd ? 0 : M.isLeerlingTaak(t) ? 1 : 2);
+  return `<span class="les-subs">${taken.sort((a, b) => volgorde(a) - volgorde(b)).map(regel).join('')}</span>`;
+}
+
 // In de kalender enkel het onderwerp: de kleurlijn toont de klas (volledige naam bij aanwijzen).
-export function lesKaart(s, l, metKlas = true) {
+// `metTaken`: ook de voorbereiding en taken eronder (bij "Enkel lessen").
+export function lesKaart(s, l, metKlas = true, metTaken = false) {
   const taken = M.takenVanLes(s, l.id);
   const v = voortgang(taken);
   const samen = klassenVan(s, l).length > 1;
@@ -208,6 +268,7 @@ export function lesKaart(s, l, metKlas = true) {
   const tip = [`${klasLabel(s, l)} · ${l.titel}`, w && `⚠ ${w.reden}`].filter(Boolean).join(' – ');
   return `<div class="les ${samen ? 'samen' : ''} ${w ? 'oranje' : ''}" role="button" tabindex="0" draggable="true" data-sleep="les:${l.id}" data-actie="les" data-id="${l.id}" style="${klasStijl(s, l)}" title="${esc(tip)}">
     <span class="les-tekst">${metKlas ? `<b>${esc(klasLabel(s, l))}</b> ` : ''}${esc(l.titel)}</span>${w ? `<span class="lestaak-let" aria-label="${esc(w.reden)}">!</span>` : ''}${teller}
+    ${metTaken ? lesTakenRegels(s, l) : ''}
   </div>`;
 }
 
@@ -317,7 +378,8 @@ export function taakRij(s, t, terugAttr = '', huidigId = null) {
   const dl = M.deadlineVan(s, t);
   const wd = M.werkdagVan(s, t);
   const info = [
-    wd ? `gepland: ${M.kortDatum(wd)}${t.hoofd && !t.werkdag ? ' (standaard)' : ''}` : 'in bakje',
+    M.isLeerlingTaak(t) ? `indienen ${M.kortDatum(t.indien)}` : '',
+    wd ? `${M.isLeerlingTaak(t) ? 'verbeteren' : 'gepland'}: ${M.kortDatum(wd)}${(t.hoofd || t.indien) && !t.werkdag ? ' (standaard)' : ''}` : 'in bakje',
     dl && !t.deadline?.eind && !t.lesId ? `⚑ ${M.kortDatum(dl)}` : '',
     tijdLabel(t),
   ].filter(Boolean);

@@ -46,6 +46,7 @@ export const ui = {
   laatsteKlassen: lokaal('saga.laatsteKlassen', []),
   laatsteVak: null,
   tekst: lokaal('saga.tekst', 'normaal'), // klein | normaal | groot
+  weergaveOpen: false, // menu "Weergave" bij het overzicht
   verbergAfspraken: lokaal('saga.verbergAfspraken', false), // persoonlijke afspraken niet tonen (op dit toestel, bv. bij projecteren)
   zijbalk: lokaal('saga.zijbalk', { breedte: 270, verborgen: false }), // bakje op de computer
   tijd: { periode: 'jaar', data: null, volledig: false, bezig: false, fout: '' }, // tijdsoverzicht

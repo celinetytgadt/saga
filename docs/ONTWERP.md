@@ -147,7 +147,7 @@ In het overzicht: "BKH3-K2 + K3" met de kleuren van beide klassen.
 - **To do**: alles wat ik moet regelen. Losse to do's per onderwerp; iets groters wordt een *to do met stukken* (technisch een schoolopdracht).
 
 **Taken voor leerlingen** (`soort: 'verbeteren'`, `indien`)
-- Hoort optioneel bij een les (anders bij een of meer klassen). Niet elke les heeft een taak.
+- Hoort optioneel bij een les (anders bij een of meer klassen). Niet elke les heeft een taak. Vanop de pagina van een klas (of bij een les) toont de keuzelijst enkel de lessen van die klas.
 - `indien`: de dag waarop leerlingen indienen. Standaard de **vrijdag van de lesweek** (eerste vrijdag op of na de les), vrij aan te passen. Verschuift de les, dan schuift de indiendag mee, tenzij je ze zelf koos (`indienManueel`).
 - Op de indiendag staat een vlaggetje "⚑ Indienen: …". De dag erna staat **"Verbeteren CR: …"** op de planning (werkdag leeg = automatisch de dag na indienen); zelf verschuiven kan, "Standaard" zet het terug.
 - Klaarzetten in Classroom hoort bij de lesvoorbereiding (geen apart blokje).
@@ -166,9 +166,10 @@ In het overzicht: "BKH3-K2 + K3" met de kleuren van beide klassen.
 - opleiding: per opleidingsonderdeel de volgende 5;
 - lessen zonder datum: ingeklapt.
 
-**Vandaag** (`#/vandaag`, startscherm op de gsm; op de computer blijft het overzicht de start)
+**Vandaag** (`#/vandaag`, het startscherm, ook op de computer; daar compact in twee kolommen)
+- Bovenaan, kaart **Vandaag**: ✓ *Gedaan* (wat je vandaag afvinkte, laatst afgevinkt eerst; terug openzetten kan), ⚑ *Deadline vandaag* (to do's, stukken en opdrachten met deadline vandaag) en *Gepland*.
+- Opleiding staat in *Mag* (en in het bakje) in de volgorde van de pagina Opleiding: opdrachten zoals ingegeven, daarin de stukken op volgorde.
 - **Moet**: de lessen van de volgende 2 werkdagen (vanaf morgen) met hun voorbereiding: afvinken of de timer starten.
-- **Gepland voor vandaag**: wat je zelf op vandaag zette (bv. Verbeteren CR).
 - **Mag**: wat bleef liggen en wat in het bakje zit, met een knop *Vandaag* om het vandaag te doen.
 - Teller op het tabblad: enkel wat bleef liggen.
 

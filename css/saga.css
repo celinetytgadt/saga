@@ -1082,3 +1082,33 @@ a.knop.primair { color: var(--accent-tekst); }
 @media (max-width: 760px) {
   .timer-balk.vraag { max-width: 70vw; }
 }
+
+/* ---------- vandaag: compact, twee kolommen op de computer ---------- */
+
+.pagina.vandaag-pagina { max-width: 1240px; padding-top: 14px; }
+.vandaag-pagina .pagina-kop { margin-bottom: 8px; }
+.vandaag-kolommen { display: grid; gap: 14px; align-items: start; }
+@media (min-width: 900px) {
+  .vandaag-kolommen { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+.vandaag-kolommen .kaart { margin-bottom: 0; }
+.vandaag-kolommen > div.kolom { display: flex; flex-direction: column; gap: 14px; }
+.vandaag-pagina .moetje-tekst { font-size: .92rem; }
+.kaart.compact { padding: 12px 14px; }
+.kaart.compact > h2 { font-size: 1.05rem; margin-bottom: 2px; }
+.vandaag-pagina .kaart h3 { margin: 10px 0 2px; font-size: .82rem; }
+.vandaag-pagina .hint { margin: 2px 0 4px; font-size: .8rem; }
+.vandaag-pagina .dag-titel { margin: 8px 0 4px; }
+.vandaag-pagina .magje { padding: 4px 0 4px 8px; gap: 8px; }
+.vandaag-pagina .moetje { padding: 6px 10px; margin-bottom: 6px; }
+.vandaag-pagina .moetje-taak { padding-top: 3px; }
+.magje-titel { font-size: .92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.moetje-tekst small { font-size: .74rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vandaag-pagina .chip { padding: 2px 10px; font-size: .8rem; }
+.vandaag-pagina .snel-invoer { margin: 0 0 12px; }
+.magje.klaar .magje-titel { text-decoration: line-through; color: var(--zacht); }
+.magje.klaar { border-left-color: var(--groen); }
+.magje.klaar .vink { background: var(--groen); border-color: var(--groen); }
+.kop-groen { color: var(--groen-tekst); }
+.kop-vlag { color: var(--vlag); }
+.vlag-bol { width: 18px; text-align: center; color: var(--vlag); font-size: .85rem; }

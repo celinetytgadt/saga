@@ -127,13 +127,25 @@ function bakjeDatum(s, t) {
   return M.deadlineVan(s, t);
 }
 
+// Opleiding: in de volgorde van de pagina Opleiding (opdrachten zoals ingegeven, daarin
+// de stukken op volgorde); losse to do's daarna, op deadline.
+export const sorteerOpleiding = (s) => (a, b) => {
+  const oa = opdrachtVan(s, a);
+  const ob = opdrachtVan(s, b);
+  if (oa && ob) return oa === ob ? (a.volg || 0) - (b.volg || 0) : M.volgordeOpdracht(oa, ob);
+  if (!!oa !== !!ob) return oa ? -1 : 1;
+  return sorteerTaken(s)(a, b);
+};
+
 export function bakje(s, zien = () => true, v = M.vandaag()) {
   const grens = M.plusDagen(v, BAKJE_DAGEN);
   const liggen = blijvenLiggen(s, v).filter(zien).sort(sorteerTaken(s));
   const school = [];
   const perVak = new Map();
   let later = 0;
-  for (const t of inTePlannen(s).filter(zien).sort(sorteerTaken(s))) {
+  const open = inTePlannen(s).filter(zien);
+  const opl = open.filter((t) => M.domeinVan(t) === 'opleiding').sort(sorteerOpleiding(s));
+  for (const t of [...open.filter((t) => M.domeinVan(t) !== 'opleiding').sort(sorteerTaken(s)), ...opl]) {
     if (M.domeinVan(t) === 'opleiding') {
       const vak = vakVan(s, opdrachtVan(s, t));
       const sleutel = vak?.id || '';
@@ -147,7 +159,8 @@ export function bakje(s, zien = () => true, v = M.vandaag()) {
     if (!d || d <= grens) school.push(t);
     else later++;
   }
-  const opleiding = [...perVak.values()].sort((a, b) => (a.vak?.naam || '~').localeCompare(b.vak?.naam || '~'));
+  // per onderdeel op naam (zoals de pagina Opleiding); zonder onderdeel achteraan
+  const opleiding = [...perVak.values()].sort((a, b) => !a.vak - !b.vak || (a.vak?.naam || '').localeCompare(b.vak?.naam || ''));
   later += opleiding.reduce((n, g) => n + g.meer, 0);
   const aantal = liggen.length + school.length + opleiding.reduce((n, g) => n + g.taken.length, 0);
   return { liggen, school, opleiding, later, aantal };

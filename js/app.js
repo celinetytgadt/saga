@@ -64,11 +64,22 @@ function tekenStatus() {
 }
 
 // Lopende timer bovenaan, zodat je hem ziet en kunt pauzeren vanop elk scherm.
+// Loopt hij al lang (zie timerCheck), dan vraagt de balk of hij nog loopt.
 function tekenTimer(s) {
   const balk = $('#timer-balk');
   const t = M.lopendeTaak(s);
+  const check = M.timerCheck(t);
   balk.hidden = !t;
+  balk.dataset.check = check?.stand || '';
+  balk.classList.toggle('vraag', check?.stand === 'vraag');
+  document.title = check?.stand === 'vraag' ? '⏱ Loopt je timer nog? · Saga' : 'Saga';
   if (!t) return (balk.innerHTML = '');
+  if (check?.stand === 'vraag') {
+    balk.innerHTML = `<span class="timer-info" title="${esc(taakTitel(s, t))}"><span class="timer-titel">Loopt "${esc(taakTitel(s, t))}" nog?</span></span>
+      <button class="knop klein primair" data-actie="timer-ja" data-id="${t.id}">Ja</button>
+      <button class="knop klein" data-actie="timer" data-id="${t.id}">Stop</button>`;
+    return;
+  }
   balk.innerHTML = `<button class="timer-pauze" data-actie="timer" data-id="${t.id}" aria-label="Timer pauzeren" title="Pauzeren">❚❚</button>
     <span class="timer-info" role="button" tabindex="0" data-actie="taak" data-id="${t.id}" title="${esc(taakTitel(s, t))}">
       <span class="timer-tijd" data-klok="${t.id}">${M.klokTekst(M.bestedeTijd(t))}</span>
@@ -83,6 +94,36 @@ function tik() {
     const t = s.taken[el.dataset.klok];
     if (t?.gestart) el.textContent = M.klokTekst(M.bestedeTijd(t));
   }
+}
+
+// Vergeten timer: vragen of hij nog loopt, en stoppen als er geen antwoord komt
+// (ook als Saga intussen dicht was: dan stopt hij op het moment van de vraag).
+function controleerTimer() {
+  const s = getState();
+  const t = M.lopendeTaak(s);
+  const check = M.timerCheck(t);
+  if (check?.stand === 'stop') {
+    const uur = new Date(check.tot).toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' });
+    wijzig((st) => M.stopTimer(st, t.id, check.tot));
+    melding(`Timer van "${taakTitel(s, t)}" gestopt om ${uur}: geen antwoord op "Loopt dit nog?".`, { actie: { label: 'Tijd nakijken', doe: () => openTaak(t.id) }, duur: 0 });
+    return;
+  }
+  if ((check?.stand || '') !== ($('#timer-balk').dataset.check || '')) {
+    tekenTimer(s);
+    if (check?.stand === 'vraag') navigator.vibrate?.(200);
+  }
+}
+
+// Een klein feestje bij het afvinken, op de plaats van het vinkje.
+function feest(el) {
+  const r = el.getBoundingClientRect();
+  const f = document.createElement('div');
+  f.className = 'feest';
+  f.textContent = '✓';
+  f.style.left = `${r.left + r.width / 2}px`;
+  f.style.top = `${r.top + r.height / 2}px`;
+  document.body.append(f);
+  setTimeout(() => f.remove(), 900);
 }
 
 function render() {
@@ -217,7 +258,12 @@ const acties = {
     const t = getState().taken[id];
     if (!t) return;
     if (t.klaar) return wijzig((s) => M.zetKlaar(s, id, false));
-    metOngedaan(`"${taakTitel(getState(), t)}" afgevinkt`, (s) => M.zetKlaar(s, id, true));
+    feest(el);
+    const n = M.gedaanOp(getState(), M.vandaag()).length + 1;
+    metOngedaan(`✓ "${taakTitel(getState(), t)}" afgevinkt${n > 1 ? ` · al ${n} vandaag` : ''}`, (s) => M.zetKlaar(s, id, true));
+  },
+  'timer-ja'(el) {
+    wijzig((s) => M.bevestigTimer(s, el.dataset.id));
   },
   timer(el) {
     const id = el.dataset.id;
@@ -456,7 +502,11 @@ document.addEventListener('keydown', (e) => {
 
 document.addEventListener('change', (e) => {
   const el = e.target;
-  if (el.dataset.instelling) {
+  if (el.dataset.instellingGetal) {
+    wijzig((s) => {
+      s.instellingen = { ...s.instellingen, [el.dataset.instellingGetal]: Number(el.value), upd: Date.now() };
+    });
+  } else if (el.dataset.instelling) {
     // instellingen die direct bij wijziging bewaard worden
     wijzig((s) => {
       s.instellingen = { ...s.instellingen, [el.dataset.instelling]: el.checked, upd: Date.now() };
@@ -623,7 +673,10 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 setInterval(() => document.visibilityState === 'visible' && sync(), 15 * 60 * 1000);
-setInterval(() => document.visibilityState === 'visible' && tik(), 1000);
+setInterval(() => {
+  controleerTimer(); // ook op de achtergrond, zodat de titel van het tabblad de vraag toont
+  if (document.visibilityState === 'visible') tik();
+}, 1000);
 
 ruimOp();
 route();

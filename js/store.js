@@ -202,6 +202,7 @@ export async function sync({ agenda = false } = {}) {
     bewaar();
     if (iets(voor, state)) melden('sync');
     syncStatus.agenda = j.agendaInfo || null;
+    syncStatus.scriptVersie = j.scriptVersie || 1;
     if ((j.scriptVersie || 1) < SCRIPT_VERSIE) {
       zetStatus('fout', 'je planning is bewaard, maar het Google-script is verouderd. Plak de nieuwe Code.gs, voer "installeer" opnieuw uit en maak een nieuwe versie (zie installatiegids, "Het script bijwerken").');
     } else {

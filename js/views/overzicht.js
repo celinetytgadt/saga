@@ -52,6 +52,8 @@ function dagBlok(s, idx, datum, v, raster) {
   const indienen = idx.indienen[datum] || [];
   // #sw: enkel de werkdag-rand, geen blokje. Verborgen afspraken tellen wel nog als werkdag.
   const afspraken = ui.verbergAfspraken ? [] : M.afsprakenOp(s, datum).filter((a) => !a.werk);
+  // geschatte tijd van wat er nog gepland staat (vanaf vandaag, los van het filter)
+  const last = datum >= v ? M.dagLast(s, datum) : null;
   const afw = M.afwezighedenOp(s, datum).filter((a) => !ui.filter.klasId || M.isVakantie(a) || a.klasIds.includes(ui.filter.klasId));
   const vakantie = afw.some(M.isVakantie);
   const klassen = [
@@ -67,6 +69,11 @@ function dagBlok(s, idx, datum, v, raster) {
     <header class="dag-kop">
       <span class="dag-datum">${raster ? (datum.endsWith('-01') ? eersteVanMaand(datum) : dagKort(datum)) : M.kortDatum(datum)}</span>
       ${werk ? `<span class="label-werk" title="werkdag">${raster ? '' : 'werk'}</span>` : ''}
+      ${
+        last?.ms
+          ? `<span class="last ${last.vol ? 'vol' : ''}" title="Geschat, op basis van je timer${last.vol ? ` – meer dan ${M.duurKort(last.grens)} op ${werk ? 'een werkdag' : 'deze dag'}` : ''}">± ${M.duurKort(last.ms)}</span>`
+          : ''
+      }
       <button class="dag-plus" data-actie="dag" data-datum="${datum}" aria-label="Acties voor ${M.kortDatum(datum)}">+</button>
     </header>
     ${afw.map((a) => `<div class="afwezig ${M.isVakantie(a) ? 'vak' : ''}" role="button" tabindex="0" data-actie="afwezigheid" data-id="${a.id}" title="${esc(afwezigLabel(s, a))}">${esc(afwezigLabel(s, a))}</div>`).join('')}

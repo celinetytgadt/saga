@@ -178,6 +178,14 @@ In het overzicht: "BKH3-K2 + K3" met de kleuren van beide klassen.
 
 **Rustiger overzicht**: vandaag heeft de sterkste rand, werkdagen een zachte arcering met "werk", lessen zijn labels (kleurstreep, geen kaartje) en taken blokjes om af te vinken. Bij het openen 4 weken vooruit (er komen er bij tijdens het scrollen).
 
+**Daglast**: bij elke dag (vanaf vandaag) de geschatte tijd die nog gepland staat (± 2u30). De schatting komt uit de timer: het gemiddelde van gelijkaardige afgewerkte taken (deze klas → alle voorbereidingen; deze opdracht → dit onderdeel → alle stukken; verbeteren per klas; to do's), zonder gegevens 30 minuten. Oranje als een dag vol zit: boven de grens bij Instellingen → Planning (standaard 4 uur), op een werkdag vanaf 1 uur. Er hoeft niets ingeschat te worden.
+
+**Vergeten timer**: na 90 minuten vraagt de balk bovenaan (en de titel van het tabblad) "Loopt … nog?". *Ja* = weer 90 minuten verder; komt er binnen 5 minuten geen antwoord (ook als Saga dicht was), dan stopt de timer op het moment van de vraag, met een melding om de tijd na te kijken.
+
+**Afvinken beloont**: een klein vinkje-animatie, "al 3 vandaag" in de melding, en bovenaan Vandaag wat je vandaag al afvinkte (`klaarOp`).
+
+**Ochtendmail** (aan te zetten bij Instellingen → Planning, script versie 8): rond 6 uur een mail met wat gepland staat, welke lessen je nog moet voorbereiden, wat er ingediend wordt en wat bleef liggen. Enkel als er iets te melden is.
+
 ## 3. Regels
 
 1. **Werkdag schuif ik zelf, deadline volgt de les.** Verschuift een les, dan schuiven de relatieve deadlines (en `vanaf`) mee. Werkdagen blijven staan. Ook als de vaste werkdagen wijzigen of er een extra werkdag bijkomt, worden relatieve deadlines herberekend.

@@ -365,6 +365,7 @@ export function bewaarTaak(state, id, wijzigingen, basis = {}) {
   if (nieuw.opdrachtId && (!huidig || huidig.opdrachtId !== nieuw.opdrachtId)) nieuw.volg = volgendStuk(state, nieuw.opdrachtId);
   if (nieuw.lesId || nieuw.opdrachtId || nieuw.domein === 'opleiding') delete nieuw.klasIds;
   if (nieuw.klaar && nieuw.gestart) Object.assign(nieuw, { tijd: bestedeTijd(nieuw), gestart: null });
+  zetKlaarOp(nieuw, huidig);
   zet(state, 'taken', nieuw);
   if (nieuw.deelGroep && 'deadline' in wijzigingen) deelDeadline(state, nieuw.id);
   if (nieuw.deelGroep && !nieuw.lesId && !nieuw.opdrachtId) deelOnderwerp(state, nieuw.id);
@@ -533,6 +534,7 @@ export function bewaarLeerlingTaak(state, id, { titel, lesId = null, klasIds = [
     klaar,
   };
   if (nieuw.klaar && nieuw.gestart) Object.assign(nieuw, { tijd: bestedeTijd(nieuw), gestart: null });
+  zetKlaarOp(nieuw, huidig);
   return zet(state, 'taken', nieuw);
 }
 
@@ -901,10 +903,101 @@ export function zetTijd(state, taakId, ms, nu = Date.now()) {
 }
 
 // Afvinken stopt de timer; terug openzetten laat de bestede tijd staan.
+// `klaarOp`: wanneer de taak afgevinkt werd (voor "vandaag gedaan").
 export function zetKlaar(state, taakId, klaar, nu = Date.now()) {
   if (klaar) stopTimer(state, taakId, nu);
   const t = state.taken[taakId];
-  if (t && !t.del) zet(state, 'taken', { ...t, klaar });
+  if (t && !t.del) zet(state, 'taken', { ...t, klaar, klaarOp: klaar ? t.klaarOp || nu : null });
+}
+
+function zetKlaarOp(nieuw, huidig, nu = Date.now()) {
+  if (!nieuw.klaar) nieuw.klaarOp = null;
+  else if (!huidig?.klaar || !nieuw.klaarOp) nieuw.klaarOp = huidig?.klaar ? huidig.klaarOp || nu : nu;
+}
+
+export function gedaanOp(state, datum) {
+  return lijst(state, 'taken').filter((t) => t.klaar && t.klaarOp && isoDatum(new Date(t.klaarOp)) === datum);
+}
+
+// Vergeten timer: na TIMER_VRAAG_MS vraagt Saga "Loopt dit nog?". Komt er binnen
+// TIMER_WACHT_MS geen antwoord, dan stopt de timer op het moment van de vraag.
+// "Ja" (`bevestigd`) start de teller opnieuw.
+export const TIMER_VRAAG_MS = 90 * 60000;
+export const TIMER_WACHT_MS = 5 * 60000;
+
+export function timerCheck(taak, nu = Date.now()) {
+  if (!taak?.gestart) return null;
+  const sinds = Math.max(taak.gestart, taak.bevestigd || 0);
+  if (nu - sinds >= TIMER_VRAAG_MS + TIMER_WACHT_MS) return { stand: 'stop', tot: sinds + TIMER_VRAAG_MS };
+  if (nu - sinds >= TIMER_VRAAG_MS) return { stand: 'vraag', sinds: sinds + TIMER_VRAAG_MS };
+  return null;
+}
+
+export function bevestigTimer(state, taakId, nu = Date.now()) {
+  const t = state.taken[taakId];
+  if (t && !t.del && t.gestart) zet(state, 'taken', { ...t, bevestigd: nu });
+}
+
+// ---------- daglast ----------
+// Hoe lang een open taak nog duurt, geschat uit de tijd die je met de timer bijhield
+// voor gelijkaardige afgewerkte taken: van specifiek (deze klas, deze opdracht) naar
+// algemeen (alle voorbereidingen). Zonder gegevens: SCHATTING_STANDAARD.
+export const SCHATTING_STANDAARD = 30 * 60000;
+export const DAGGRENS_STANDAARD = 240; // minuten op een dag die geen werkdag is
+export const DAGGRENS_WERKDAG = 60;
+
+function schatSleutels(state, t) {
+  const klas = klassenVanTaak(state, t)[0] || '';
+  if (isVerbeteren(t)) return ['verb:' + klas, 'verb'];
+  if (t.lesId) return ['les:' + klas, 'les'];
+  if (t.opdrachtId) {
+    const opd = state.opdrachten[t.opdrachtId];
+    return ['opd:' + t.opdrachtId, 'vak:' + (opd?.vakId || opd?.onderwerpId || ''), 'stuk'];
+  }
+  return ['los:' + (t.onderwerpId || ''), 'los'];
+}
+
+function gemiddelden(state) {
+  return onthoud('gemiddelden', state.taken, () => {
+    const som = {};
+    for (const t of lijst(state, 'taken')) {
+      if (!t.klaar || !t.tijd) continue;
+      const ms = t.tijd * (t.deelVan || 1); // een blok telt voor de hele taak
+      for (const k of schatSleutels(state, t)) {
+        const s = (som[k] ||= { ms: 0, n: 0 });
+        s.ms += ms;
+        s.n++;
+      }
+    }
+    const g = {};
+    for (const [k, s] of Object.entries(som)) g[k] = s.ms / s.n;
+    return g;
+  });
+}
+
+export function schatting(state, t) {
+  const g = gemiddelden(state);
+  const k = schatSleutels(state, t).find((k) => g[k]);
+  const ms = (k ? g[k] : SCHATTING_STANDAARD) / (t.deelVan || 1);
+  return Math.max(0, ms - bestedeTijd(t));
+}
+
+function takenPerDag(state) {
+  return onthoud('takenPerDag', state.taken, () => groepeer(lijst(state, 'taken').filter((t) => !t.klaar), (t) => werkdagVan(state, t)));
+}
+
+// Geschatte tijd die nog gepland staat op een dag, en of dat te veel is.
+export function dagLast(state, datum) {
+  const ms = (takenPerDag(state).get(datum) || []).reduce((n, t) => n + schatting(state, t), 0);
+  const grens = (isWerkdag(state, datum) ? DAGGRENS_WERKDAG : state.instellingen.daggrens || DAGGRENS_STANDAARD) * 60000;
+  return { ms, vol: ms > grens, grens };
+}
+
+// "± 45m", "± 2u", "± 2u30" (afgerond op 5 minuten)
+export function duurKort(ms) {
+  const min = Math.max(5, Math.round(ms / 300000) * 5);
+  if (min < 60) return `${min}m`;
+  return `${Math.floor(min / 60)}u${min % 60 ? pad(min % 60) : ''}`;
 }
 
 // 1:05:09 of 4:09 (voor een lopende klok)

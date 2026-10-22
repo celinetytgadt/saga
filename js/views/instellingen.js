@@ -34,6 +34,19 @@ export function viewInstellingen(s) {
       ).join('')}</div>
     </section>
 
+    <section class="kaart">
+      <h2>Planning</h2>
+      <label class="rij-veld">Een dag zonder werk is vol vanaf
+        <select data-instelling-getal="daggrens">${[120, 180, 240, 300, 360, 480]
+          .map((m) => `<option value="${m}" ${(s.instellingen.daggrens || M.DAGGRENS_STANDAARD) === m ? 'selected' : ''}>${m / 60} uur</option>`)
+          .join('')}</select></label>
+      <p class="hint">In het overzicht staat bij elke dag hoeveel tijd er nog gepland staat (± 2u30), geschat uit de tijd die je met de timer bijhield voor gelijkaardige taken (zonder gegevens: 30 minuten per blokje). Is een dag vol, dan kleurt het oranje. Op een werkdag is dat vanaf 1 uur.</p>
+      <label class="check"><input type="checkbox" data-instelling="ochtendmail" ${s.instellingen.ochtendmail ? 'checked' : ''}> Ochtendmail: elke ochtend rond 6 uur een korte mail met je dag</label>
+      <p class="hint">Wat gepland staat, welke lessen je nog moet voorbereiden, wat er ingediend wordt en wat bleef liggen. Je krijgt enkel een mail als er iets te melden is.${
+        sy.url && (sy.scriptVersie || 0) < 8 ? ' <b>Werk eerst het Google-script bij</b> (versie 8, zie de installatiegids, "Het script bijwerken").' : ''
+      }</p>
+    </section>
+
     <section class="kaart" id="vakanties">
       <h2>Vakanties en afwezigheden</h2>
       <p class="hint">Een vakantie geldt voor alle klassen. Een afwezigheid (uitstap, stage, examens) duid je aan voor één of meer klassen. Lessen op zo'n dag krijgen een waarschuwing, en "Inplannen volgens rooster" slaat die dagen over.</p>

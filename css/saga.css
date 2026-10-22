@@ -1035,3 +1035,50 @@ a.knop.primair { color: var(--accent-tekst); }
 .magje { border-left: 3px solid var(--klas); padding: 6px 0 6px 8px; border-bottom: 1px solid var(--rand); }
 .magje.opl { border-left-style: dashed; }
 .timer-chip.loopt { background: var(--groen); color: #fff; border-color: var(--groen); border-style: solid; }
+
+/* ---------- daglast, gedaan, timervraag, feestje ---------- */
+
+.last { font-size: .7rem; font-weight: 600; color: var(--zacht); white-space: nowrap; }
+.last.vol { color: var(--oranje); background: var(--oranje-vlak); border-radius: 999px; padding: 0 6px; }
+.last.groot { font-size: .85rem; }
+.dag-kop .last { margin-left: auto; }
+.dag-kop .last + .dag-plus { margin-left: 0; }
+
+.gedaan { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: -4px 0 10px; color: var(--groen-tekst); }
+.gedaan-chip { font-size: .78rem; background: color-mix(in srgb, var(--groen) 15%, var(--vlak)); color: var(--groen-tekst); border-radius: 999px; padding: 1px 8px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.timer-balk.vraag { background: var(--oranje-vlak); border-color: var(--oranje); animation: tik-tak 1.2s ease-in-out 3; }
+@keyframes tik-tak { 50% { transform: scale(1.04); } }
+
+.feest {
+  position: fixed;
+  z-index: 100;
+  pointer-events: none;
+  translate: -50% -50%;
+  color: #fff;
+  background: var(--groen);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--groen) 60%, transparent);
+  animation: feest .9s ease-out forwards;
+}
+@keyframes feest {
+  0% { scale: .3; opacity: 0; }
+  25% { scale: 1.15; opacity: 1; box-shadow: 0 0 0 0 color-mix(in srgb, var(--groen) 60%, transparent); }
+  100% { scale: 1; opacity: 0; translate: -50% -110%; box-shadow: 0 0 0 18px transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .feest, .timer-balk.vraag { animation: none; }
+  .feest { display: none; }
+}
+.rij-veld { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rij-veld select { width: auto; }
+.timer-balk.vraag { padding: 3px 3px 3px 12px; }
+.timer-balk.vraag .timer-titel { display: inline; color: var(--oranje); font-weight: 600; }
+@media (max-width: 760px) {
+  .timer-balk.vraag { max-width: 70vw; }
+}

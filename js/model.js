@@ -66,7 +66,7 @@ export function maandagVan(s) {
 // Bij het openen: vorige week, deze week en WEKEN_START weken vooruit; bij het scrollen
 // komen er weken bij (tot WEKEN_MAX). Naar boven kan tot WEKEN_TERUG_MAX weken terug
 // (ouder staat niet meer op het toestel, wel op Drive).
-export const WEKEN_START = 10;
+export const WEKEN_START = 4;
 export const WEKEN_MAX = 52;
 export const WEKEN_TERUG_MAX = 4;
 
@@ -204,6 +204,16 @@ export function lijst(state, collectie) {
 }
 
 // ---------- werkdagen ----------
+
+// De eerstvolgende `aantal` werkdagen na `datum` (niet `datum` zelf), binnen 3 weken.
+export function volgendeWerkdagen(state, datum, aantal = 2) {
+  const r = [];
+  for (let i = 1; i <= 21 && r.length < aantal; i++) {
+    const d = plusDagen(datum, i);
+    if (isWerkdag(state, d)) r.push(d);
+  }
+  return r;
+}
 
 // Volgorde: manuele aanduiding > afspraak met #sw > vaste werkdagen.
 export function isWerkdag(state, datum) {
@@ -378,6 +388,9 @@ export function verplaatsLes(state, lesId, datum) {
 // Waarschuwing voor een taak: { niveau: 'rood' | 'oranje', reden } of null.
 export function waarschuwing(state, taak, vandaagDatum = vandaag()) {
   if (taak.klaar) return null;
+  // de voorbereiding van een les die al gegeven is: geen waarschuwing meer
+  const les = taak.hoofd && state.lessen[taak.lesId];
+  if (les && les.datum && les.datum < vandaagDatum) return null;
   const dl = deadlineVan(state, taak);
   const va = vanafVan(state, taak);
   const wd = werkdagVan(state, taak);
@@ -923,6 +936,26 @@ export function leesMinuten(tekst) {
 export function verwijderLes(state, lesId) {
   for (const t of takenVanLes(state, lesId)) wis(state, 'taken', t.id);
   wis(state, 'lessen', lesId);
+}
+
+// ---------- herplannen ----------
+
+// Voorstel om taken die bleven liggen opnieuw te verdelen over de komende dagen die
+// geen werkdag zijn (vanaf vandaag, minstens een week ver), zonder voorbij hun deadline.
+// Geeft [{ taak, datum }].
+export function herplanPlan(state, taken, vandaagDatum = vandaag()) {
+  const tot = plusDagen(vandaagDatum, Math.max(6, taken.length - 1));
+  const dagen = verdeelDagen(state, taken.length, vandaagDatum, tot);
+  return taken.map((taak, i) => {
+    let datum = dagen[i];
+    const dl = deadlineVan(state, taak);
+    if (dl && datum > dl) datum = dl < vandaagDatum ? vandaagDatum : dl;
+    return { taak, datum };
+  });
+}
+
+export function pasHerplanToe(state, plan) {
+  for (const p of plan) zetWerkdag(state, p.taak.id, p.datum);
 }
 
 // ---------- opleiding ----------

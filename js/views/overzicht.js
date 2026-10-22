@@ -2,7 +2,7 @@
 
 import * as M from '../model.js';
 import { esc, ui, mobiel, WEEK, toonTaak, toonLes, toonOpdracht } from '../ui.js';
-import { anker, bakje, dagKort, groepen, groepKaart, klasLabel, lesKaart, lesVan, opNaam, sorteerLessen, voortgang, klassenNaam } from '../weergave.js';
+import { anker, bakje, dagKort, snelInvoerHtml, groepen, groepKaart, klasLabel, lesKaart, lesVan, opNaam, sorteerLessen, voortgang, klassenNaam } from '../weergave.js';
 
 // Alles per dag opzoeken, één keer per keer tekenen.
 function indexeer(s) {
@@ -171,7 +171,12 @@ export function bakjeInhoud(s) {
         ${mobiel.matches ? '' : '<button class="knop klein verberg" data-actie="bakje-verberg" title="Bakje verbergen" aria-label="Bakje verbergen">‹</button>'}
       </div>
     </div>
-    ${b.liggen.length ? `<h3 class="kop-rood">Blijven liggen</h3>${kaarten(b.liggen)}` : ''}
+    ${snelInvoerHtml('', 'Snel noteren… (N)')}
+    ${
+      b.liggen.length
+        ? `<div class="liggen-kop"><h3 class="kop-oranje">Bleef liggen</h3><button class="knop klein" data-actie="herplan" title="Verdelen over je komende vrije dagen">Alles herplannen</button></div>${kaarten(b.liggen)}`
+        : ''
+    }
     ${b.school.length ? `<h3>School</h3>${kaarten(b.school)}` : ''}
     ${opl ? `<h3 class="kop-opl">🎓 Opleiding</h3>${opl}` : ''}
     ${!b.aantal && !ui.filter.lessen ? '<p class="leeg">Alles staat ingepland. 🌿</p>' : ''}
@@ -238,7 +243,7 @@ export function viewLijst(s) {
   const maandKop = (d, i) => (i === 0 || d.endsWith('-01') ? `<h2 class="maand-kop">${M.maandNaam(d)}</h2>` : '');
   return `<div class="lijst">
     ${periodeNav(s)}
-    ${liggen ? `<a class="melding" href="#/bakje">${liggen} ${liggen === 1 ? 'blokje blijft' : 'blokjes blijven'} liggen →</a>` : ''}
+    ${liggen ? `<a class="melding" href="#/vandaag">${liggen} ${liggen === 1 ? 'blokje bleef' : 'blokjes bleven'} liggen →</a>` : ''}
     ${eerderKnop()}
     ${dagen.map((d, i) => maandKop(d, i) + dagBlok(s, idx, d, v, false)).join('')}
     ${meerKnop()}

@@ -228,10 +228,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
   transition: background .15s, border-color .15s;
 }
 .dag.weekend { background: color-mix(in srgb, var(--vlak) 70%, var(--bg)); }
-/* Werkdag (vast of #sw): gewone achtergrond, wel een dikke blauwe rand. */
-.dag.werkdag { background: var(--vlak); border: 3px solid color-mix(in srgb, var(--accent) 55%, var(--vlak)); }
+/* Werkdag (vast of #sw): een zachte arcering. Vandaag springt het meest in het oog. */
+.dag.werkdag {
+  background: repeating-linear-gradient(135deg, var(--vlak) 0 7px, color-mix(in srgb, var(--accent) 7%, var(--vlak)) 7px 9px);
+}
 .dag.voorbij { opacity: .55; }
-.dag.vandaag { border: 2px solid var(--groen); background: var(--vandaag); }
+.dag.vandaag { border: 3px solid var(--groen); background: var(--vandaag); box-shadow: 0 0 0 3px color-mix(in srgb, var(--groen) 25%, transparent); }
 .dag.drop-hier, .bakje.drop-hier { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
 
 .dag-kop { display: flex; align-items: center; gap: 6px; min-height: 24px; }
@@ -341,6 +343,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .bakje { display: flex; flex-direction: column; gap: 5px; }
 .bakje-kop { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
 .kop-rood { color: var(--rood); }
+.kop-oranje { color: var(--oranje); }
 .leeg { color: var(--zacht); font-style: italic; margin: 6px 0; }
 .hint { color: var(--zacht); font-size: .85rem; margin: 6px 0; }
 
@@ -981,3 +984,54 @@ a.knop.primair { color: var(--accent-tekst); }
 .meer-link { display: block; margin: 0 0 4px; text-decoration: none; }
 .zonder-datum summary { cursor: pointer; font-weight: 600; font-size: .9rem; margin: 8px 0 4px; }
 .zonder-datum .les { margin-bottom: 4px; }
+
+/* ---------- lessen als label, taken om af te vinken ---------- */
+
+.les { border: none; border-left: 4px solid var(--klas); border-radius: 3px; background: transparent; font-weight: 600; padding: 1px 6px; }
+.les:hover { background: var(--vlak-2); }
+.label-werk:empty { display: inline; }
+.dag .label-werk:empty::after { content: 'werk'; }
+
+/* ---------- snel noteren ---------- */
+
+.snel-invoer { display: flex; gap: 6px; align-items: flex-end; margin: 4px 0 10px; }
+.snel-invoer textarea {
+  flex: 1;
+  resize: none;
+  min-height: 38px;
+  max-height: 140px;
+  field-sizing: content;
+  border: 1px solid var(--rand-sterk);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font: inherit;
+  background: var(--vlak);
+  color: var(--tekst);
+}
+.snel-invoer textarea:focus { outline: 2px solid var(--groen); outline-offset: 1px; }
+.snel-invoer .knop { min-width: 38px; height: 38px; font-size: 1.2rem; padding: 0; }
+
+.liggen-kop { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
+.liggen-kop h3 { margin: 0; }
+
+/* ---------- vandaag ---------- */
+
+.vandaag-pagina h1 small { font-size: .9rem; font-weight: 500; margin-left: 6px; }
+.vandaag-pagina .kaart h3 { margin: 12px 0 6px; font-size: .9rem; }
+.dag-titel { color: var(--zacht); }
+.moetje {
+  border-left: 4px solid var(--klas);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--klas) 8%, var(--vlak));
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}
+.moetje.af { opacity: .65; }
+.moetje-kop { display: flex; justify-content: space-between; gap: 8px; cursor: pointer; }
+.moetje-taak, .magje { display: flex; align-items: center; gap: 8px; padding: 6px 0 0; }
+.moetje-tekst { flex: 1; min-width: 0; cursor: pointer; display: flex; flex-direction: column; }
+.moetje-tekst small { color: var(--zacht); font-size: .78rem; }
+.moetje-taak .vink, .magje .vink { width: 18px; height: 18px; margin: 0; font-size: .75rem; }
+.magje { border-left: 3px solid var(--klas); padding: 6px 0 6px 8px; border-bottom: 1px solid var(--rand); }
+.magje.opl { border-left-style: dashed; }
+.timer-chip.loopt { background: var(--groen); color: #fff; border-color: var(--groen); border-style: solid; }

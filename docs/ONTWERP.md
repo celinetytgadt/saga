@@ -166,6 +166,18 @@ In het overzicht: "BKH3-K2 + K3" met de kleuren van beide klassen.
 - opleiding: per opleidingsonderdeel de volgende 5;
 - lessen zonder datum: ingeklapt.
 
+**Vandaag** (`#/vandaag`, startscherm op de gsm; op de computer blijft het overzicht de start)
+- **Moet**: de lessen van de volgende 2 werkdagen (vanaf morgen) met hun voorbereiding: afvinken of de timer starten.
+- **Gepland voor vandaag**: wat je zelf op vandaag zette (bv. Verbeteren CR).
+- **Mag**: wat bleef liggen en wat in het bakje zit, met een knop *Vandaag* om het vandaag te doen.
+- Teller op het tabblad: enkel wat bleef liggen.
+
+**Snel noteren**: bovenaan Vandaag en het bakje, of met de toets **N** op elk scherm. Eén regel = één to do in het bakje; een geplakte lijst geeft meerdere to do's.
+
+**Bleef liggen**: zacht oranje, met *Alles herplannen* (verdelen over de komende dagen die geen werkdag zijn, niet voorbij de deadline; ongedaan te maken). De voorbereiding van een les die al gegeven is, telt niet mee en krijgt geen waarschuwing meer.
+
+**Rustiger overzicht**: vandaag heeft de sterkste rand, werkdagen een zachte arcering met "werk", lessen zijn labels (kleurstreep, geen kaartje) en taken blokjes om af te vinken. Bij het openen 4 weken vooruit (er komen er bij tijdens het scrollen).
+
 ## 3. Regels
 
 1. **Werkdag schuif ik zelf, deadline volgt de les.** Verschuift een les, dan schuiven de relatieve deadlines (en `vanaf`) mee. Werkdagen blijven staan. Ook als de vaste werkdagen wijzigen of er een extra werkdag bijkomt, worden relatieve deadlines herberekend.

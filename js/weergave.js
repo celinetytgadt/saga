@@ -99,10 +99,14 @@ export function inTePlannen(s) {
   });
 }
 
+// Taken van een vroegere dag die nog niet klaar zijn. De voorbereiding van een les die
+// al voorbij is, telt niet mee: die les is gegeven.
 export function blijvenLiggen(s, v = M.vandaag()) {
   return M.lijst(s, 'taken').filter((t) => {
     const wd = !t.klaar && M.werkdagVan(s, t);
-    return wd && wd < v;
+    if (!wd || wd >= v) return false;
+    const les = !M.isVerbeteren(t) && lesVan(s, t);
+    return !(les && les.datum && les.datum < v);
   });
 }
 
@@ -168,6 +172,15 @@ export function voortgang(taken) {
 }
 
 // ---------- bouwstenen ----------
+
+// Snel iets noteren: één regel = één to do in het bakje. Enter bewaart, een geplakte
+// lijst wordt meerdere to do's. Sorteren (dag, onderwerp, deadline) kan later.
+export function snelInvoerHtml(plaats = '', placeholder = 'Wat moet er nog gebeuren?') {
+  return `<form class="snel-invoer ${plaats}" autocomplete="off">
+    <textarea name="tekst" rows="1" placeholder="${placeholder}" aria-label="Snel een to do noteren" enterkeyhint="done"></textarea>
+    <button class="knop primair klein" aria-label="Noteren">+</button>
+  </form>`;
+}
 
 // Bestede tijd bij een taak: een lopende klok (tikt elke seconde mee) of het totaal.
 export function tijdLabel(t) {

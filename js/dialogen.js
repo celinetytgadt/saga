@@ -16,7 +16,7 @@ export function metOngedaan(tekst, f) {
   return resultaat;
 }
 
-function dialoog(html, init, { terug = null, herteken = null } = {}) {
+export function dialoog(html, init, { terug = null, herteken = null } = {}) {
   ui.terug = terug;
   ui.herteken = herteken;
   dlg.innerHTML = `<div class="dlg-in">${html}</div>`;

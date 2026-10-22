@@ -18,8 +18,9 @@
 </head>
 <body>
   <header class="balk">
-    <a class="merk" href="#/dagen">Saga</a>
+    <a class="merk" href="#/">Saga</a>
     <nav class="hoofdnav" aria-label="Hoofdmenu">
+      <a href="#/vandaag" data-nav="vandaag">Vandaag</a>
       <a href="#/dagen" data-nav="dagen">Overzicht</a>
       <a href="#/klassen" data-nav="klassen">School</a>
       <a href="#/opleiding" data-nav="opleiding">Opleiding</a>
@@ -35,13 +36,13 @@
   <main id="app"></main>
 
   <nav class="tabbar" aria-label="Menu">
+    <a href="#/vandaag" data-nav="vandaag">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M8 12.5l2.8 2.8 5.2-5.8"/></svg>
+      Vandaag<span id="bakje-teller" class="teller-badge" hidden></span>
+    </a>
     <a href="#/dagen" data-nav="dagen">
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
       Dagen
-    </a>
-    <a href="#/bakje" data-nav="bakje">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13l2.5-7h11L20 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M4 13h4.5a3.5 3.5 0 0 0 7 0H20"/></svg>
-      Bakje<span id="bakje-teller" class="teller-badge" hidden></span>
     </a>
     <a href="#/klassen" data-nav="klassen">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5C4 5 5 4 6.5 4H20v14H6.5C5 18 4 19 4 20.5z"/><path d="M4 20.5C4 19 5 18 6.5 18H20v2.5"/></svg>

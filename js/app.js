@@ -6,21 +6,22 @@
 import * as M from './model.js';
 import { getState, abonneer, wijzig, getSync, zetSyncCfg, sync, syncAlsNodig, vernieuwAgenda, voegSamen, haalAlles } from './store.js';
 import { $, esc, ui, mobiel, bewaarLokaal, zetFilter, melding } from './ui.js';
-import { taakTitel, tijdFormHtml, timerHtml } from './weergave.js';
+import { snelInvoerHtml, taakTitel, tijdFormHtml, timerHtml } from './weergave.js';
 import { viewRaster, viewLijst, viewBakje, bakjeVoorFilter } from './views/overzicht.js';
 import { viewKlassen } from './views/school.js';
 import { viewKlas } from './views/klas.js';
 import { viewOpleiding } from './views/opleiding.js';
 import { viewInstellingen } from './views/instellingen.js';
 import { viewTijd } from './views/tijd.js';
+import { viewVandaag } from './views/vandaag.js';
 import {
-  dlg, metOngedaan, sluit, openTaak, openLes, openOpdracht, openDag, openNieuw, openLeerlingTaak, openStukkenPlakken, openKlas, openVak,
+  dlg, dialoog, metOngedaan, sluit, openTaak, openLes, openOpdracht, openDag, openNieuw, openLeerlingTaak, openStukkenPlakken, openKlas, openVak,
   openOnderwerp, openPlakken, openAfwezigheid,
 } from './dialogen.js';
 
-const VIEWS = ['dagen', 'bakje', 'klassen', 'klas', 'opleiding', 'instellingen', 'tijd'];
+const VIEWS = ['vandaag', 'dagen', 'bakje', 'klassen', 'klas', 'opleiding', 'instellingen', 'tijd'];
 // Welk menu-item oplicht bij een scherm.
-const NAV = { klas: 'klassen' };
+const NAV = { klas: 'klassen', bakje: 'vandaag' };
 
 // ---------- tekenen ----------
 
@@ -98,6 +99,7 @@ function teken() {
   let view = ui.view;
   if (view === 'bakje' && !mobiel.matches) view = 'dagen';
   const html = {
+    vandaag: () => viewVandaag(s),
     dagen: () => (mobiel.matches ? viewLijst(s) : viewRaster(s)),
     bakje: () => viewBakje(s),
     klassen: () => viewKlassen(s),
@@ -120,7 +122,8 @@ function teken() {
   for (const a of document.querySelectorAll('[data-nav]')) {
     a.classList.toggle('actief', a.dataset.nav === (NAV[view] || view));
   }
-  const aantal = bakjeVoorFilter(s).aantal;
+  // enkel wat bleef liggen telt mee: geen grote rode teller voor alles wat nog kan
+  const aantal = bakjeVoorFilter(s).liggen.length;
   const badge = $('#bakje-teller');
   badge.textContent = aantal;
   badge.hidden = !aantal;
@@ -147,7 +150,8 @@ function teken() {
 // #/dagen, #/klas/<id>, …
 function route() {
   const [v, id] = location.hash.replace(/^#\/?/, '').split('/');
-  ui.view = VIEWS.includes(v) ? v : 'dagen';
+  // zonder adres: op de gsm Vandaag, op de computer het overzicht
+  ui.view = VIEWS.includes(v) ? v : mobiel.matches ? 'vandaag' : 'dagen';
   ui.id = id ? decodeURIComponent(id) : null;
   ui.naarVandaag = true;
   window.scrollTo(0, 0);
@@ -247,6 +251,22 @@ const acties = {
   },
   dag(el) {
     openDag(el.dataset.datum);
+  },
+  'plan-vandaag'(el) {
+    const t = getState().taken[el.dataset.id];
+    if (!t) return;
+    metOngedaan(`"${taakTitel(getState(), t)}" staat op vandaag`, (s) => M.zetWerkdag(s, t.id, M.vandaag()));
+  },
+  // Alles wat bleef liggen opnieuw verdelen over de komende vrije dagen.
+  herplan() {
+    const s = getState();
+    const plan = M.herplanPlan(s, bakjeVoorFilter(s).liggen);
+    if (!plan.length) return;
+    const laatste = plan.map((p) => p.datum).sort().at(-1);
+    metOngedaan(`${plan.length} ${plan.length === 1 ? 'blokje' : 'blokjes'} herpland tot ${M.kortDatum(laatste)}`, (st) => M.pasHerplanToe(st, plan));
+  },
+  'snel-noteren'() {
+    snelNoteren();
   },
   afwezigheid(el) {
     openAfwezigheid(el.dataset.id || null, { datum: el.dataset.datum });
@@ -406,10 +426,31 @@ document.addEventListener('click', (e) => {
   f(el, e);
 });
 
+// Snel noteren vanop elk scherm (toets N op de computer): het veld op het scherm, anders een venstertje.
+function snelNoteren() {
+  const veld = $('#app .snel-invoer textarea');
+  if (veld && !dlg.open) {
+    veld.scrollIntoView({ block: 'center' });
+    return veld.focus();
+  }
+  dialoog(`<h2>Snel noteren</h2>${snelInvoerHtml('in-venster')}<p class="hint">Komt in het bakje. Een lijst plakken mag: elke regel wordt een to do.</p>`);
+  $('#dlg .snel-invoer textarea')?.focus();
+}
+
 document.addEventListener('keydown', (e) => {
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('[role="button"][data-actie]')) {
     e.preventDefault();
     e.target.click();
+  }
+  // in het notitieveld: Enter bewaart, Shift+Enter is een nieuwe regel
+  if (e.key === 'Enter' && !e.shiftKey && e.target.matches?.('.snel-invoer textarea')) {
+    e.preventDefault();
+    e.target.form.requestSubmit();
+  }
+  const typt = e.target.closest?.('input, textarea, select, [contenteditable]');
+  if ((e.key === 'n' || e.key === 'N') && !typt && !dlg.open && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault();
+    snelNoteren();
   }
 });
 
@@ -462,6 +503,19 @@ document.addEventListener('submit', (e) => {
     e.preventDefault();
     const w = Object.fromEntries(new FormData(e.target).entries());
     zetSyncCfg(w.url, w.token);
+  } else if (e.target.matches('.snel-invoer')) {
+    e.preventDefault();
+    const veld = e.target.tekst;
+    const titels = veld.value.split('\n').map((r) => r.trim()).filter(Boolean);
+    if (!titels.length) return;
+    const domein = ui.filter.domein === 'opleiding' ? 'opleiding' : 'school';
+    veld.value = '';
+    if (dlg.open && e.target.closest('#dlg')) sluit();
+    metOngedaan(titels.length === 1 ? `"${titels[0]}" staat in het bakje` : `${titels.length} to do's in het bakje`, (s) => {
+      for (const titel of titels) M.zet(s, 'taken', { id: M.nieuwId(), titel, domein, werkdag: null, deadline: null, vanaf: null, klaar: false, notitie: '' });
+    });
+    const nieuw = $('#app .snel-invoer textarea');
+    if (nieuw && !mobiel.matches) nieuw.focus();
   } else if (e.target.matches('.tijd-form')) {
     e.preventDefault();
     const form = e.target;

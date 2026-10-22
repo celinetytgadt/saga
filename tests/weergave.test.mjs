@@ -69,3 +69,12 @@ test('elk bestand van de app zit in de cache van de service worker', () => {
   const lijst = (map) => fs.readdirSync(new URL(`../${map}/`, import.meta.url)).filter((f) => f.endsWith('.js')).map((f) => `${map}/${f}`);
   for (const f of [...lijst('js'), ...lijst('js/views'), 'css/saga.css', 'index.html']) assert.ok(sw.includes(`'${f}'`), `${f} ontbreekt in sw.js`);
 });
+
+test('blijven liggen: niet de voorbereiding van een les die al voorbij is', () => {
+  const s = basis();
+  s.lessen.oud = { id: 'oud', klasIds: ['k1'], titel: 'Oud', datum: plus(-2), upd: 1 };
+  s.lessen.nu = { id: 'nu', klasIds: ['k1'], titel: 'Nu', datum: plus(2), upd: 1 };
+  s.taken.h1 = todo('h1', { lesId: 'oud', hoofd: true, werkdag: plus(-3) });
+  s.taken.h2 = todo('h2', { lesId: 'nu', hoofd: true, werkdag: plus(-1) });
+  assert.deepEqual(W.blijvenLiggen(s, V).map((t) => t.id), ['h2']);
+});

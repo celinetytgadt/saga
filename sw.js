@@ -1,6 +1,6 @@
 // Saga – service worker: app werkt snel en ook zonder netwerk.
 // Strategie: toon wat in de cache zit, haal ondertussen de nieuwste versie op.
-const CACHE = 'saga-v31';
+const CACHE = 'saga-v32';
 const SCHIL = [
   './',
   'index.html',
@@ -17,6 +17,7 @@ const SCHIL = [
   'js/views/opleiding.js',
   'js/views/instellingen.js',
   'js/views/tijd.js',
+  'js/views/vandaag.js',
   'manifest.webmanifest',
   'icons/icon.svg',
   'icons/icon-192.png',

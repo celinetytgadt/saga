@@ -539,8 +539,8 @@ test('losse taak opdelen in stukken: wordt een opdracht met de taak als eerste s
 test('overzicht: doorlopende weken, ook over de maandgrens', () => {
   const r = M.venster('2026-10-29'); // donderdag
   assert.equal(r.van, '2026-10-19'); // maandag van vorige week
-  assert.equal(r.tot, '2027-01-10'); // zondag, 10 weken na deze week
-  assert.equal(r.dagen.length, 12 * 7);
+  assert.equal(r.tot, '2026-11-29'); // zondag, 4 weken na deze week
+  assert.equal(r.dagen.length, 6 * 7);
   assert.ok(r.dagen.includes('2026-11-20'));
   const meer = M.venster('2026-10-29', 3, 20);
   assert.equal(meer.van, '2026-10-05');
@@ -820,4 +820,33 @@ test('taak voor leerlingen zonder les hoort bij een klas', () => {
   assert.equal(M.domeinVan(t), 'school');
   const r = M.tijdRapport({ ...s, taken: { [t.id]: { ...t, tijd: 600000 } } }, '2026-09-01', '2027-08-31');
   assert.equal(r.groepen[0].soorten.verbeteren, 600000);
+});
+
+test('volgende werkdagen, zonder vandaag', () => {
+  const s = basis(); // werkdagen di en vr
+  assert.deepEqual(M.volgendeWerkdagen(s, '2026-10-20'), ['2026-10-23', '2026-10-27']); // dinsdag zelf telt niet
+  s.instellingen = { ...s.instellingen, werkdagen: [] };
+  assert.deepEqual(M.volgendeWerkdagen(s, '2026-10-20'), []);
+});
+
+test('herplannen: over vrije dagen vanaf vandaag, niet voorbij de deadline', () => {
+  const s = basis(); // werkdagen di en vr
+  s.taken.a = taak({ id: 'a', lesId: null, werkdag: '2026-10-12' });
+  s.taken.b = taak({ id: 'b', lesId: null, werkdag: '2026-10-13', deadline: { datum: '2026-10-19' } });
+  s.taken.c = taak({ id: 'c', lesId: null, werkdag: '2026-10-14', deadline: { datum: '2026-10-10' } });
+  const plan = M.herplanPlan(s, [s.taken.a, s.taken.b, s.taken.c], '2026-10-19'); // maandag
+  for (const p of plan) assert.ok(p.datum >= '2026-10-19');
+  assert.ok(!M.isWerkdag(s, plan[0].datum));
+  assert.equal(plan.find((p) => p.taak.id === 'b').datum, '2026-10-19');
+  assert.equal(plan.find((p) => p.taak.id === 'c').datum, '2026-10-19'); // deadline voorbij: vandaag
+  M.pasHerplanToe(s, plan);
+  assert.equal(s.taken.a.werkdag, plan[0].datum);
+});
+
+test('voorbereiding van een gegeven les: geen waarschuwing meer', () => {
+  const s = basis(); // les do 15 okt
+  M.zorgHoofdtaken(s);
+  const h = s.taken[M.hoofdId('l1')];
+  assert.equal(M.waarschuwing(s, h, '2026-10-20'), null);
+  assert.ok(M.waarschuwing(s, h, '2026-10-15'));
 });

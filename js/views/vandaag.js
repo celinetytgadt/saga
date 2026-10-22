@@ -3,7 +3,7 @@
 
 import * as M from '../model.js';
 import { esc } from '../ui.js';
-import { anker, bakje, groepen, groepKaart, klasLabel, klasStijl, snelInvoerHtml, sorteerLessen, taakTitel, tijdLabel } from '../weergave.js';
+import { anker, bakje, klasLabel, klasStijl, opdrachtStijl, snelInvoerHtml, sorteerLessen, sorteerTaken, taakTitel, tijdLabel, voortgang } from '../weergave.js';
 
 // Kleine timerknop: starten, of pauzeren met de lopende klok erbij.
 function timerKnop(t) {
@@ -50,9 +50,21 @@ function magje(s, t, v) {
     wd && wd < v && `bleef liggen (${M.kortDatum(wd)})`,
     tijdLabel(t),
   ].filter(Boolean);
-  return `<div class="magje ${M.domeinVan(t) === 'opleiding' ? 'opl' : ''}" style="--klas:${a.kleur}">${vink(t)}
-    <span class="moetje-tekst" role="button" tabindex="0" data-actie="taak" data-id="${t.id}">${esc(taakTitel(s, t))}${sub.length ? `<small>${sub.join(' · ')}</small>` : ''}</span>
-    <button class="chip" data-actie="plan-vandaag" data-id="${t.id}">Vandaag</button>
+  const knop = !t.klaar && wd !== v ? `<button class="chip" data-actie="plan-vandaag" data-id="${t.id}">Vandaag</button>` : t.klaar ? '' : timerKnop(t);
+  return `<div class="magje ${M.domeinVan(t) === 'opleiding' ? 'opl' : ''} ${t.klaar ? 'klaar' : ''}" style="--klas:${a.kleur}">${vink(t)}
+    <span class="moetje-tekst" role="button" tabindex="0" data-actie="taak" data-id="${t.id}"><span class="magje-titel">${esc(taakTitel(s, t))}</span>${
+      sub.length && !t.klaar ? `<small>${sub.join(' · ')}</small>` : ''
+    }</span>
+    ${knop}
+  </div>`;
+}
+
+// Opdracht met einddeadline vandaag (nog niet alle stukken klaar).
+function opdrachtRij(s, o) {
+  const st = opdrachtStijl(s, o);
+  const vg = voortgang(M.takenVanOpdracht(s, o.id));
+  return `<div class="magje ${st.opl ? 'opl' : ''}" style="--klas:${st.kleur}"><span class="vlag-bol">⚑</span>
+    <span class="moetje-tekst" role="button" tabindex="0" data-actie="opdracht" data-id="${o.id}"><span class="magje-titel">${esc(o.titel)}</span><small>${st.naam ? esc(st.naam) + ' · ' : ''}einddeadline · ${vg.klaar}/${vg.totaal} stukken</small></span>
   </div>`;
 }
 
@@ -68,56 +80,66 @@ export function viewVandaag(s) {
     })
     .join('');
 
-  // wat je zelf al op vandaag zette (zonder de voorbereidingen hierboven)
-  const gepland = M.lijst(s, 'taken').filter((t) => !t.klaar && M.werkdagVan(s, t) === v && !(t.lesId && lesIds.has(t.lesId) && !M.isVerbeteren(t)));
+  // Bovenaan: wat je vandaag afvinkte, wat vandaag een deadline heeft, en wat je zelf op vandaag zette.
+  const gedaan = M.gedaanOp(s, v).sort((a, b) => (b.klaarOp || 0) - (a.klaarOp || 0));
+  const open = M.lijst(s, 'taken').filter((t) => !t.klaar);
+  const deadline = open.filter((t) => !t.hoofd && !M.isVerbeteren(t) && M.deadlineVan(s, t) === v).sort(sorteerTaken(s));
+  const eindes = M.lijst(s, 'opdrachten').filter((o) => {
+    if (o.deadline !== v) return false;
+    const vg = voortgang(M.takenVanOpdracht(s, o.id));
+    return !vg.totaal || vg.klaar < vg.totaal;
+  });
+  const bovenaan = new Set(deadline.map((t) => t.id));
+  // (zonder de voorbereidingen van de lessen hieronder)
+  const gepland = open
+    .filter((t) => M.werkdagVan(s, t) === v && !bovenaan.has(t.id) && !(t.lesId && lesIds.has(t.lesId) && !M.isVerbeteren(t)))
+    .sort(sorteerTaken(s));
+  for (const t of gepland) bovenaan.add(t.id);
   const b = bakje(s, undefined, v);
-  const kiezen = [...b.school, ...b.opleiding.flatMap((g) => g.taken)];
-
+  const zonder = (lijst) => lijst.filter((t) => !bovenaan.has(t.id));
+  const liggen = zonder(b.liggen);
+  const kiezen = zonder([...b.school, ...b.opleiding.flatMap((g) => g.taken)]);
   const last = M.dagLast(s, v);
-  const gedaan = M.gedaanOp(s, v);
+  const rijen = (lijst) => lijst.map((t) => magje(s, t, v)).join('');
+  const vandaagLeeg = !gedaan.length && !deadline.length && !eindes.length && !gepland.length;
+
   return `<div class="pagina vandaag-pagina">
     <div class="pagina-kop"><h1>Vandaag <small class="zacht">${M.kortDatum(v)}</small></h1>
       ${last.ms ? `<span class="last groot ${last.vol ? 'vol' : ''}" title="Geschatte tijd van wat vandaag nog gepland staat">± ${M.duurKort(last.ms)} gepland</span>` : ''}
     </div>
-    ${
-      gedaan.length
-        ? `<div class="gedaan"><b>✓ Vandaag al ${gedaan.length} afgevinkt</b>${gedaan
-            .slice(0, 6)
-            .map((t) => `<span class="gedaan-chip">${esc(taakTitel(s, t))}</span>`)
-            .join('')}${gedaan.length > 6 ? `<span class="gedaan-chip">+${gedaan.length - 6}</span>` : ''}</div>`
-        : ''
-    }
     ${snelInvoerHtml()}
+    <div class="vandaag-kolommen">
+      <div class="kolom">
+        <section class="kaart compact">
+          <h2>Vandaag</h2>
+          ${gedaan.length ? `<h3 class="kop-groen">✓ Gedaan (${gedaan.length})</h3>${rijen(gedaan)}` : ''}
+          ${deadline.length || eindes.length ? `<h3 class="kop-vlag">⚑ Deadline vandaag</h3>${eindes.map((o) => opdrachtRij(s, o)).join('')}${rijen(deadline)}` : ''}
+          ${gepland.length ? `<h3>Gepland</h3>${rijen(gepland)}` : ''}
+          ${vandaagLeeg ? '<p class="leeg">Nog niets voor vandaag. Kies iets uit "Mag".</p>' : ''}
+        </section>
 
-    <section class="kaart">
-      <h2>Moet: voorbereiden</h2>
-      ${
-        werkdagen.length
-          ? `<p class="hint">De lessen van je volgende ${werkdagen.length === 1 ? 'werkdag' : '2 werkdagen'}.</p>${moetjes}`
-          : '<p class="leeg">Geen werkdagen in de komende 3 weken. Stel je vaste werkdagen in bij Instellingen.</p>'
-      }
-    </section>
+        <section class="kaart compact">
+          <h2>Moet: voorbereiden</h2>
+          ${
+            werkdagen.length
+              ? `<p class="hint">De lessen van je volgende ${werkdagen.length === 1 ? 'werkdag' : '2 werkdagen'}.</p>${moetjes}`
+              : '<p class="leeg">Geen werkdagen in de komende 3 weken. Stel je vaste werkdagen in bij Instellingen.</p>'
+          }
+        </section>
+      </div>
 
-    ${
-      gepland.length
-        ? `<section class="kaart"><h2>Gepland voor vandaag</h2>${groepen(s, gepland)
-            .map((g) => groepKaart(s, g))
-            .join('')}</section>`
-        : ''
-    }
-
-    <section class="kaart">
-      <h2>Mag: kies zelf</h2>
-      ${
-        b.liggen.length
-          ? `<div class="liggen-kop"><h3 class="kop-oranje">Bleef liggen (${b.liggen.length})</h3>
-              <button class="knop klein" data-actie="herplan">Alles herplannen</button></div>
-              ${b.liggen.map((t) => magje(s, t, v)).join('')}`
-          : ''
-      }
-      ${kiezen.length ? `${b.liggen.length ? '<h3>Nog in te plannen</h3>' : ''}${kiezen.map((t) => magje(s, t, v)).join('')}` : ''}
-      ${!b.liggen.length && !kiezen.length ? '<p class="leeg">Niets te kiezen: alles staat ingepland. 🌿</p>' : ''}
-      ${b.later ? `<p class="hint">Nog ${b.later} voor later: zie <a href="#/klassen">School</a> en <a href="#/opleiding">Opleiding</a>.</p>` : ''}
-    </section>
+      <section class="kaart compact kolom">
+        <h2>Mag: kies zelf</h2>
+        ${
+          liggen.length
+            ? `<div class="liggen-kop"><h3 class="kop-oranje">Bleef liggen (${liggen.length})</h3>
+                <button class="knop klein" data-actie="herplan">Alles herplannen</button></div>${rijen(liggen)}`
+            : ''
+        }
+        ${kiezen.length ? `${liggen.length ? '<h3>Nog in te plannen</h3>' : ''}${rijen(kiezen)}` : ''}
+        ${!liggen.length && !kiezen.length ? '<p class="leeg">Niets te kiezen: alles staat ingepland. 🌿</p>' : ''}
+        ${b.later ? `<p class="hint">Nog ${b.later} voor later: zie <a href="#/klassen">School</a> en <a href="#/opleiding">Opleiding</a>.</p>` : ''}
+      </section>
+    </div>
   </div>`;
 }

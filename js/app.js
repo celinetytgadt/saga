@@ -191,8 +191,8 @@ function teken() {
 // #/dagen, #/klas/<id>, …
 function route() {
   const [v, id] = location.hash.replace(/^#\/?/, '').split('/');
-  // zonder adres: op de gsm Vandaag, op de computer het overzicht
-  ui.view = VIEWS.includes(v) ? v : mobiel.matches ? 'vandaag' : 'dagen';
+  // zonder adres: Vandaag
+  ui.view = VIEWS.includes(v) ? v : 'vandaag';
   ui.id = id ? decodeURIComponent(id) : null;
   ui.naarVandaag = true;
   window.scrollTo(0, 0);

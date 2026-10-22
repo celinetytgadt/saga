@@ -66,10 +66,11 @@ export function regels(tekst) {
     .filter(Boolean);
 }
 
-function hoortBijOpties(s, gekozen) {
+function hoortBijOpties(s, gekozen, klasIds = []) {
   const grens = M.plusDagen(M.vandaag(), -30);
+  const vanKlas = (l) => !klasIds.length || M.klassenVanLes(l).some((k) => klasIds.includes(k));
   const lessen = M.lijst(s, 'lessen')
-    .filter((l) => 'les:' + l.id === gekozen || !l.datum || l.datum >= grens)
+    .filter((l) => 'les:' + l.id === gekozen || ((!l.datum || l.datum >= grens) && vanKlas(l)))
     .sort((a, b) => vergelijkDatum(a.datum, b.datum) || sorteerLessen(s)(a, b));
   const opdrachten = M.lijst(s, 'opdrachten')
     .filter((o) => 'opd:' + o.id === gekozen || !o.deadline || o.deadline >= grens)
@@ -149,7 +150,7 @@ export function openTaak(id, voorinvulling = {}, terug = null) {
           ? `<input type="hidden" name="titel" value="${esc(t.titel)}"><input type="hidden" name="hoort" value="${hoort}">
              <p class="hint">Voorbereiding van de les ${esc(klasLabel(s, les))} · ${esc(les.titel)}${les.datum ? ` (${M.kortDatum(les.datum)})` : ''}.</p>`
           : `<label>Wat<input name="titel" required value="${esc(t.titel)}" ${id ? '' : 'autofocus'}></label>
-             <label>Hoort bij<select name="hoort">${hoortBijOpties(s, hoort)}</select></label>
+             <label>Hoort bij<select name="hoort">${hoortBijOpties(s, hoort, voorinvulling.klasIds || [])}</select></label>
              <div class="voor-klas">${klasChips(s, t.klasIds || [], 'Voor klas(sen) <small>(optioneel; verschijnt dan ook bij de klas)</small>')}</div>`
       }
       <label>Werkdag <small>(wanneer ik eraan werk; leeg = ${t.hoofd ? 'standaard, vóór de les' : 'bakje'})</small><input type="date" name="werkdag" value="${t.werkdag || ''}"></label>
@@ -425,10 +426,12 @@ export function openLes(id, voorinvulling = {}) {
 
 // Taak voor leerlingen: ze maken ze, ik verbeter ze. Hoort optioneel bij een les.
 // Indienen standaard op de vrijdag van de lesweek; verbeteren staat de dag erna gepland.
-function lesOpties(s, gekozen) {
+// `klasIds`: enkel lessen van die klas(sen) (bv. vanop de pagina van een klas).
+function lesOpties(s, gekozen, klasIds = []) {
   const grens = M.plusDagen(M.vandaag(), -21);
+  const vanKlas = (l) => !klasIds.length || M.klassenVanLes(l).some((k) => klasIds.includes(k));
   const lessen = M.lijst(s, 'lessen')
-    .filter((l) => l.id === gekozen || (l.datum && l.datum >= grens))
+    .filter((l) => l.id === gekozen || (l.datum && l.datum >= grens && vanKlas(l)))
     .sort((a, b) => vergelijkDatum(a.datum, b.datum) || sorteerLessen(s)(a, b));
   return lessen
     .map((l) => `<option value="${l.id}" ${l.id === gekozen ? 'selected' : ''}>${esc(klasLabel(s, l))} · ${esc(l.titel)}${l.datum ? ` (${M.kortDatum(l.datum)})` : ''}</option>`)
@@ -440,13 +443,16 @@ export function openLeerlingTaak(id, voorinvulling = {}, terug = null) {
   const t = id ? s.taken[id] : { titel: '', lesId: voorinvulling.lesId || null, klasIds: voorinvulling.klasIds || [], werkdag: null, notitie: '', klaar: false };
   if (!t || t.del) return;
   const indien = t.indien || M.standaardIndien(s, t.lesId);
+  // de lessen in de keuzelijst: van de klas waarvoor je de taak maakt (of van haar les)
+  const les0 = lesVan(s, t);
+  const klasFilter = voorinvulling.klasIds?.length ? voorinvulling.klasIds : les0 ? M.klassenVanLes(les0) : t.klasIds || [];
   dialoog(
     `<h2>${id ? esc(taakTitel(s, t)) : 'Nieuwe taak voor leerlingen'}</h2>
     ${id ? verplaatsHtml(M.werkdagVan(s, t), 'Standaard (dag na indienen)') : ''}
     ${id ? `<div class="timer-wrap">${timerHtml(t)}</div>` : ''}
     <form id="f-lt" class="formulier">
       <label>Taak<input name="titel" required value="${esc(t.titel)}" placeholder="bv. Oefening aankoopfactuur" ${id ? '' : 'autofocus'}></label>
-      <label>Bij les <small>(optioneel)</small><select name="les"><option value="">— geen les —</option>${lesOpties(s, t.lesId)}</select></label>
+      <label>Bij les <small>(optioneel)</small><select name="les"><option value="">— geen les —</option>${lesOpties(s, t.lesId, klasFilter)}</select></label>
       <div class="voor-klas">${klasChips(s, t.klasIds || [], 'Voor klas(sen)')}</div>
       <label>Indienen tegen<input type="date" name="indien" required value="${indien}"></label>
       <p class="hint" id="lt-uitleg"></p>

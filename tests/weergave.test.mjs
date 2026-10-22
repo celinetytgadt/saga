@@ -78,3 +78,19 @@ test('blijven liggen: niet de voorbereiding van een les die al voorbij is', () =
   s.taken.h2 = todo('h2', { lesId: 'nu', hoofd: true, werkdag: plus(-1) });
   assert.deepEqual(W.blijvenLiggen(s, V).map((t) => t.id), ['h2']);
 });
+
+test('bakje: opleiding in de volgorde van de pagina Opleiding', () => {
+  const s = basis();
+  // ingegeven als 1, 2, 3; zelfde einddeadline
+  for (const [i, id] of ['o1', 'o2', 'o3'].entries()) s.opdrachten[id] = { id, titel: id, vakId: 'v1', deadline: plus(60), volg: i + 1, upd: 1 };
+  const stuk = (id, opd, volg) => (s.taken[id] = todo(id, { titel: 'cursus doornemen', opdrachtId: opd, domein: 'opleiding', deadline: { eind: true }, volg }));
+  stuk('c2', 'o3', 2);
+  stuk('a1', 'o1', 1);
+  stuk('c1', 'o3', 1);
+  stuk('b1', 'o2', 1);
+  stuk('a2', 'o1', 2);
+  s.taken.los = todo('los', { domein: 'opleiding' });
+  const b = W.bakje(s, undefined, V);
+  assert.deepEqual(b.opleiding[0].taken.map((t) => t.id), ['a1', 'a2', 'b1', 'c1', 'c2']);
+  assert.deepEqual(b.opleiding[1].taken.map((t) => t.id), ['los']); // losse to do: groep zonder onderdeel
+});

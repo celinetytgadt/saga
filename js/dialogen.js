@@ -77,8 +77,8 @@ function hoortBijOpties(s, gekozen) {
   const onderwerpen = M.lijst(s, 'onderwerpen').sort(opNaam);
   const optie = (waarde, tekst) => `<option value="${waarde}" ${waarde === gekozen ? 'selected' : ''}>${tekst}</option>`;
   return [
-    optie('los:school', '— losse taak · school —'),
-    optie('los:opleiding', '— losse taak · opleiding —'),
+    optie('los:school', '— losse to do · school —'),
+    optie('los:opleiding', '— losse to do · opleiding —'),
     onderwerpen.length
       ? `<optgroup label="School · onderwerpen">${onderwerpen.map((o) => optie('ond:' + o.id, esc(o.naam))).join('')}</optgroup>`
       : '',
@@ -91,7 +91,7 @@ function hoortBijOpties(s, gekozen) {
       const lijst = opdrachten.filter((o) => M.opdrachtDomein(o) === domein);
       if (!lijst.length) return '';
       const pet = domein === 'opleiding' ? '🎓 ' : '';
-      return `<optgroup label="${domein === 'school' ? 'School' : 'Opleiding'} · opdrachten">${lijst
+      return `<optgroup label="${domein === 'school' ? "School · to do's met stukken" : 'Opleiding · opdrachten'}">${lijst
         .map((o) => optie('opd:' + o.id, `${pet}${esc(o.titel)}${o.deadline ? ` (${M.kortDatum(o.deadline)})` : ''}`))
         .join('')}</optgroup>`;
     }),
@@ -117,6 +117,7 @@ export function openTaak(id, voorinvulling = {}, terug = null) {
     ? s.taken[id]
     : { titel: '', lesId: null, opdrachtId: null, werkdag: null, deadline: null, vanaf: null, klaar: false, notitie: '', ...voorinvulling };
   if (!t || t.del) return;
+  if (M.isLeerlingTaak(t)) return openLeerlingTaak(id, {}, terug);
   if (!id && !voorinvulling.deadline) {
     if (t.lesId) t.deadline = { rel: -1 };
     if (t.opdrachtId) t.deadline = { eind: true };
@@ -130,18 +131,8 @@ export function openTaak(id, voorinvulling = {}, terug = null) {
   const les = lesVan(s, t);
 
   dialoog(
-    `<h2>${id ? (t.hoofd ? esc(taakTitel(s, t)) : t.opdrachtId ? 'Stuk van opdracht' : 'Taak') : t.opdrachtId ? 'Nieuw stuk' : 'Nieuwe taak'}</h2>
-    ${
-      id
-        ? `<div class="snel" aria-label="Verplaats naar">
-        <span class="snel-label">Verplaats naar</span>
-        <button class="chip" data-zet="${M.vandaag()}">Vandaag</button>
-        <button class="chip" data-zet="${M.plusDagen(M.vandaag(), 1)}">Morgen</button>
-        <button class="chip" data-zet="${M.plusDagen(basis, 7)}">+1 week</button>
-        <button class="chip" data-zet="">${t.hoofd ? 'Standaard (vóór de les)' : 'Bakje'}</button>
-      </div>`
-        : ''
-    }
+    `<h2>${id ? (t.hoofd ? `Voorbereiding: ${esc(taakTitel(s, t))}` : t.opdrachtId ? 'Stuk' : 'To do') : t.opdrachtId ? 'Nieuw stuk' : 'Nieuwe to do'}</h2>
+    ${id ? verplaatsHtml(basis, t.hoofd ? 'Standaard (vóór de les)' : 'Bakje') : ''}
     ${
       id && t.deelVan
         ? `<div class="blokken-wrap">${blokkenHtml(s, t)}</div>`
@@ -156,7 +147,7 @@ export function openTaak(id, voorinvulling = {}, terug = null) {
       ${
         t.hoofd
           ? `<input type="hidden" name="titel" value="${esc(t.titel)}"><input type="hidden" name="hoort" value="${hoort}">
-             <p class="hint">Taak van de les ${esc(klasLabel(s, les))} · ${esc(les.titel)}${les.datum ? ` (${M.kortDatum(les.datum)})` : ''}.</p>`
+             <p class="hint">Voorbereiding van de les ${esc(klasLabel(s, les))} · ${esc(les.titel)}${les.datum ? ` (${M.kortDatum(les.datum)})` : ''}.</p>`
           : `<label>Wat<input name="titel" required value="${esc(t.titel)}" ${id ? '' : 'autofocus'}></label>
              <label>Hoort bij<select name="hoort">${hoortBijOpties(s, hoort)}</select></label>
              <div class="voor-klas">${klasChips(s, t.klasIds || [], 'Voor klas(sen) <small>(optioneel; verschijnt dan ook bij de klas)</small>')}</div>`
@@ -236,15 +227,10 @@ export function openTaak(id, voorinvulling = {}, terug = null) {
         });
         sluit();
       });
-      d.querySelectorAll('[data-zet]').forEach((b) =>
-        b.addEventListener('click', () => {
-          wijzig((st) => M.zetWerkdag(st, id, b.dataset.zet || null));
-          sluit();
-        })
-      );
+      verplaatsKnoppen(d, id);
       $('[data-sluit]', d).addEventListener('click', sluit);
       $('[data-weg]', d)?.addEventListener('click', () => {
-        metOngedaan('Taak verwijderd', (st) => M.wis(st, 'taken', id));
+        metOngedaan(`"${taakTitel(getState(), t)}" verwijderd`, (st) => M.wis(st, 'taken', id));
         sluit();
       });
     },
@@ -265,15 +251,43 @@ export function openTaak(id, voorinvulling = {}, terug = null) {
   );
 }
 
+// "Verplaats naar": vandaag, morgen, een week later, of terug naar de standaard (of het bakje).
+function verplaatsHtml(basis, standaard) {
+  return `<div class="snel" aria-label="Verplaats naar">
+    <span class="snel-label">Verplaats naar</span>
+    <button class="chip" data-zet="${M.vandaag()}">Vandaag</button>
+    <button class="chip" data-zet="${M.plusDagen(M.vandaag(), 1)}">Morgen</button>
+    <button class="chip" data-zet="${M.plusDagen(basis, 7)}">+1 week</button>
+    <button class="chip" data-zet="">${standaard}</button>
+  </div>`;
+}
+
+function verplaatsKnoppen(d, id) {
+  d.querySelectorAll('[data-zet]').forEach((b) =>
+    b.addEventListener('click', () => {
+      wijzig((st) => M.zetWerkdag(st, id, b.dataset.zet || null));
+      sluit();
+    })
+  );
+}
+
+// Bij een les: de voorbereiding, de taken voor leerlingen en eventuele extra to do's.
 function lesTakenHtml(s, lesId) {
-  const les = s.lessen[lesId];
-  const taken = M.takenVanLes(s, lesId).sort((a, b) => !!b.hoofd - !!a.hoofd || (a.deelNr || 0) - (b.deelNr || 0) || sorteerTaken(s)(a, b));
-  const tijd = totaalTijd(taken);
-  return `<h3>Taak${tijd && taken.length > 1 ? ` · ⏱ ${M.duurTekst(tijd)} samen` : ''}</h3>
-    ${takenLijst(s, taken, `data-terug-les="${lesId}"`) || '<p class="leeg">Nog geen taak bij deze les.</p>'}
+  const alle = M.takenVanLes(s, lesId);
+  const volg = (a, b) => (a.deelNr || 0) - (b.deelNr || 0) || sorteerTaken(s)(a, b);
+  const voorb = alle.filter((t) => t.hoofd || (t.deelGroep && !M.isVerbeteren(t))).sort(volg);
+  const leerling = alle.filter((t) => M.isVerbeteren(t)).sort(volg);
+  const rest = alle.filter((t) => !voorb.includes(t) && !leerling.includes(t)).sort(volg);
+  const tijd = totaalTijd(alle);
+  const terug = `data-terug-les="${lesId}"`;
+  return `<h3>Voorbereiding${tijd ? ` · ⏱ ${M.duurTekst(tijd)}${alle.length > 1 ? ' samen' : ''}` : ''}</h3>
+    ${takenLijst(s, voorb, terug) || '<p class="leeg">Geen voorbereiding bij deze les.</p>'}
+    <h3>Taken voor leerlingen</h3>
+    ${takenLijst(s, leerling, terug) || '<p class="leeg">Geen taak bij deze les.</p>'}
+    ${rest.length ? `<h3>To do's</h3>${takenLijst(s, rest, terug)}` : ''}
     <div class="chips">
-      <button type="button" class="chip" data-actie="nieuwe-taak" data-les="${lesId}">+ extra taak</button>
-      ${les?.datum ? `<button type="button" class="chip" data-actie="verbeteren" data-les="${lesId}">+ verbeteren</button>` : ''}
+      <button type="button" class="chip" data-actie="nieuwe-leerlingtaak" data-les="${lesId}">+ taak voor leerlingen</button>
+      <button type="button" class="chip" data-actie="nieuwe-taak" data-les="${lesId}">+ to do bij deze les</button>
     </div>`;
 }
 
@@ -351,8 +365,8 @@ export function openLes(id, voorinvulling = {}) {
       <label>Datum <small>(leeg = nog niet ingepland)</small><input type="date" name="datum" value="${l.datum || ''}"></label>
       ${
         id
-          ? `<p class="hint">Verschuif je de les, dan schuiven de deadlines van de taken mee. Je werkdagen blijven staan.</p>`
-          : `<p class="hint">Saga maakt bij de les één taak met dezelfde naam, op de dag vóór de les (of vroeger als dat een werkdag is). Die kun je daarna verschuiven.</p>`
+          ? `<p class="hint">Verschuif je de les, dan schuiven de voorbereiding en de indiendag van de taken mee (tenzij je ze zelf verplaatste).</p>`
+          : `<p class="hint">Saga zet de voorbereiding van de les op de dag vóór de les (of vroeger als dat een werkdag is). Die kun je daarna verschuiven. Een taak voor leerlingen voeg je daarna toe bij de les.</p>`
       }
       <div class="knoppen">
         ${id ? `<button type="button" class="knop gevaar" data-weg>Verwijderen</button>` : ''}
@@ -409,52 +423,91 @@ export function openLes(id, voorinvulling = {}) {
   );
 }
 
-export function openVerbeteren(lesId) {
+// Taak voor leerlingen: ze maken ze, ik verbeter ze. Hoort optioneel bij een les.
+// Indienen standaard op de vrijdag van de lesweek; verbeteren staat de dag erna gepland.
+function lesOpties(s, gekozen) {
+  const grens = M.plusDagen(M.vandaag(), -21);
+  const lessen = M.lijst(s, 'lessen')
+    .filter((l) => l.id === gekozen || (l.datum && l.datum >= grens))
+    .sort((a, b) => vergelijkDatum(a.datum, b.datum) || sorteerLessen(s)(a, b));
+  return lessen
+    .map((l) => `<option value="${l.id}" ${l.id === gekozen ? 'selected' : ''}>${esc(klasLabel(s, l))} · ${esc(l.titel)}${l.datum ? ` (${M.kortDatum(l.datum)})` : ''}</option>`)
+    .join('');
+}
+
+export function openLeerlingTaak(id, voorinvulling = {}, terug = null) {
   const s = getState();
-  const les = s.lessen[lesId];
-  if (!les) return;
-  const klasIds = M.klassenVanLes(les);
-  const indien = les.datum || M.vandaag();
+  const t = id ? s.taken[id] : { titel: '', lesId: voorinvulling.lesId || null, klasIds: voorinvulling.klasIds || [], werkdag: null, notitie: '', klaar: false };
+  if (!t || t.del) return;
+  const indien = t.indien || M.standaardIndien(s, t.lesId);
   dialoog(
-    `<h2>Verbeteren</h2>
-    <p class="hint">${esc(klasLabel(s, les))} · ${esc(les.titel)}</p>
-    <form id="f-verb" class="formulier">
-      <label>Wat<input name="titel" required value="Verbeteren ${esc(les.titel)}"></label>
-      <label>Indienen door leerlingen<input type="date" name="indien" required value="${indien}"></label>
-      <label>Verbeterd tegen <small>(voorstel: volgende les na indienen)</small><input type="date" name="deadline" required value="${M.volgendeLesNa(s, klasIds, indien)}"></label>
-      <div class="knoppen"><span class="vul"></span>
+    `<h2>${id ? esc(taakTitel(s, t)) : 'Nieuwe taak voor leerlingen'}</h2>
+    ${id ? verplaatsHtml(M.werkdagVan(s, t), 'Standaard (dag na indienen)') : ''}
+    ${id ? `<div class="timer-wrap">${timerHtml(t)}</div>` : ''}
+    <form id="f-lt" class="formulier">
+      <label>Taak<input name="titel" required value="${esc(t.titel)}" placeholder="bv. Oefening aankoopfactuur" ${id ? '' : 'autofocus'}></label>
+      <label>Bij les <small>(optioneel)</small><select name="les"><option value="">— geen les —</option>${lesOpties(s, t.lesId)}</select></label>
+      <div class="voor-klas">${klasChips(s, t.klasIds || [], 'Voor klas(sen)')}</div>
+      <label>Indienen tegen<input type="date" name="indien" required value="${indien}"></label>
+      <p class="hint" id="lt-uitleg"></p>
+      <label>Verbeteren op <small>(leeg = de dag na het indienen)</small><input type="date" name="werkdag" value="${t.werkdag || ''}"></label>
+      <label>Notitie<textarea name="notitie" rows="2">${esc(t.notitie)}</textarea></label>
+      ${id ? `<label class="check"><input type="checkbox" name="klaar" ${t.klaar ? 'checked' : ''}> Verbeterd</label>` : ''}
+      <div class="knoppen">
+        ${id ? '<button type="button" class="knop gevaar" data-weg>Verwijderen</button>' : ''}
+        <span class="vul"></span>
         <button type="button" class="knop" data-sluit>Annuleren</button>
-        <button class="knop primair">Toevoegen</button>
+        <button class="knop primair">${id ? 'Opslaan' : 'Toevoegen'}</button>
       </div>
     </form>`,
     (d) => {
-      const f = $('#f-verb', d);
-      let deadlineAangepast = false;
-      f.deadline.addEventListener('input', () => (deadlineAangepast = true));
-      f.indien.addEventListener('change', () => {
-        if (!deadlineAangepast && f.indien.value) f.deadline.value = M.volgendeLesNa(getState(), klasIds, f.indien.value);
-      });
+      const f = $('#f-lt', d);
+      // de indiendag volgt de gekozen les, tot je ze zelf aanpast
+      let eigenDag = !!t.indienManueel;
+      f.indien.addEventListener('input', () => (eigenDag = true));
+      const bijwerken = () => {
+        const st = getState();
+        if (!eigenDag) f.indien.value = M.standaardIndien(st, f.les.value || null);
+        f.querySelector('.voor-klas').hidden = !!f.les.value;
+        $('#lt-uitleg', d).textContent = f.indien.value
+          ? `"Verbeteren CR: …" komt op ${M.kortDatum(f.werkdag.value || M.verbeterDag(f.indien.value))} op je planning.`
+          : '';
+      };
+      f.addEventListener('change', bijwerken);
+      bijwerken();
       f.addEventListener('submit', (e) => {
         e.preventDefault();
         const w = formWaarden(f);
         wijzig((st) =>
-          M.zet(st, 'taken', {
-            id: M.nieuwId(),
+          M.bewaarLeerlingTaak(st, id, {
             titel: w.titel.trim(),
-            lesId,
-            soort: 'verbeteren',
-            werkdag: null,
-            vanaf: { datum: w.indien },
-            deadline: { datum: w.deadline },
-            klaar: false,
-            notitie: '',
+            lesId: w.les || null,
+            klasIds: new FormData(f).getAll('klas'),
+            indien: w.indien,
+            werkdag: w.werkdag || null,
+            notitie: w.notitie.trim(),
+            klaar: id ? !!w.klaar : false,
           })
         );
         sluit();
       });
+      if (id) verplaatsKnoppen(d, id);
       $('[data-sluit]', d).addEventListener('click', sluit);
+      $('[data-weg]', d)?.addEventListener('click', () => {
+        metOngedaan(`"${t.titel}" verwijderd`, (st) => M.wis(st, 'taken', id));
+        sluit();
+      });
     },
-    { terug: () => openLes(lesId) }
+    {
+      terug,
+      herteken: id
+        ? () => {
+            const huidig = getState().taken[id];
+            const wrap = dlg.querySelector('.timer-wrap');
+            if (huidig && !huidig.del && wrap && !wrap.querySelector('.tijd-form')) wrap.innerHTML = timerHtml(huidig);
+          }
+        : null,
+    }
   );
 }
 
@@ -466,7 +519,7 @@ function opdrachtStukkenHtml(s, opdrachtId) {
   const tijd = totaalTijd(taken);
   return `<h3>Stukken ${vg.totaal ? `· ${vg.klaar}/${vg.totaal} klaar` : ''}${tijd ? ` · ⏱ ${M.duurTekst(tijd)}` : ''}</h3>
     ${vg.totaal ? `<div class="voortgang groot" aria-hidden="true"><span style="width:${vg.pct}%"></span></div>` : ''}
-    ${takenLijst(s, taken, `data-terug-opdracht="${opdrachtId}"`) || '<p class="leeg">Nog geen stukken. Deel de opdracht op in behapbare stappen.</p>'}
+    ${takenLijst(s, taken, `data-terug-opdracht="${opdrachtId}"`) || '<p class="leeg">Nog geen stukken. Deel het op in behapbare stappen.</p>'}
     <div class="chips">
       <button type="button" class="chip" data-actie="nieuwe-taak" data-opdracht="${opdrachtId}">+ stuk</button>
       <button type="button" class="chip" data-actie="stukken-plakken" data-opdracht="${opdrachtId}">Lijst plakken</button>
@@ -501,14 +554,14 @@ export function openOpdracht(id, voorinvulling = {}) {
   const school = M.opdrachtDomein(o) === 'school';
   const groepen = school ? M.lijst(s, 'onderwerpen') : vakken;
   dialoog(
-    `<h2>${school ? (id ? 'Opdracht' : 'Nieuwe opdracht') : id ? '🎓 Opdracht' : '🎓 Nieuwe opdracht'}</h2>
+    `<h2>${school ? (id ? 'To do met stukken' : 'Nieuwe to do met stukken') : id ? '🎓 Opdracht' : '🎓 Nieuwe opdracht'}</h2>
     <form id="f-opd" class="formulier">
       <label>${school ? 'Onderwerp' : 'Opleidingsonderdeel'}<select name="groep">
         <option value="">— geen —</option>${school ? onderwerpOpties(s, o.onderwerpId) : vakOpties(s, o.vakId)}
         <option value="__nieuw" ${groepen.length || voorinvulling.klasId ? '' : 'selected'}>+ nieuw ${school ? 'onderwerp' : 'onderdeel'}…</option>
       </select></label>
       <label class="nieuw-vak">Naam nieuw ${school ? 'onderwerp' : 'onderdeel'}<input name="nieuweGroep" placeholder="${school ? 'bv. Stage' : 'bv. Didactiek 2'}"></label>
-      <label>Opdracht<input name="titel" required value="${esc(o.titel)}" placeholder="${school ? 'bv. Stageverslag' : 'bv. Portfolio stage'}" ${id ? '' : 'autofocus'}></label>
+      <label>${school ? 'To do' : 'Opdracht'}<input name="titel" required value="${esc(o.titel)}" placeholder="${school ? 'bv. Stageverslag' : 'bv. Portfolio stage'}" ${id ? '' : 'autofocus'}></label>
       <label>Einddeadline${school ? ' <small>(optioneel)</small>' : ''}<input type="date" name="deadline" ${school ? '' : 'required'} value="${o.deadline || ''}"></label>
       ${school ? klasChips(s, o.klasIds || [], 'Voor klas(sen) <small>(optioneel)</small>') : ''}
       ${
@@ -567,7 +620,7 @@ export function openOpdracht(id, voorinvulling = {}) {
       });
       $('[data-sluit]', d).addEventListener('click', sluitHelemaal);
       $('[data-weg]', d)?.addEventListener('click', () => {
-        metOngedaan('Opdracht verwijderd', (st) => M.verwijderOpdracht(st, id));
+        metOngedaan(`"${o.titel}" verwijderd`, (st) => M.verwijderOpdracht(st, id));
         sluitHelemaal();
       });
     },
@@ -586,7 +639,7 @@ export function openStukkenPlakken(opdrachtId) {
   const opd = getState().opdrachten[opdrachtId];
   dialoog(
     `<h2>Stukken toevoegen</h2>
-    <p class="hint">🎓 ${esc(opd.titel)}</p>
+    <p class="hint">${M.opdrachtDomein(opd) === 'opleiding' ? '🎓 ' : ''}${esc(opd.titel)}</p>
     <form id="f-stuk" class="formulier">
       <label>Eén stuk per regel, in volgorde<textarea name="lijst" rows="7" autofocus></textarea></label>
       <div class="knoppen"><span class="vul"></span>
@@ -690,7 +743,7 @@ export function openDag(datum) {
   dialoog(
     `<h2>${M.kortDatum(datum)}</h2>
     <div class="menu">
-      <button class="knop" data-actie="nieuwe-taak" data-datum="${datum}">+ taak op deze dag</button>
+      <button class="knop" data-actie="nieuwe-taak" data-datum="${datum}">+ to do op deze dag</button>
       <button class="knop" data-actie="nieuwe-les" data-datum="${datum}">+ les op deze dag</button>
       <button class="knop" data-actie="afwezigheid" data-datum="${datum}">+ vakantie of afwezigheid vanaf deze dag</button>
       <button class="knop" data-werk>${werk ? 'Geen werkdag maken' : 'Extra werkdag maken'}</button>
@@ -709,9 +762,10 @@ export function openNieuw() {
   dialoog(
     `<h2>Nieuw</h2>
     <div class="menu">
-      <button class="knop" data-actie="nieuwe-taak">✏️ Taak <small>losse taak of bij een les/opdracht</small></button>
-      <button class="knop" data-actie="nieuwe-les">🏫 Les <small>school</small></button>
-      <button class="knop" data-actie="nieuwe-opdracht" data-domein="school">📋 Opdracht <small>school, met stukken</small></button>
+      <button class="knop" data-actie="nieuwe-taak">✏️ To do <small>iets dat je moet regelen</small></button>
+      <button class="knop" data-actie="nieuwe-leerlingtaak">📝 Taak voor leerlingen <small>verbeteren komt vanzelf op je planning</small></button>
+      <button class="knop" data-actie="nieuwe-les">🏫 Les</button>
+      <button class="knop" data-actie="nieuwe-opdracht" data-domein="school">📋 To do met stukken <small>school</small></button>
       <button class="knop" data-actie="nieuwe-opdracht" data-domein="opleiding">🎓 Opdracht <small>opleiding, met stukken</small></button>
       <button class="knop" data-actie="afwezigheid">🏖 Vakantie of afwezigheid</button>
     </div>`

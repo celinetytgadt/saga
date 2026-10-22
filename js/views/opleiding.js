@@ -22,11 +22,11 @@ export function viewOpleiding(s) {
   const losse = M.losseTaken(s, 'opleiding');
   const losseKaart = losse.length
     ? werkKaart(s, {
-        titel: 'Losse taken',
+        titel: "To do's",
         kleur: 'var(--fuchsia)',
         taken: losse,
         opl: true,
-        onder: '<button class="knop klein" data-actie="nieuwe-taak" data-domein="opleiding">+ losse taak</button>',
+        onder: '<button class="knop klein" data-actie="nieuwe-taak" data-domein="opleiding">+ to do</button>',
       })
     : '';
   return `<div class="pagina">

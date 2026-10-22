@@ -930,3 +930,54 @@ a.knop.primair { color: var(--accent-tekst); }
 @media (max-width: 760px) {
   .weken-meer { padding: 8px 0; }
 }
+
+/* ---------- taken voor leerlingen, vlaggen, weergave-menu, bakje ---------- */
+
+.deadline.indien { color: var(--accent); }
+
+/* "Enkel lessen": de voorbereiding en taken onder de les */
+.les:has(.les-subs) { flex-wrap: wrap; }
+.les-subs { flex-basis: 100%; display: flex; flex-direction: column; gap: 1px; padding: 2px 0 1px; }
+.les-sub { font-size: .72rem; color: var(--tekst); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.les-sub small { color: var(--zacht); }
+.les-sub.af { color: var(--groen-tekst); }
+
+.weergave-menu { position: relative; }
+.weergave-menu > summary { list-style: none; display: inline-block; }
+.weergave-menu > summary::-webkit-details-marker { display: none; }
+.weergave-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 30;
+  min-width: 260px;
+  background: var(--vlak);
+  border: 1px solid var(--rand-sterk);
+  border-radius: 12px;
+  box-shadow: var(--schaduw);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.weergave-pop .check { align-items: flex-start; font-weight: 600; }
+.weergave-pop small { display: block; color: var(--zacht); font-weight: 400; font-size: .8rem; }
+.filter-actief {
+  border: 1px dashed var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--vlak));
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 4px 11px;
+  font-weight: 600;
+  font-size: .85rem;
+  cursor: pointer;
+}
+@media (max-width: 760px) {
+  .weergave-pop { left: 0; right: auto; }
+}
+
+.bakje h4.kop-vak { font-size: .8rem; margin: 6px 0 0; display: flex; align-items: center; gap: 6px; color: var(--zacht); }
+.bakje h4.kop-vak::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--klas); }
+.meer-link { display: block; margin: 0 0 4px; text-decoration: none; }
+.zonder-datum summary { cursor: pointer; font-weight: 600; font-size: .9rem; margin: 8px 0 4px; }
+.zonder-datum .les { margin-bottom: 4px; }

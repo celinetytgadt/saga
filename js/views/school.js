@@ -58,8 +58,8 @@ function onderwerpKaart(s, ond) {
     opdrachten: M.opdrachtenVanOnderwerp(s, ond?.id || null),
     taken: M.takenVanOnderwerp(s, ond?.id || null),
     kop: ond ? `<button class="knop klein" data-actie="onderwerp-bewerk" data-id="${ond.id}">Bewerken</button>` : '',
-    onder: `<button class="knop klein" data-actie="nieuwe-opdracht" data-domein="school" ${data}>+ opdracht</button>
-      <button class="knop klein" data-actie="nieuwe-taak" data-domein="school" ${data}>+ losse taak</button>`,
+    onder: `<button class="knop klein" data-actie="nieuwe-taak" data-domein="school" ${data}>+ to do</button>
+      <button class="knop klein" data-actie="nieuwe-opdracht" data-domein="school" ${data}>+ met stukken</button>`,
   });
 }
 
@@ -70,17 +70,17 @@ export function viewKlassen(s) {
   return `<div class="pagina">
     <div class="pagina-kop"><h1>School</h1><button class="knop primair" data-actie="klas-bewerk">+ klas</button></div>
     ${klassen.length ? `<div class="groepen">${klassen.map((k) => klasKaart(s, k)).join('')}</div>` : '<p class="leeg">Nog geen klassen. Voeg je eerste klas toe, bv. BKH4.</p>'}
-    <div class="pagina-kop sectie-kop"><h1>Opdrachten en taken</h1>
+    <div class="pagina-kop sectie-kop"><h1>To do's</h1>
       <div class="knoppen-rij">
         <button class="knop" data-actie="onderwerp-bewerk">+ onderwerp</button>
-        <button class="knop primair" data-actie="nieuwe-opdracht" data-domein="school">+ opdracht</button>
+        <button class="knop primair" data-actie="nieuwe-taak" data-domein="school">+ to do</button>
       </div>
     </div>
-    <p class="hint">Werk dat niet bij een les hoort, per onderwerp (bv. Stage, Vergaderingen). Een opdracht deel je op in stukken, net als bij de opleiding. Hoort iets bij een klas, duid die klas dan aan: het verschijnt ook op de pagina van de klas.</p>
+    <p class="hint">Wat je moet regelen, per onderwerp (bv. Stage, Vergaderingen). Iets groters deel je op in stukken ("+ met stukken"). Hoort iets bij een klas, duid die klas dan aan: het verschijnt ook op de pagina van de klas. Taken voor leerlingen voeg je toe bij een les of op de pagina van de klas.</p>
     ${
       onderwerpen.length || zonder
         ? `<div class="groepen">${onderwerpen.map((o) => onderwerpKaart(s, o)).join('')}${zonder || !onderwerpen.length ? onderwerpKaart(s, null) : ''}</div>`
-        : '<p class="leeg">Nog geen opdrachten of losse taken.</p>'
+        : '<p class="leeg">Nog geen to do\'s.</p>'
     }
   </div>`;
 }

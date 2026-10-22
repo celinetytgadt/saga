@@ -1115,3 +1115,5 @@ a.knop.primair { color: var(--accent-tekst); }
 .kop-groen { color: var(--groen-tekst); }
 .kop-vlag { color: var(--vlag); }
 .vlag-bol { width: 18px; text-align: center; color: var(--vlag); font-size: .85rem; }
+.afspraak-rij { border-left-color: var(--rand-sterk); border-left-style: dotted; }
+.afspraak-uur { flex: none; min-width: 74px; font-weight: 600; font-size: .85rem; color: var(--accent); font-variant-numeric: tabular-nums; }

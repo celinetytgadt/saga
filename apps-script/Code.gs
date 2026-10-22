@@ -29,7 +29,7 @@ const BESTAND_NAAM = 'saga-data.json';
 const BACKUPS_HOUDEN = 14;
 
 // Verhogen bij elke wijziging die de app moet kennen; de app waarschuwt bij een oudere versie.
-const SCRIPT_VERSIE = 8;
+const SCRIPT_VERSIE = 9;
 
 // Welke agenda('s) gelezen worden, op naam (hoofdletters maken niet uit).
 // Leeg laten ([]) = alle agenda's die je in Google Agenda ziet.
@@ -315,24 +315,26 @@ function leesAgenda_(oud) {
       if (!werk && !CODE_S.test(titel) && !CODE_S.test(beschrijving)) return;
 
       const heleDag = ev.isAllDayEvent();
-      let datum, eindDatum, tijd;
+      let datum, eindDatum, tijd, eindTijd;
       if (heleDag) {
         datum = Utilities.formatDate(ev.getAllDayStartDate(), scriptTz, 'yyyy-MM-dd');
         eindDatum = Utilities.formatDate(new Date(ev.getAllDayEndDate().getTime() - 43200000), scriptTz, 'yyyy-MM-dd');
         tijd = null;
+        eindTijd = null;
       } else {
         datum = Utilities.formatDate(ev.getStartTime(), agendaTz, 'yyyy-MM-dd');
         eindDatum = Utilities.formatDate(new Date(ev.getEndTime().getTime() - 1000), agendaTz, 'yyyy-MM-dd');
         tijd = Utilities.formatDate(ev.getStartTime(), agendaTz, 'HH:mm');
+        eindTijd = Utilities.formatDate(ev.getEndTime(), agendaTz, 'HH:mm');
       }
       const id = ev.getId() + '_' + datum;
       const schoon = titel.replace(CODE_SW, '$1').replace(CODE_S, '$1').replace(/\s+/g, ' ').trim();
-      const item = { id: id, titel: schoon || '(afspraak)', datum: datum, eindDatum: eindDatum, tijd: tijd, werk: werk };
+      const item = { id: id, titel: schoon || '(afspraak)', datum: datum, eindDatum: eindDatum, tijd: tijd, eindTijd: eindTijd, werk: werk };
       gezien[id] = true;
       info.aantal++;
       const o = oud[id];
       const zelfde = o && !o.del && o.titel === item.titel && o.datum === item.datum &&
-        o.eindDatum === item.eindDatum && o.tijd === item.tijd && o.werk === item.werk;
+        o.eindDatum === item.eindDatum && o.tijd === item.tijd && o.eindTijd === item.eindTijd && o.werk === item.werk;
       if (!zelfde) {
         item.upd = stempel;
         r[id] = item;

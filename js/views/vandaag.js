@@ -5,7 +5,7 @@
 // 3. Gedaan: wat je vandaag afvinkte.
 
 import * as M from '../model.js';
-import { esc } from '../ui.js';
+import { esc, ui } from '../ui.js';
 import { anker, bakje, klasLabel, klasStijl, opdrachtStijl, snelInvoerHtml, sorteerLessen, sorteerTaken, taakTitel, tijdLabel, voortgang } from '../weergave.js';
 
 // Kleine timerknop: starten, of pauzeren met de lopende klok erbij.
@@ -16,6 +16,24 @@ function timerKnop(t) {
 
 const vink = (t) =>
   `<button class="vink" data-actie="vink" data-id="${t.id}" aria-label="${t.klaar ? 'Markeer als niet klaar' : 'Markeer als klaar'}">${t.klaar ? '✓' : ''}</button>`;
+
+// Afspraak uit de agenda (#s) op deze dag, met het uur als dat er is.
+// Een afspraak over meerdere dagen: eerste dag vanaf het beginuur, laatste dag tot het einduur.
+export function afspraakUur(a, v) {
+  const eerste = a.datum === v;
+  const laatste = (a.eindDatum || a.datum) === v;
+  if (!a.tijd) return 'hele dag';
+  if (eerste && laatste) return a.eindTijd && a.eindTijd !== a.tijd ? `${a.tijd}–${a.eindTijd}` : a.tijd;
+  if (eerste) return `vanaf ${a.tijd}`;
+  if (laatste && a.eindTijd) return `tot ${a.eindTijd}`;
+  return 'hele dag';
+}
+
+function afspraakRij(a, v) {
+  return `<div class="magje afspraak-rij"><span class="afspraak-uur">${afspraakUur(a, v)}</span>
+    <span class="moetje-tekst"><span class="magje-titel">${esc(a.titel)}</span></span>
+  </div>`;
+}
 
 // Voorbereiding van een les, in dezelfde opmaak als de andere rijen.
 function voorbRij(s, t, les, v) {
@@ -92,6 +110,12 @@ export function viewVandaag(s) {
   const liggen = zonder(b.liggen);
   const kiezen = zonder([...b.school, ...b.opleiding.flatMap((g) => g.taken)]);
   const last = M.dagLast(s, v);
+  // afspraken met #s (niet de #sw-werkdagen), tenzij verborgen op dit toestel; hele dag eerst, dan op uur
+  const afspraken = ui.verbergAfspraken
+    ? []
+    : M.afsprakenOp(s, v)
+        .filter((a) => !a.werk)
+        .sort((a, b) => (afspraakUur(a, v) === 'hele dag' ? '' : a.tijd || '').localeCompare(afspraakUur(b, v) === 'hele dag' ? '' : b.tijd || ''));
   const rijen = (lijst) => lijst.map((t) => magje(s, t, v)).join('');
 
   const voorbHtml = !werkdagen.length
@@ -108,6 +132,7 @@ export function viewVandaag(s) {
     <div class="vandaag-kolommen">
       <section class="kaart compact belangrijk">
         <h2>Belangrijk</h2>
+        ${afspraken.length ? `<h3>📅 Afspraken</h3>${afspraken.map((a) => afspraakRij(a, v)).join('')}` : ''}
         <h3>Voorbereiding <small class="zacht">lessen van ${werkdagen.length ? werkdagen.map(M.kortDatum).join(' en ') : 'je volgende werkdagen'}</small></h3>
         ${voorbHtml}
         ${deadline.length || eindes.length ? `<h3 class="kop-vlag">⚑ Deadline vandaag</h3>${eindes.map((o) => opdrachtRij(s, o)).join('')}${rijen(deadline)}` : ''}

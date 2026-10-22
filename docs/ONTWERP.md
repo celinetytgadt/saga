@@ -167,7 +167,7 @@ In het overzicht: "BKH3-K2 + K3" met de kleuren van beide klassen.
 - lessen zonder datum: ingeklapt.
 
 **Vandaag** (`#/vandaag`, het startscherm op elk toestel). Op de computer drie kolommen, op de gsm onder elkaar:
-1. **Belangrijk**: *Voorbereiding* (de lessen van de volgende 2 werkdagen, vanaf morgen, die nog niet voorbereid zijn), *⚑ Deadline vandaag* (to do's, stukken en opdrachten) en *Gepland vandaag*. Alles in dezelfde rijen: afvinken, timer starten.
+1. **Belangrijk**: *📅 Afspraken* van vandaag uit de agenda (enkel #s, niet de #sw-werkdagen; met het uur, "hele dag" eerst; verborgen als je afspraken verbergt op dit toestel), *Voorbereiding* (de lessen van de volgende 2 werkdagen, vanaf morgen, die nog niet voorbereid zijn), *⚑ Deadline vandaag* (to do's, stukken en opdrachten) en *Gepland vandaag*. Alles in dezelfde rijen: afvinken, timer starten.
 2. **Magjes**: wat bleef liggen (met *Alles herplannen*) en het bakje, met een knop *Vandaag*. Opleiding in de volgorde van de pagina Opleiding.
 3. **Gedaan**: wat je vandaag afvinkte (laatst afgevinkt eerst; terug openzetten kan).
 - Teller op het tabblad: enkel wat bleef liggen.

@@ -1032,7 +1032,7 @@ a.knop.primair { color: var(--accent-tekst); }
 .moetje-tekst { flex: 1; min-width: 0; cursor: pointer; display: flex; flex-direction: column; }
 .moetje-tekst small { color: var(--zacht); font-size: .78rem; }
 .moetje-taak .vink, .magje .vink { width: 18px; height: 18px; margin: 0; font-size: .75rem; }
-.magje { border-left: 3px solid var(--klas); padding: 6px 0 6px 8px; border-bottom: 1px solid var(--rand); }
+.magje { border-left: 7px solid var(--klas); padding: 6px 0 6px 10px; border-bottom: 1px solid var(--rand); }
 .magje.opl { border-left-style: dashed; }
 .timer-chip.loopt { background: var(--groen); color: #fff; border-color: var(--groen); border-style: solid; }
 
@@ -1102,7 +1102,7 @@ a.knop.primair { color: var(--accent-tekst); }
 .vandaag-pagina .kaart h3 { margin: 10px 0 2px; font-size: .82rem; }
 .vandaag-pagina .hint { margin: 2px 0 4px; font-size: .8rem; }
 .vandaag-pagina .dag-titel { margin: 8px 0 4px; }
-.vandaag-pagina .magje { padding: 4px 0 4px 8px; gap: 8px; }
+.vandaag-pagina .magje { padding: 4px 0 4px 10px; gap: 8px; }
 .vandaag-pagina .moetje { padding: 6px 10px; margin-bottom: 6px; }
 .vandaag-pagina .moetje-taak { padding-top: 3px; }
 .magje-titel { font-size: .92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1115,5 +1115,5 @@ a.knop.primair { color: var(--accent-tekst); }
 .kop-groen { color: var(--groen-tekst); }
 .kop-vlag { color: var(--vlag); }
 .vlag-bol { width: 18px; text-align: center; color: var(--vlag); font-size: .85rem; }
-.afspraak-rij { border-left-color: var(--rand-sterk); border-left-style: dotted; }
+.afspraak-rij { border-left: 3px dotted var(--rand-sterk); padding-left: 14px !important; }
 .afspraak-uur { flex: none; min-width: 74px; font-weight: 600; font-size: .85rem; color: var(--accent); font-variant-numeric: tabular-nums; }

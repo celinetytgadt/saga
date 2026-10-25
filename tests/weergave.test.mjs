@@ -104,3 +104,33 @@ test('afspraak op Vandaag: met het uur als dat er is', async () => {
   assert.equal(afspraakUur({ datum: plus(-2), eindDatum: V, tijd: '18:00', eindTijd: '10:00' }, V), 'tot 10:00');
   assert.equal(afspraakUur({ datum: plus(-1), eindDatum: plus(1), tijd: '18:00', eindTijd: '10:00' }, V), 'hele dag');
 });
+
+test('Vandaag: geen dubbels tussen Belangrijk en Magjes; verbeteren vanaf de dag na het indienen', async () => {
+  const { viewVandaag } = await import('../js/views/vandaag.js');
+  const v = M.vandaag();
+  const s = basis();
+  s.instellingen.werkdagen = [0, 1, 2, 3, 4, 5, 6];
+  s.lessen.l1 = { id: 'l1', klasIds: ['k1'], titel: 'Les morgen', datum: M.plusDagen(v, 1), upd: 1 };
+  // voorbereiding die gisteren gepland stond: enkel bij Belangrijk, niet bij "Bleef liggen"
+  s.taken['h-l1'] = todo('h-l1', { titel: '', lesId: 'l1', hoofd: true, werkdag: M.plusDagen(v, -1), deadline: { rel: -1, nietOpWerkdag: true } });
+  s.taken.cr = todo('cr', { titel: 'Balans', soort: 'verbeteren', indien: M.plusDagen(v, -3), klasIds: ['k1'], werkdag: M.plusDagen(v, -2) });
+  s.taken.later = todo('later', { titel: 'Nog niet', soort: 'verbeteren', indien: v, klasIds: ['k1'] });
+  s.taken.cursus = todo('cursus', { titel: 'Cursus schrijven', klasIds: ['k1'], werkdag: v });
+  s.onderwerpen.o1 = { id: 'o1', naam: 'Stage', kleur: '#5bbba4', upd: 1 };
+  s.taken.st = todo('st', { titel: 'Stagebrief', onderwerpId: 'o1', deadline: { datum: v } });
+  s.taken.los = todo('los', { titel: 'Los' });
+  const html = viewVandaag(s);
+  const [belangrijk, rest] = html.split('<h2>Magjes</h2>');
+  const telt = (deel, id) => deel.split(`data-actie="vink" data-id="${id}"`).length - 1;
+  for (const id of ['h-l1', 'cr', 'cursus', 'st']) {
+    assert.equal(telt(belangrijk, id), 1, id);
+    assert.equal(telt(rest, id), 0, id);
+  }
+  assert.equal(telt(belangrijk, 'later'), 0); // pas morgen
+  assert.equal(telt(belangrijk, 'los'), 0);
+  assert.equal(telt(rest, 'los'), 1);
+  assert.match(belangrijk, /<h3>Verbeteren<\/h3>/);
+  assert.match(belangrijk, /kop-onderwerp[^>]*>Stage</);
+  // magjes hebben ook een startknop
+  assert.match(rest.slice(rest.indexOf('data-id="los"')), /data-actie="timer" data-id="los"/);
+});

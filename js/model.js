@@ -795,18 +795,26 @@ export function onderwerpVan(state, taak) {
   return o && !o.del && !taak.lesId && !taak.opdrachtId ? o : null;
 }
 
+// Een klas die (nog) bestaat in een lijst klas-id's.
+const metKlas = (state, ids) => (ids || []).some((id) => state.klassen[id] && !state.klassen[id].del);
+
 // Losse schooltaken van een onderwerp; `null` = zonder (of met een verwijderd) onderwerp.
+// Zonder onderwerp maar bij een klas: die staat al bij de klas, niet bij "Zonder onderwerp".
 export function takenVanOnderwerp(state, onderwerpId) {
-  return losseTaken(state, 'school').filter((t) => (onderwerpVan(state, t)?.id || null) === (onderwerpId || null));
+  return losseTaken(state, 'school').filter((t) => {
+    const id = onderwerpVan(state, t)?.id || null;
+    return id === (onderwerpId || null) && (id || !metKlas(state, t.klasIds));
+  });
 }
 
-// Schoolopdrachten (met stukken) van een onderwerp; `null` = zonder onderwerp.
+// Schoolopdrachten (met stukken) van een onderwerp; `null` = zonder onderwerp (en zonder klas).
 export function opdrachtenVanOnderwerp(state, onderwerpId) {
   return lijst(state, 'opdrachten')
     .filter((o) => opdrachtDomein(o) === 'school')
     .filter((o) => {
       const ond = o.onderwerpId && state.onderwerpen?.[o.onderwerpId];
-      return ((ond && !ond.del ? ond.id : null) || null) === (onderwerpId || null);
+      const id = (ond && !ond.del ? ond.id : null) || null;
+      return id === (onderwerpId || null) && (id || !metKlas(state, o.klasIds));
     })
     .sort(volgordeOpdracht);
 }

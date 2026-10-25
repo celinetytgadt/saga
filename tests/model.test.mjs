@@ -494,6 +494,18 @@ test('losse taken per onderwerp; onderwerp verwijderen houdt de taken', () => {
   assert.deepEqual(M.takenVanOnderwerp(s, null).map((t) => t.id).sort(), ['a', 'b']);
 });
 
+test('to do bij een klas zonder onderwerp staat niet bij "Zonder onderwerp"', () => {
+  const s = basis();
+  s.onderwerpen.o1 = { id: 'o1', naam: 'Stage', kleur: '#5bbba4', upd: 1 };
+  s.taken.a = taak({ id: 'a', lesId: null, klasIds: ['k1'] }); // bv. cursus schrijven
+  s.taken.b = taak({ id: 'b', lesId: null, klasIds: ['k1'], onderwerpId: 'o1' });
+  s.taken.c = taak({ id: 'c', lesId: null, klasIds: ['weg'] }); // klas bestaat niet (meer)
+  s.opdrachten.g = { id: 'g', titel: 'Cursus', domein: 'school', klasIds: ['k1'], upd: 1 };
+  assert.deepEqual(M.takenVanOnderwerp(s, null).map((t) => t.id), ['c']);
+  assert.deepEqual(M.takenVanOnderwerp(s, 'o1').map((t) => t.id), ['b']);
+  assert.equal(M.opdrachtenVanOnderwerp(s, null).length, 0);
+});
+
 test('vroeger opgesplitste losse taak wordt een opdracht met stukken', () => {
   const s = basis();
   M.zorgHoofdtaken(s);

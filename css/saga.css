@@ -1114,6 +1114,9 @@ a.knop.primair { color: var(--accent-tekst); }
 .magje.klaar .vink { background: var(--groen); border-color: var(--groen); }
 .kop-groen { color: var(--groen-tekst); }
 .kop-vlag { color: var(--vlag); }
+.magje-knoppen { display: flex; gap: 4px; flex-shrink: 0; margin-left: auto; }
+.belangrijk h4.kop-onderwerp { font-size: .82rem; margin: 8px 0 0; display: flex; align-items: center; gap: 6px; color: var(--zacht); }
+.belangrijk h4.kop-onderwerp::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--klas); }
 .vlag-bol { width: 18px; text-align: center; color: var(--vlag); font-size: .85rem; }
 .afspraak-rij { border-left: 3px dotted var(--rand-sterk); padding-left: 14px !important; }
 .afspraak-uur { flex: none; min-width: 74px; font-weight: 600; font-size: .85rem; color: var(--accent); font-variant-numeric: tabular-nums; }

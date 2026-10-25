@@ -2,7 +2,7 @@
 
 import * as M from '../model.js';
 import { esc, WEEK, GRIJS } from '../ui.js';
-import { klassenVan, opNaam, voortgang, werkKaart } from '../weergave.js';
+import { klassenVan, opdrachtRegel, opNaam, takenLijst, voortgang, werkKaart } from '../weergave.js';
 
 export function roosterTekst(k) {
   return (k.rooster || []).length
@@ -35,6 +35,17 @@ function klasKaart(s, k) {
   const lessen = M.lessenVanKlas(s, k.id);
   const komend = lessen.filter((l) => l.datum && l.datum >= v).slice(0, 4);
   const zonder = lessen.filter((l) => !l.datum).length;
+  // to do's van de klas die niet bij een les horen (bv. een cursus schrijven)
+  const todos = M.losseTaken(s, 'school')
+    .filter((t) => !t.klaar && !M.isVerbeteren(t) && (t.klasIds || []).includes(k.id))
+    .sort((a, b) => (M.werkdagVan(s, a) || M.deadlineVan(s, a) || '9').localeCompare(M.werkdagVan(s, b) || M.deadlineVan(s, b) || '9'));
+  const opdrachten = M.lijst(s, 'opdrachten')
+    .filter((o) => M.opdrachtDomein(o) === 'school' && (o.klasIds || []).includes(k.id))
+    .filter((o) => {
+      const vg = voortgang(M.takenVanOpdracht(s, o.id));
+      return !(vg.totaal && vg.klaar === vg.totaal && (!o.deadline || o.deadline < v));
+    })
+    .sort(M.volgordeOpdracht);
   return `<section class="kaart groep-kaart" style="--klas:${k.kleur}">
     <header>
       <span class="bol"></span><h2><a class="kaart-link" href="#/klas/${k.id}">${esc(k.naam)}</a></h2>
@@ -43,6 +54,11 @@ function klasKaart(s, k) {
     <p class="rooster-tekst">Lesdagen: ${roosterTekst(k)}</p>
     ${komend.length ? `<ol class="lessen-lijst">${komend.map((l) => lesRegel(s, l, k.id)).join('')}</ol>` : '<p class="leeg">Geen komende lessen.</p>'}
     ${zonder ? `<p class="hint">${zonder} ${zonder === 1 ? 'les' : 'lessen'} zonder datum.</p>` : ''}
+    ${
+      todos.length || opdrachten.length
+        ? `<h3>To do's</h3>${opdrachten.length ? `<ol class="lessen-lijst">${opdrachten.map((o) => opdrachtRegel(s, o)).join('')}</ol>` : ''}${takenLijst(s, todos, '')}`
+        : ''
+    }
     <div class="knoppen">
       <a class="knop klein primair" href="#/klas/${k.id}">Open ${esc(k.naam)} →</a>
       <button class="knop klein" data-actie="nieuwe-les" data-klas="${k.id}">+ les</button>
@@ -76,7 +92,7 @@ export function viewKlassen(s) {
         <button class="knop primair" data-actie="nieuwe-taak" data-domein="school">+ to do</button>
       </div>
     </div>
-    <p class="hint">Wat je moet regelen, per onderwerp (bv. Stage, Vergaderingen). Iets groters deel je op in stukken ("+ met stukken"). Hoort iets bij een klas, duid die klas dan aan: het verschijnt ook op de pagina van de klas. Taken voor leerlingen voeg je toe bij een les of op de pagina van de klas.</p>
+    <p class="hint">Wat je moet regelen, per onderwerp (bv. Stage, Vergaderingen). Iets groters deel je op in stukken ("+ met stukken"). Hoort iets bij een klas, duid die klas dan aan: zonder onderwerp staat het dan enkel bij de klas, met een onderwerp ook hier. Taken voor leerlingen voeg je toe bij een les of op de pagina van de klas.</p>
     ${
       onderwerpen.length || zonder
         ? `<div class="groepen">${onderwerpen.map((o) => onderwerpKaart(s, o)).join('')}${zonder || !onderwerpen.length ? onderwerpKaart(s, null) : ''}</div>`

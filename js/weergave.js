@@ -67,6 +67,8 @@ export function anker(s, taak) {
   }
   const ond = M.onderwerpVan(s, taak);
   if (ond) return { kleur: ond.kleur, label: ond.naam, titel: '' };
+  const klas = (taak.klasIds || []).map((id) => s.klassen[id]).find((k) => k && !k.del);
+  if (klas && M.domeinVan(taak) === 'school') return { kleur: klas.kleur, label: klassenNaam(s, taak.klasIds), titel: '' };
   return { kleur: M.domeinVan(taak) === 'opleiding' ? 'var(--fuchsia)' : 'var(--rand-sterk)', label: '', titel: '' };
 }
 

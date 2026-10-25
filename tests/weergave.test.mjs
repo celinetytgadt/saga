@@ -105,7 +105,7 @@ test('afspraak op Vandaag: met het uur als dat er is', async () => {
   assert.equal(afspraakUur({ datum: plus(-1), eindDatum: plus(1), tijd: '18:00', eindTijd: '10:00' }, V), 'hele dag');
 });
 
-test('Vandaag: geen dubbels tussen Belangrijk en Magjes; verbeteren vanaf de dag na het indienen', async () => {
+test('Vandaag: deadline vandaag bovenaan, blok per klas en per onderwerp, geen dubbels met de magjes', async () => {
   const { viewVandaag } = await import('../js/views/vandaag.js');
   const v = M.vandaag();
   const s = basis();
@@ -115,22 +115,32 @@ test('Vandaag: geen dubbels tussen Belangrijk en Magjes; verbeteren vanaf de dag
   s.taken['h-l1'] = todo('h-l1', { titel: '', lesId: 'l1', hoofd: true, werkdag: M.plusDagen(v, -1), deadline: { rel: -1, nietOpWerkdag: true } });
   s.taken.cr = todo('cr', { titel: 'Balans', soort: 'verbeteren', indien: M.plusDagen(v, -3), klasIds: ['k1'], werkdag: M.plusDagen(v, -2) });
   s.taken.later = todo('later', { titel: 'Nog niet', soort: 'verbeteren', indien: v, klasIds: ['k1'] });
-  s.taken.cursus = todo('cursus', { titel: 'Cursus schrijven', klasIds: ['k1'], werkdag: v });
+  s.taken.cursus = todo('cursus', { titel: 'Cursus schrijven', klasIds: ['k1'], deadline: { datum: M.plusDagen(v, 5) } });
+  s.taken.verre = todo('verre', { titel: 'Toets maken', klasIds: ['k1'], deadline: { datum: M.plusDagen(v, 10) } });
   s.onderwerpen.o1 = { id: 'o1', naam: 'Stage', kleur: '#5bbba4', upd: 1 };
   s.taken.st = todo('st', { titel: 'Stagebrief', onderwerpId: 'o1', deadline: { datum: v } });
+  s.taken.st2 = todo('st2', { titel: 'Bedrijven bellen', onderwerpId: 'o1', deadline: { datum: M.plusDagen(v, 3) } });
   s.taken.los = todo('los', { titel: 'Los' });
   const html = viewVandaag(s);
   const [belangrijk, rest] = html.split('<h2>Magjes</h2>');
   const telt = (deel, id) => deel.split(`data-actie="vink" data-id="${id}"`).length - 1;
-  for (const id of ['h-l1', 'cr', 'cursus', 'st']) {
+  for (const id of ['h-l1', 'cr', 'cursus', 'st', 'st2']) {
     assert.equal(telt(belangrijk, id), 1, id);
     assert.equal(telt(rest, id), 0, id);
   }
-  assert.equal(telt(belangrijk, 'later'), 0); // pas morgen
-  assert.equal(telt(belangrijk, 'los'), 0);
-  assert.equal(telt(rest, 'los'), 1);
-  assert.match(belangrijk, /<h3>Verbeteren<\/h3>/);
-  assert.match(belangrijk, /kop-onderwerp[^>]*>Stage</);
-  // magjes hebben ook een startknop
+  assert.equal(telt(html, 'later'), 0); // pas vanaf morgen (dag na het indienen)
+  for (const id of ['verre', 'los']) {
+    assert.equal(telt(belangrijk, id), 0, id);
+    assert.equal(telt(rest, id), 1, id);
+  }
+  // deadline vandaag staat boven de blokken; blok BKH4 met voorbereiding, verbeteren en to do
+  const dl = belangrijk.indexOf('Deadline vandaag');
+  const klas = belangrijk.indexOf('kop-blok" style="--klas:#123b78">BKH4<');
+  const stage = belangrijk.indexOf('>Stage</h3>');
+  assert.ok(dl > 0 && dl < belangrijk.indexOf('data-id="st"') && belangrijk.indexOf('data-id="st"') < klas, 'deadline bovenaan');
+  assert.ok(klas < belangrijk.indexOf('data-id="h-l1"') && belangrijk.indexOf('data-id="cursus"') < stage, 'blok per klas, dan onderwerp');
+  // magjes per klas of onderwerp, met een startknop
+  assert.match(rest, /kop-blok[^>]*>BKH4</);
+  assert.match(rest, /kop-blok[^>]*>Zonder onderwerp</);
   assert.match(rest.slice(rest.indexOf('data-id="los"')), /data-actie="timer" data-id="los"/);
 });

@@ -303,10 +303,12 @@ const acties = {
     if (!t) return;
     metOngedaan(`"${taakTitel(getState(), t)}" staat op vandaag`, (s) => M.zetWerkdag(s, t.id, M.vandaag()));
   },
-  // Alles wat bleef liggen opnieuw verdelen over de komende vrije dagen.
-  herplan() {
+  // Alles wat bleef liggen opnieuw verdelen over de komende vrije dagen
+  // (op Vandaag enkel wat bij de magjes staat: `data-ids`).
+  herplan(el) {
     const s = getState();
-    const plan = M.herplanPlan(s, bakjeVoorFilter(s).liggen);
+    const ids = el?.dataset.ids?.split(',');
+    const plan = M.herplanPlan(s, ids ? ids.map((id) => s.taken[id]).filter(Boolean) : bakjeVoorFilter(s).liggen);
     if (!plan.length) return;
     const laatste = plan.map((p) => p.datum).sort().at(-1);
     metOngedaan(`${plan.length} ${plan.length === 1 ? 'blokje' : 'blokjes'} herpland tot ${M.kortDatum(laatste)}`, (st) => M.pasHerplanToe(st, plan));

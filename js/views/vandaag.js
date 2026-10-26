@@ -5,13 +5,14 @@
 //    lopende verbeteringen, to do's met een deadline binnen een week of gepland vandaag)
 //    en dan een blok per ander onderwerp (to do's met een deadline binnen een week of
 //    gepland vandaag);
-// 2. Magjes: wat bleef liggen en wat in het bakje zit, per klas of onderwerp;
+// 2. Magjes: wat bleef liggen en wat in het bakje zit, per klas of onderwerp; onderaan
+//    de Classroom-taken van meer dan een maand geleden die nog niet afgewerkt zijn;
 // 3. Gedaan: wat je vandaag afvinkte.
 // Een taak staat in maar één kolom: wat bij Belangrijk staat, staat niet bij de magjes.
 
 import * as M from '../model.js';
 import { esc, GRIJS, ui } from '../ui.js';
-import { anker, bakje, klasLabel, klasStijl, lesVan, opdrachtStijl, snelInvoerHtml, sorteerLessen, sorteerTaken, taakTitel, tijdLabel, voortgang } from '../weergave.js';
+import { anker, bakje, klasLabel, klasStijl, lesVan, opdrachtStijl, snelInvoerHtml, sorteerLessen, sorteerTaken, taakTitel, tijdLabel, verbeterTekst, voortgang } from '../weergave.js';
 
 // Kleine timerknop: starten, of pauzeren met de lopende klok erbij.
 function timerKnop(t) {
@@ -91,6 +92,7 @@ function verbeterRij(s, t) {
   const dl = M.deadlineVan(s, t);
   const sub = [
     a.titel && esc(a.titel),
+    verbeterTekst(s, t),
     ingediend && `ingediend ${M.kortDatum(ingediend)}`,
     dl && `⚑ ${M.kortDatum(dl)}`,
     tijdLabel(t),
@@ -152,7 +154,10 @@ export function viewVandaag(s) {
   );
 
   const gedaan = M.gedaanOp(s, v).sort((a, b) => (b.klaarOp || 0) - (a.klaarOp || 0));
-  const open = M.lijst(s, 'taken').filter((t) => !t.klaar);
+  const alleOpen = M.lijst(s, 'taken').filter((t) => !t.klaar);
+  // Classroom-taken van meer dan een maand geleden: enkel in hun bakje onderaan de magjes
+  const oud = alleOpen.filter((t) => M.isOudeClassroomTaak(t, v)).sort((a, b) => a.indien.localeCompare(b.indien));
+  const open = alleOpen.filter((t) => !M.isOudeClassroomTaak(t, v));
   // voorbereiding van een les: staat bij de lessen van de volgende werkdagen (of als je ze vandaag plande)
   const isVoorb = (t) => !!t.lesId && !M.isVerbeteren(t) && (t.hoofd || !!t.deelGroep);
   // taak bij een les die al gegeven is (geen verbeteren): telt niet meer
@@ -253,6 +258,11 @@ export function viewVandaag(s) {
         }
         ${magjesHtml || '<p class="leeg">Niets te kiezen: alles staat ingepland. 🌿</p>'}
         ${b.later ? `<p class="hint">Nog ${b.later} voor later: zie <a href="#/klassen">School</a> en <a href="#/opleiding">Opleiding</a>.</p>` : ''}
+        ${
+          oud.length
+            ? `<div class="oud-classroom"><h3>Nog niet afgewerkte Classroom-taken (${oud.length})</h3>${blokken(s, oud, (t) => verbeterRij(s, t))}</div>`
+            : ''
+        }
       </section>
 
       <section class="kaart compact gedaan-kaart">

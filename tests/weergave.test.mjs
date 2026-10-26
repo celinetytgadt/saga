@@ -148,3 +148,13 @@ test('Vandaag: deadline vandaag of morgen bovenaan, blok per klas en per onderwe
   assert.match(rest, /kop-blok[^>]*>Zonder onderwerp</);
   assert.match(rest.slice(rest.indexOf('data-id="los"')), /data-actie="timer" data-id="los"/);
 });
+
+test('oude Classroom-taak telt niet als "bleef liggen" en toont wie nog moet', () => {
+  const s = basis();
+  s.klassen.k1.leerlingen = ['Amira', 'Bram'];
+  s.taken.oud = todo('oud', { soort: 'verbeteren', klasIds: ['k1'], indien: plus(-40), verbeterd: ['k1|Bram'] });
+  s.taken.recent = todo('recent', { soort: 'verbeteren', klasIds: ['k1'], indien: plus(-10) });
+  assert.deepEqual(W.blijvenLiggen(s, V).map((t) => t.id), ['recent']);
+  assert.equal(W.verbeterTekst(s, s.taken.oud), '1/2 verbeterd · nog: Amira');
+  assert.equal(W.verbeterTekst(s, s.taken.recent), '0/2 verbeterd · nog: Amira, Bram');
+});

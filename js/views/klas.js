@@ -93,7 +93,9 @@ export function viewKlas(s, id) {
         <button class="knop klein" data-actie="klas-bewerk" data-id="${k.id}">Bewerken</button>
       </div>
     </div>
-    <p class="rooster-tekst">Lesdagen: ${roosterTekst(k)}</p>
+    <p class="rooster-tekst">Lesdagen: ${roosterTekst(k)} · ${
+      (k.leerlingen || []).length ? `${k.leerlingen.length} leerlingen` : '<button class="chip" data-actie="klas-bewerk" data-id="' + k.id + '">+ leerlingen</button>'
+    }</p>
     <div class="groepen">
       ${volgendeLesKaart(s, k, komend[0])}
       ${openWerkKaart(s, k)}

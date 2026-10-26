@@ -995,3 +995,37 @@ test('ochtendmail: de dag in een paar regels (Code.gs)', () => {
   assert.equal(brief.onderwerp, 'do 15 okt · 2 gepland, 1 les voor te bereiden');
   assert.equal(ctx.dagBriefje_({ instellingen: { werkdagen: [] } }, '2026-10-15'), null);
 });
+
+test('leerlingen plakken: regels of komma\'s, zonder lege of dubbele namen', () => {
+  assert.deepEqual(M.leesLeerlingen('Amira\n Bram ,Lotte\n\nAmira;  Jan  Piet'), ['Amira', 'Bram', 'Lotte', 'Jan Piet']);
+  assert.deepEqual(M.leesLeerlingen(''), []);
+});
+
+test('verbeterd aanvinken per leerling, ook bij een les met twee klassen', () => {
+  const s = basis();
+  s.klassen.k1.leerlingen = ['Amira', 'Bram', 'Lotte'];
+  s.klassen.k2 = { id: 'k2', naam: 'BKH3', kleur: '#5bbba4', leerlingen: ['Bram'], upd: 1 };
+  s.lessen.l1.klasIds = ['k1', 'k2'];
+  M.bewaarLeerlingTaak(s, 'lt', { titel: 'Oefening', lesId: 'l1', indien: '2026-10-16' });
+  assert.deepEqual(M.verbeterStand(s, s.taken.lt), { totaal: 4, klaar: 0, nog: ['Amira (BKH4)', 'Bram (BKH4)', 'Lotte (BKH4)', 'Bram (BKH3)'] });
+  M.zetLeerlingVerbeterd(s, 'lt', 'k1|Bram', true);
+  M.zetLeerlingVerbeterd(s, 'lt', 'k2|Bram', true);
+  M.zetLeerlingVerbeterd(s, 'lt', 'k1|Lotte', true);
+  M.zetLeerlingVerbeterd(s, 'lt', 'k1|Lotte', false);
+  assert.deepEqual(M.verbeterStand(s, s.taken.lt).nog, ['Amira (BKH4)', 'Lotte (BKH4)']);
+  // opnieuw bewaren in het taakvenster laat de vinkjes staan
+  M.bewaarLeerlingTaak(s, 'lt', { titel: 'Oefening 2', lesId: 'l1', indien: '2026-10-16' });
+  assert.deepEqual(s.taken.lt.verbeterd, ['k1|Bram', 'k2|Bram']);
+  // een leerling die uit de klas verdwijnt telt niet meer mee
+  s.klassen.k1.leerlingen = ['Amira', 'Bram'];
+  s.lessen.l1.klasIds = ['k1'];
+  assert.deepEqual(M.verbeterStand(s, s.taken.lt), { totaal: 2, klaar: 1, nog: ['Amira'] });
+});
+
+test('Classroom-taak is oud als het indienen meer dan een maand geleden is', () => {
+  const t = { id: 'x', soort: 'verbeteren', indien: '2026-09-25', klaar: false };
+  assert.equal(M.isOudeClassroomTaak(t, '2026-10-25'), false); // precies 30 dagen
+  assert.equal(M.isOudeClassroomTaak(t, '2026-10-26'), true);
+  assert.equal(M.isOudeClassroomTaak({ ...t, klaar: true }, '2026-10-26'), false);
+  assert.equal(M.isOudeClassroomTaak({ ...t, indien: undefined }, '2026-10-26'), false);
+});

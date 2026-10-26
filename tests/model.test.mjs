@@ -831,7 +831,7 @@ test('Code.gs: zelfde archiefregels; sync geeft enkel actieve data, "alles" de v
   ctx.agendaInfo_ = () => null;
   const post = (actie) => ctx.doPost({ postData: { contents: JSON.stringify({ actie, token: 'geheim', data: { taken: { nieuw: { id: 'nieuw', titel: 'n', upd: 5 } } } }) } });
   const sync = post('sync');
-  assert.equal(sync.scriptVersie, 11);
+  assert.equal(sync.scriptVersie, 12);
   assert.equal(sync.data.lessen.l1, undefined); // oude les blijft op Drive, niet op het toestel
   assert.ok(sync.data.taken.open && sync.data.taken.nieuw);
   const alles = post('alles');
@@ -976,24 +976,6 @@ test('afvinken onthoudt wanneer, voor "vandaag gedaan"', () => {
   assert.equal(s.taken.t.klaarOp, null);
   M.bewaarTaak(s, 't', { klaar: true });
   assert.ok(s.taken.t.klaarOp);
-});
-
-test('ochtendmail: de dag in een paar regels (Code.gs)', () => {
-  const ctx = {};
-  vm.createContext(ctx);
-  vm.runInContext(fs.readFileSync(new URL('../apps-script/Code.gs', import.meta.url), 'utf8'), ctx);
-  const s = basis(); // werkdagen di en vr, les l1 op do 15 okt
-  s.lessen.l2 = { id: 'l2', klasIds: ['k1'], titel: 'Verkoopfactuur', datum: '2026-10-16', upd: 1 }; // vrijdag = werkdag
-  M.zorgHoofdtaken(s);
-  M.bewaarLeerlingTaak(s, null, { titel: 'Oefening', lesId: 'l1', indien: '2026-10-14' });
-  s.taken.oud = { id: 'oud', titel: 'Mails', domein: 'school', werkdag: '2026-10-10', klaar: false, upd: 1 };
-  const brief = ctx.dagBriefje_(JSON.parse(JSON.stringify(s)), '2026-10-15');
-  // de voorbereiding van vrijdag staat op donderdag (dag vóór de les, geen werkdag)
-  assert.match(brief.tekst, /Gepland voor vandaag:\n {2}○ Verkoopfactuur\n {2}○ Verbeteren CR: Oefening/);
-  assert.match(brief.tekst, /Nog voor te bereiden:\n {2}○ vr 16 okt · BKH4 · Verkoopfactuur/);
-  assert.match(brief.tekst, /2 blokjes bleven liggen/); // to do + voorbereiding van de les van vandaag
-  assert.equal(brief.onderwerp, 'do 15 okt · 2 gepland, 1 les voor te bereiden');
-  assert.equal(ctx.dagBriefje_({ instellingen: { werkdagen: [] } }, '2026-10-15'), null);
 });
 
 test('leerlingen plakken: regels of komma\'s, zonder lege of dubbele namen', () => {

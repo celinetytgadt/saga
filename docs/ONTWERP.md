@@ -193,7 +193,7 @@ In het overzicht: "BKH3-K2 + K3" met de kleuren van beide klassen.
 
 **Afvinken beloont**: een klein vinkje-animatie, "al 3 vandaag" in de melding, en bovenaan Vandaag wat je vandaag al afvinkte (`klaarOp`).
 
-**Ochtendmail** (aan te zetten bij Instellingen → Planning, script versie 8): rond 6 uur een mail met wat gepland staat, welke lessen je nog moet voorbereiden, wat er ingediend wordt en wat bleef liggen. Enkel als er iets te melden is.
+~~**Ochtendmail**~~: weggehaald in script versie 12 (te veel mails). Vandaag is het overzicht van de dag.
 
 ## 3. Regels
 

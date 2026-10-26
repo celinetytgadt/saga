@@ -105,7 +105,7 @@ test('afspraak op Vandaag: met het uur als dat er is', async () => {
   assert.equal(afspraakUur({ datum: plus(-1), eindDatum: plus(1), tijd: '18:00', eindTijd: '10:00' }, V), 'hele dag');
 });
 
-test('Vandaag: deadline vandaag bovenaan, blok per klas en per onderwerp, geen dubbels met de magjes', async () => {
+test('Vandaag: deadline vandaag of morgen bovenaan, blok per klas en per onderwerp, geen dubbels met de magjes', async () => {
   const { viewVandaag } = await import('../js/views/vandaag.js');
   const v = M.vandaag();
   const s = basis();
@@ -121,6 +121,7 @@ test('Vandaag: deadline vandaag bovenaan, blok per klas en per onderwerp, geen d
   s.taken.st = todo('st', { titel: 'Stagebrief', onderwerpId: 'o1', deadline: { datum: v } });
   s.taken.st2 = todo('st2', { titel: 'Bedrijven bellen', onderwerpId: 'o1', deadline: { datum: M.plusDagen(v, 3) } });
   s.taken.los = todo('los', { titel: 'Los' });
+  s.taken.mg = todo('mg', { titel: 'Kopies', klasIds: ['k1'], deadline: { datum: M.plusDagen(v, 1) } });
   const html = viewVandaag(s);
   const [belangrijk, rest] = html.split('<h2>Magjes</h2>');
   const telt = (deel, id) => deel.split(`data-actie="vink" data-id="${id}"`).length - 1;
@@ -134,11 +135,14 @@ test('Vandaag: deadline vandaag bovenaan, blok per klas en per onderwerp, geen d
     assert.equal(telt(rest, id), 1, id);
   }
   // deadline vandaag staat boven de blokken; blok BKH4 met voorbereiding, verbeteren en to do
-  const dl = belangrijk.indexOf('Deadline vandaag');
+  const dl = belangrijk.indexOf('Deadline vandaag of morgen');
   const klas = belangrijk.indexOf('kop-blok" style="--klas:#123b78">BKH4<');
   const stage = belangrijk.indexOf('>Stage</h3>');
   assert.ok(dl > 0 && dl < belangrijk.indexOf('data-id="st"') && belangrijk.indexOf('data-id="st"') < klas, 'deadline bovenaan');
-  assert.ok(klas < belangrijk.indexOf('data-id="h-l1"') && belangrijk.indexOf('data-id="cursus"') < stage, 'blok per klas, dan onderwerp');
+  assert.ok(dl < belangrijk.indexOf('data-id="h-l1"') && belangrijk.indexOf('data-id="h-l1"') < klas, 'voorbereiding van de les van morgen in het rode vlak');
+  assert.ok(klas < belangrijk.indexOf('data-id="cr"') && belangrijk.indexOf('data-id="cursus"') < stage, 'blok per klas, dan onderwerp');
+  assert.ok(dl < belangrijk.indexOf('data-id="mg"') && belangrijk.indexOf('data-id="mg"') < klas, 'deadline morgen in het rode vlak');
+  assert.ok(belangrijk.indexOf('data-id="st2"') > stage, 'deadline over 3 dagen: in het blok, niet in het rode vlak');
   // magjes per klas of onderwerp, met een startknop
   assert.match(rest, /kop-blok[^>]*>BKH4</);
   assert.match(rest, /kop-blok[^>]*>Zonder onderwerp</);

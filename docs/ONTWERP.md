@@ -230,7 +230,7 @@ Afwezigheden beheren, standaardtaken beheren, vaste werkdagen instellen.
   - `#sw` → verschijnt in Saga **én** telt als extra werkdag (evaluatiedag, pedagogische studiedag).
 - De code moet als los woord staan: `#school` of `#sport` tellen niet mee.
 - De code wordt in Saga niet getoond ("Tandarts", niet "Tandarts #s").
-- Een **achterliggende sync** draait **1 keer per dag** ('s nachts, rond 5u) en leest de agenda voor de komende 60 dagen. Enkel afspraken met de code worden overgenomen, al de rest wordt genegeerd.
+- Een **achterliggende sync** draait **1 keer per dag** ('s nachts, rond 5u) en leest de agenda voor het komende jaar (vroeger 75 dagen; te kort voor de lesdagen van een opleiding). Enkel afspraken met de code worden overgenomen, al de rest wordt genegeerd.
 - **Extra agenda's** (bv. de agenda van de opleiding): in Instellingen → *Agenda's* staat een lijst van de andere agenda's die het script ziet. Wat je aanvinkt, komt **volledig** in Saga, zonder codes; de naam van de agenda staat klein naast de afspraak op Vandaag. Ze tellen niet als werkdag (tenzij met `#sw`). De keuze (`instellingen.extraAgendas`, ids) gaat mee met de synchronisatie, zodat het nachtelijke script ze kent. Aan- of uitvinken leest de agenda meteen opnieuw in. Staat een afspraak in de hoofdagenda én een extra agenda, dan maar één keer. Vereist script versie 10.
 - Wie niet wil wachten: knop **"agenda nu vernieuwen"** in de instellingen (kaart *Agenda's*).
 - Alleen lezen: de planner schrijft nooit in de agenda.

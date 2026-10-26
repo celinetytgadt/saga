@@ -831,7 +831,7 @@ test('Code.gs: zelfde archiefregels; sync geeft enkel actieve data, "alles" de v
   ctx.agendaInfo_ = () => null;
   const post = (actie) => ctx.doPost({ postData: { contents: JSON.stringify({ actie, token: 'geheim', data: { taken: { nieuw: { id: 'nieuw', titel: 'n', upd: 5 } } } }) } });
   const sync = post('sync');
-  assert.equal(sync.scriptVersie, 10);
+  assert.equal(sync.scriptVersie, 11);
   assert.equal(sync.data.lessen.l1, undefined); // oude les blijft op Drive, niet op het toestel
   assert.ok(sync.data.taken.open && sync.data.taken.nieuw);
   const alles = post('alles');

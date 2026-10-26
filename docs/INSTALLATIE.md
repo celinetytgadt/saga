@@ -79,11 +79,10 @@ Doe dit op je laptop én op je gsm.
 ## Het script bijwerken
 
 Als er een nieuwe versie van `Code.gs` is (Saga meldt dan "het Google-script is verouderd").
-Dat is nu het geval: de nieuwste is **versie 11**. Versie 8 is nodig voor de **ochtendmail**, versie 9 leest ook het **einduur**
+Dat is nu het geval: de nieuwste is **versie 12**. Versie 9 leest ook het **einduur**
 van een afspraak (op Vandaag zie je dan "14:00–15:30" in plaats van "14:00"), versie 10 is nodig voor **extra agenda's**
-(bv. die van je opleiding, zie "Agenda" hieronder), versie 11 leest een jaar vooruit in plaats van 75 dagen. Versie 7 volstaat voor de rest.
-Bij **installeer** vraagt Google dan ook toestemming om *e-mail te versturen als jou* (enkel naar jezelf, voor de ochtendmail)
-en om *je e-mailadres te zien* (om te weten naar waar).
+(bv. die van je opleiding, zie "Agenda" hieronder), versie 11 leest een jaar vooruit in plaats van 75 dagen, versie 12 haalt de ochtendmail weg
+(en de toestemming om e-mail te versturen; **installeer** ruimt de oude dagelijkse mail op). Versie 7 volstaat voor de rest.
 
 1. Open je project op <https://script.google.com>.
 2. Wis alles in `Code.gs`, plak de nieuwe inhoud van [`apps-script/Code.gs`](../apps-script/Code.gs) en klik op het **diskette-icoon**.
@@ -108,12 +107,6 @@ trek die dan eerst in, zodat enkel de beperkte rechten overblijven:
 
 Saga maakt dan een nieuwe map **Saga** op je Drive. Je planning gaat niet verloren: die staat op je toestellen en wordt bij
 de volgende synchronisatie opnieuw bewaard. De oude map Saga mag je daarna weggooien.
-
-## Ochtendmail
-
-- Zet ze aan in Saga: **Instellingen → Planning → Ochtendmail**. Ze komt rond 6 uur, enkel als er iets te melden is.
-- Testen: kies in de script-editor de functie **testOchtendMail** en klik **Uitvoeren**. Je krijgt meteen een mail.
-- De link in de mail staat bovenaan in `Code.gs` (`APP_URL`).
 
 ## Agenda
 

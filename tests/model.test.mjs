@@ -305,6 +305,7 @@ test('Code.gs leest enkel afspraken met #s of #sw', () => {
     ev('Uitstap #s', '', dag(23), dag(25), true),
     ev('#school feest', '', dag(15, 10), dag(15, 11)),
   ];
+  const opleiding = [ev('Seminarie didactiek', '', dag(16, 18), dag(16, 21)), ev('Tandarts #s', '', dag(14, 16, 30), dag(14, 17))];
   const ctx = {
     Date,
     Session: { getScriptTimeZone: () => 'Europe/Brussels' },
@@ -312,8 +313,9 @@ test('Code.gs leest enkel afspraken met #s of #sw', () => {
     CalendarApp: {
       getDefaultCalendar: () => ({ getTimeZone: () => 'Europe/Brussels' }),
       getAllCalendars: () => [
-        { getName: () => 'Hoofdagenda', getEvents: () => [] },
-        { getName: () => 'De  zottekes ', getEvents: () => agenda },
+        { getId: () => 'hoofd@x', getName: () => 'Hoofdagenda', getEvents: () => [] },
+        { getId: () => 'zot@x', getName: () => 'De  zottekes ', getEvents: () => agenda },
+        { getId: () => 'opl@x', getName: () => 'Opleiding', getEvents: () => opleiding },
       ],
     },
   };
@@ -342,6 +344,53 @@ test('Code.gs leest enkel afspraken met #s of #sw', () => {
   const weg = JSON.parse(JSON.stringify(ctx.leesAgenda_(r)));
   assert.deepEqual(weg.afspraken, r);
   assert.match(weg.info.fout, /niet gevonden\. Het script ziet: Hoofdagenda, De  zottekes/);
+});
+
+test('Code.gs leest alle afspraken uit een aangevinkte extra agenda', () => {
+  const ev = (titel, d, u, id = titel) => ({
+    getId: () => id,
+    getTitle: () => titel,
+    getDescription: () => '',
+    isAllDayEvent: () => false,
+    getStartTime: () => new Date(2026, 9, d, u),
+    getEndTime: () => new Date(2026, 9, d, u + 2),
+  });
+  const fmt = (d, tz, p) => {
+    const z = (n) => String(n).padStart(2, '0');
+    return p === 'HH:mm' ? `${z(d.getHours())}:${z(d.getMinutes())}` : `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
+  };
+  const kal = (id, naam, evs) => ({ getId: () => id, getName: () => naam, getEvents: () => evs });
+  const ctx = {
+    Date,
+    Session: { getScriptTimeZone: () => 'Europe/Brussels' },
+    Utilities: { formatDate: fmt },
+    CalendarApp: {
+      getDefaultCalendar: () => ({ getTimeZone: () => 'Europe/Brussels' }),
+      getAllCalendars: () => [
+        kal('zot@x', 'De Zottekes', [ev('Tandarts #s', 14, 16), ev('Poetsvrouw', 14, 9), ev('Seminarie #s', 16, 18, 'sem')]),
+        kal('opl@x', 'Opleiding', [ev('Seminarie', 16, 18, 'sem'), ev('Intervisie', 20, 9), ev('Stagedag #sw', 22, 8)]),
+        kal('fees@x', 'Feestdagen', [ev('Allerheiligen', 1, 0)]),
+      ],
+    },
+  };
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(new URL('../apps-script/Code.gs', import.meta.url), 'utf8'), ctx);
+  const zonder = JSON.parse(JSON.stringify(ctx.leesAgenda_({})));
+  assert.deepEqual(zonder.info.alle, [{ id: 'opl@x', naam: 'Opleiding' }, { id: 'fees@x', naam: 'Feestdagen' }]);
+  assert.deepEqual(Object.values(zonder.afspraken).map((a) => a.titel).sort(), ['Seminarie', 'Tandarts']);
+
+  const res = JSON.parse(JSON.stringify(ctx.leesAgenda_(zonder.afspraken, ['opl@x'])));
+  assert.deepEqual([res.info.extra, res.info.aantal, res.info.aantalExtra], [['Opleiding'], 2, 2]);
+  const r = Object.values(res.afspraken).filter((a) => !a.del);
+  assert.deepEqual(r.map((a) => `${a.titel}|${a.agenda || ''}|${a.werk}`).sort(), [
+    'Intervisie|Opleiding|false',
+    'Seminarie||false', // ook in de hoofdagenda: één keer, zonder agendanaam
+    'Stagedag|Opleiding|true',
+    'Tandarts||false',
+  ]);
+  // weer uitgevinkt: de afspraken uit die agenda verdwijnen
+  const weg = JSON.parse(JSON.stringify(ctx.leesAgenda_(res.afspraken, [])));
+  assert.deepEqual(Object.values(weg.afspraken).filter((a) => !a.del).map((a) => a.titel).sort(), ['Seminarie', 'Tandarts']);
 });
 
 test('Code.gs bewaart op Drive met enkel eigen bestanden (nagemaakte Drive-API)', () => {
@@ -782,7 +831,7 @@ test('Code.gs: zelfde archiefregels; sync geeft enkel actieve data, "alles" de v
   ctx.agendaInfo_ = () => null;
   const post = (actie) => ctx.doPost({ postData: { contents: JSON.stringify({ actie, token: 'geheim', data: { taken: { nieuw: { id: 'nieuw', titel: 'n', upd: 5 } } } }) } });
   const sync = post('sync');
-  assert.equal(sync.scriptVersie, 9);
+  assert.equal(sync.scriptVersie, 10);
   assert.equal(sync.data.lessen.l1, undefined); // oude les blijft op Drive, niet op het toestel
   assert.ok(sync.data.taken.open && sync.data.taken.nieuw);
   const alles = post('alles');

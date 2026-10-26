@@ -513,6 +513,14 @@ document.addEventListener('change', (e) => {
     wijzig((s) => {
       s.instellingen = { ...s.instellingen, [el.dataset.instelling]: el.checked, upd: Date.now() };
     });
+  } else if (el.dataset.extraAgenda) {
+    // extra agenda aan- of uitvinken en meteen opnieuw inlezen
+    wijzig((s) => {
+      const lijst = (s.instellingen.extraAgendas || []).filter((id) => id !== el.dataset.extraAgenda);
+      if (el.checked) lijst.push(el.dataset.extraAgenda);
+      s.instellingen = { ...s.instellingen, extraAgendas: lijst, upd: Date.now() };
+    });
+    vernieuwAgenda();
   } else if (el.dataset.lokaal === 'verbergAfspraken') {
     zetVerbergAfspraken(el.checked);
   } else if (el.dataset.weergave === 'lessen') {

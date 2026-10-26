@@ -10,7 +10,22 @@ function agendaStatus(info) {
   const wanneer = new Date(info.tijd);
   const tijd = `${M.kortDatum(M.isoDatum(wanneer))} om ${wanneer.toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' })}`;
   if (info.fout) return `<p class="sync-tekst sync-fout">Agenda: ${esc(info.fout)} (${tijd}).</p>`;
-  return `<p class="sync-tekst">📅 Agenda ${esc(info.agendas.join(', '))} ingelezen op ${tijd}: ${info.aantal} ${info.aantal === 1 ? 'afspraak' : 'afspraken'} met #s of #sw.</p>`;
+  const afspraken = (n) => `${n} ${n === 1 ? 'afspraak' : 'afspraken'}`;
+  const extra = (info.extra || []).length ? `, en ${afspraken(info.aantalExtra || 0)} uit ${esc(info.extra.join(', '))}` : '';
+  return `<p class="sync-tekst">📅 Ingelezen op ${tijd}: ${afspraken(info.aantal)} met #s of #sw uit ${esc(info.agendas.join(', '))}${extra}.</p>`;
+}
+
+// Extra agenda's aanvinken: daaruit komen alle afspraken (zonder #s). Het script (versie 10) geeft de lijst door.
+function extraAgendas(s, sy) {
+  if ((sy.scriptVersie || 0) < 10)
+    return `<p class="hint">Wil je ook een andere agenda (bv. van je opleiding) volledig tonen? <b>Werk eerst het Google-script bij</b> naar versie 10 (zie de installatiegids, "Het script bijwerken"). Daarna kun je hier aanvinken welke.</p>`;
+  const lijst = sy.agenda?.alle || [];
+  if (!lijst.length) return '<p class="hint">Geen andere agenda\'s gevonden. Tik op "Agenda nu vernieuwen" als je er net een toevoegde.</p>';
+  const aan = s.instellingen.extraAgendas || [];
+  return `<p class="hint">Ook tonen, met al hun afspraken (zonder #s):</p>
+    ${lijst
+      .map((a) => `<label class="check"><input type="checkbox" data-extra-agenda="${esc(a.id)}" ${aan.includes(a.id) ? 'checked' : ''}> ${esc(a.naam)}</label>`)
+      .join('')}`;
 }
 
 export function viewInstellingen(s) {
@@ -86,13 +101,22 @@ export function viewInstellingen(s) {
         <label>Geheime sleutel<input name="token" type="password" autocomplete="off" value="${esc(sy.token)}"></label>
         <div class="knoppen">
           <button class="knop primair">Opslaan en synchroniseren</button>
-          ${sy.url ? '<button type="button" class="knop" data-actie="agenda">Agenda nu vernieuwen</button>' : ''}
         </div>
       </form>
-      ${agendaStatus(sy.agenda)}
-      <p class="hint">Agenda: afspraken met <b>#s</b> in de titel of beschrijving verschijnen in Saga, met <b>#sw</b> tellen ze ook als werkdag. Ze worden elke nacht ingelezen.</p>
       <p class="hint">Hoe je dit instelt: zie <a href="https://github.com/celinetytgadt/saga/blob/HEAD/docs/INSTALLATIE.md" target="_blank" rel="noopener">de installatiegids</a>.</p>
     </section>
+
+    ${
+      sy.url
+        ? `<section class="kaart" id="agendas">
+      <h2>Agenda's</h2>
+      <p class="hint">Afspraken met <b>#s</b> in de titel of beschrijving verschijnen in Saga, met <b>#sw</b> tellen ze ook als werkdag. Ze worden elke nacht ingelezen.</p>
+      ${agendaStatus(sy.agenda)}
+      ${extraAgendas(s, sy)}
+      <div class="knoppen"><button type="button" class="knop klein" data-actie="agenda">Agenda nu vernieuwen</button></div>
+    </section>`
+        : ''
+    }
 
     <section class="kaart">
       <h2>Back-up</h2>

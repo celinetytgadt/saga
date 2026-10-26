@@ -24,6 +24,7 @@ Eén gebruiker. Werkt op gsm en computer, met dezelfde gegevens.
 | `naam` | `BKH4` | |
 | `kleur` | `#3b82f6` | herkenbaar in het overzicht |
 | `lesrooster` | `[ma, do]` | weekdagen waarop de klas les heeft (max. 1 les per dag per klas), nodig om een reeks te laten opschuiven |
+| `leerlingen` | `["Amira", "Bram"]` | enkel voornamen (bij Bewerken plakken: één per regel of met komma's), om aan te vinken wie verbeterd is |
 
 ### Les
 | veld | voorbeeld | uitleg |
@@ -152,6 +153,14 @@ In het overzicht: "BKH3-K2 + K3" met de kleuren van beide klassen.
 - Op de indiendag staat een vlaggetje "⚑ Indienen: …". De dag erna staat **"Verbeteren CR: …"** op de planning (werkdag leeg = automatisch de dag na indienen); zelf verschuiven kan, "Standaard" zet het terug.
 - Klaarzetten in Classroom hoort bij de lesvoorbereiding (geen apart blokje).
 - Oudere verbetertaken (zonder `indien`) blijven gewone taken.
+
+**Leerlingen aanvinken** (`klas.leerlingen`, `taak.verbeterd`)
+- Per klas enkel **voornamen**, geen feedback of punten (privacy). Bij Bewerken van de klas plakken: één naam per regel of met komma's. Op de pagina van de klas staat "18 leerlingen" (of *+ leerlingen*).
+- In het venster van een taak voor leerlingen: **Wie is verbeterd? 12/18**, met een knop per leerling (per klas bij een les met meerdere klassen). Een tik bewaart meteen. Is iedereen aangevinkt, dan verschijnt *✓ Iedereen verbeterd: taak afvinken*.
+- `verbeterd` bewaart sleutels `klasId|naam`. Een leerling die uit de lijst verdwijnt, telt niet meer mee.
+- Op Vandaag en in de lijsten staat bij de taak "12/18 verbeterd · nog: Lars, Sara" (meer dan 5 open: enkel het aantal), zodat je ziet waarom een taak nog openstaat.
+
+**Nog niet afgewerkte Classroom-taken**: een taak voor leerlingen die nog niet afgevinkt is en waarvan het **indienen meer dan 30 dagen geleden** is, verhuist naar een eigen bakje **onderaan de Magjes**, per klas. Ze staat dan niet meer bij Belangrijk en telt niet meer als "bleef liggen" (ook niet in de teller op het tabblad).
 
 **Overzicht**
 - Vlaggetjes (einddeadlines, indiendagen, deadlines) staan **altijd onderaan** de dag.

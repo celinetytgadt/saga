@@ -438,6 +438,27 @@ function lesOpties(s, gekozen, klasIds = []) {
     .join('');
 }
 
+// Wie is verbeterd? Een knop per leerling (per klas als de taak voor meer klassen is).
+function leerlingenHtml(s, t) {
+  const groepen = M.leerlingenVanTaak(s, t);
+  if (!groepen.length) {
+    const klas = M.klassenVanTaak(s, t).map((k) => s.klassen[k]).find((k) => k && !k.del);
+    return klas ? `<p class="hint">Voeg bij <a href="#/klas/${klas.id}">${esc(klas.naam)}</a> (Bewerken) de voornamen toe om aan te vinken wie verbeterd is.</p>` : '';
+  }
+  const klaar = new Set(t.verbeterd || []);
+  const st = M.verbeterStand(s, t);
+  return `<fieldset class="leerlingen"><legend>Wie is verbeterd? <b>${st.klaar}/${st.totaal}</b></legend>
+    ${groepen
+      .map(
+        (g) => `${groepen.length > 1 ? `<h3 class="kop-blok" style="--klas:${g.klas.kleur}">${esc(g.klas.naam)}</h3>` : ''}<div class="leerling-knoppen">${g.leerlingen
+          .map((l) => `<button type="button" class="leerling ${klaar.has(l.sleutel) ? 'aan' : ''}" data-leerling="${esc(l.sleutel)}" aria-pressed="${klaar.has(l.sleutel)}">${klaar.has(l.sleutel) ? '✓ ' : ''}${esc(l.naam)}</button>`)
+          .join('')}</div>`
+      )
+      .join('')}
+    ${!st.nog.length && !t.klaar ? `<button type="button" class="knop primair" data-actie="vink" data-id="${t.id}" data-sluit-dlg>✓ Iedereen verbeterd: taak afvinken</button>` : ''}
+  </fieldset>`;
+}
+
 export function openLeerlingTaak(id, voorinvulling = {}, terug = null) {
   const s = getState();
   const t = id ? s.taken[id] : { titel: '', lesId: voorinvulling.lesId || null, klasIds: voorinvulling.klasIds || [], werkdag: null, notitie: '', klaar: false };
@@ -450,6 +471,7 @@ export function openLeerlingTaak(id, voorinvulling = {}, terug = null) {
     `<h2>${id ? esc(taakTitel(s, t)) : 'Nieuwe taak voor leerlingen'}</h2>
     ${id ? verplaatsHtml(M.werkdagVan(s, t), 'Standaard (dag na indienen)') : ''}
     ${id ? `<div class="timer-wrap">${timerHtml(t)}</div>` : ''}
+    ${id ? `<div class="leerlingen-wrap">${leerlingenHtml(s, t)}</div>` : ''}
     <form id="f-lt" class="formulier">
       <label>Taak<input name="titel" required value="${esc(t.titel)}" placeholder="bv. Oefening aankoopfactuur" ${id ? '' : 'autofocus'}></label>
       <label>Bij les <small>(optioneel)</small><select name="les"><option value="">— geen les —</option>${lesOpties(s, t.lesId, klasFilter)}</select></label>
@@ -498,6 +520,13 @@ export function openLeerlingTaak(id, voorinvulling = {}, terug = null) {
         sluit();
       });
       if (id) verplaatsKnoppen(d, id);
+      // leerlingen aanvinken bewaart meteen (ook als je het venster daarna wegklikt)
+      $('.leerlingen-wrap', d)?.addEventListener('click', (e) => {
+        const ll = e.target.closest('[data-leerling]');
+        if (!ll) return;
+        wijzig((st) => M.zetLeerlingVerbeterd(st, id, ll.dataset.leerling, ll.getAttribute('aria-pressed') !== 'true'));
+        $('.leerlingen-wrap', d).innerHTML = leerlingenHtml(getState(), getState().taken[id]);
+      });
       $('[data-sluit]', d).addEventListener('click', sluit);
       $('[data-weg]', d)?.addEventListener('click', () => {
         metOngedaan(`"${t.titel}" verwijderd`, (st) => M.wis(st, 'taken', id));
@@ -859,6 +888,8 @@ export function openKlas(id) {
       <fieldset><legend>Lesdagen <small>(max. 1 les per dag)</small></legend><div class="dagknoppen">${WEEK.map(
         (d) => `<label class="dagknop-check"><input type="checkbox" name="rooster" value="${d}" ${(k.rooster || []).includes(d) ? 'checked' : ''}><span>${M.DAGNAMEN[d]}</span></label>`
       ).join('')}</div></fieldset>
+      <label>Leerlingen <small>(voornamen, één per regel of met komma's)</small><textarea name="leerlingen" rows="4" placeholder="Amira&#10;Bram&#10;Lotte">${esc((k.leerlingen || []).join('\n'))}</textarea></label>
+      <p class="hint">Bij een taak voor leerlingen vink je zo aan wie verbeterd is. Enkel voornamen, geen feedback.</p>
       <div class="knoppen">
         ${id ? `<button type="button" class="knop gevaar" data-weg>Verwijderen</button>` : ''}
         <span class="vul"></span>
@@ -878,6 +909,7 @@ export function openKlas(id) {
             naam: fd.get('naam').trim(),
             kleur: fd.get('kleur') || k.kleur,
             rooster: fd.getAll('rooster').map(Number),
+            leerlingen: M.leesLeerlingen(fd.get('leerlingen')),
           })
         );
         sluit();

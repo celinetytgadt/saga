@@ -538,6 +538,55 @@ export function bewaarLeerlingTaak(state, id, { titel, lesId = null, klasIds = [
   return zet(state, 'taken', nieuw);
 }
 
+// ---------- leerlingen ----------
+// Per klas enkel voornamen (`klas.leerlingen`), geen feedback of punten. Bij een taak voor
+// leerlingen vink je aan wie verbeterd is (`taak.verbeterd`: sleutels 'klasId|naam'), zodat
+// je ziet waarom een oude taak nog openstaat. Na een maand (te rekenen vanaf het indienen)
+// verhuist een open taak naar het bakje "Nog niet afgewerkte Classroom-taken".
+
+// Plakken: één naam per regel of met komma's; lege en dubbele namen vallen weg.
+export function leesLeerlingen(tekst) {
+  const namen = String(tekst || '').split(/[\n,;]/).map((n) => n.trim().replace(/\s+/g, ' ')).filter(Boolean);
+  return [...new Set(namen)];
+}
+
+export const leerlingSleutel = (klasId, naam) => klasId + '|' + naam;
+
+// Leerlingen van de klas(sen) van een taak, per klas.
+export function leerlingenVanTaak(state, t) {
+  return klassenVanTaak(state, t)
+    .map((id) => state.klassen[id])
+    .filter((k) => k && !k.del && (k.leerlingen || []).length)
+    .map((k) => ({ klas: k, leerlingen: k.leerlingen.map((naam) => ({ naam, sleutel: leerlingSleutel(k.id, naam) })) }));
+}
+
+// Hoeveel leerlingen verbeterd zijn en wie nog niet (enkel wie nu in de klas staat).
+export function verbeterStand(state, t) {
+  const klaar = new Set(t.verbeterd || []);
+  const groepen = leerlingenVanTaak(state, t);
+  const alle = groepen.flatMap((g) => g.leerlingen);
+  const nog = alle.filter((l) => !klaar.has(l.sleutel)).map((l) => (groepen.length > 1 ? `${l.naam} (${klassenKort(state, l.sleutel)})` : l.naam));
+  return { totaal: alle.length, klaar: alle.length - nog.length, nog };
+}
+
+function klassenKort(state, sleutel) {
+  return state.klassen[sleutel.split('|')[0]]?.naam || '';
+}
+
+export function zetLeerlingVerbeterd(state, taakId, sleutel, aan) {
+  const t = state.taken[taakId];
+  if (!t || t.del) return;
+  const rest = (t.verbeterd || []).filter((x) => x !== sleutel);
+  zet(state, 'taken', { ...t, verbeterd: aan ? [...rest, sleutel] : rest });
+}
+
+export const OUD_CLASSROOM_DAGEN = 30;
+
+// Open taak voor leerlingen waarvan het indienen meer dan een maand geleden is.
+export function isOudeClassroomTaak(t, vandaagDatum = vandaag()) {
+  return isLeerlingTaak(t) && !t.klaar && !t.del && t.indien < plusDagen(vandaagDatum, -OUD_CLASSROOM_DAGEN);
+}
+
 // Een les opslaan (nieuw of gewijzigd). Een nieuwe les krijgt haar taak;
 // een verplaatste les neemt haar taak mee (tenzij die zelf verplaatst werd).
 export function bewaarLes(state, id, { klasIds, titel, datum }) {

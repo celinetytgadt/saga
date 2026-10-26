@@ -1121,3 +1121,27 @@ a.knop.primair { color: var(--accent-tekst); }
 .vlag-bol { width: 18px; text-align: center; color: var(--vlag); font-size: .85rem; }
 .afspraak-rij { border-left: 3px dotted var(--rand-sterk); padding-left: 14px !important; }
 .afspraak-uur { flex: none; min-width: 74px; font-weight: 600; font-size: .85rem; color: var(--accent); font-variant-numeric: tabular-nums; }
+
+/* Leerlingen aanvinken bij een taak voor leerlingen: grote knoppen, ook op de gsm */
+.leerlingen { margin: 10px 0 4px; }
+.leerlingen legend b { color: var(--accent); }
+.leerlingen h3.kop-blok { display: flex; align-items: center; gap: 6px; margin: 6px 0 0; font-size: .9rem; }
+.leerlingen h3.kop-blok::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: var(--klas); }
+.leerling-knoppen { display: flex; flex-wrap: wrap; gap: 6px; }
+.leerling {
+  border: 1px solid var(--rand-sterk);
+  background: var(--vlak);
+  color: var(--tekst);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: .9em;
+  cursor: pointer;
+  min-height: 34px;
+}
+.leerling.aan { background: var(--vandaag); border-color: var(--groen-tekst); color: var(--groen-tekst); font-weight: 600; }
+.leerlingen .knop.primair { align-self: flex-start; margin-top: 6px; }
+
+/* Bakje onderaan de magjes: Classroom-taken van meer dan een maand geleden */
+.oud-classroom { margin-top: 18px; padding-top: 10px; border-top: 1px dashed var(--rand-sterk); }
+.oud-classroom > h3 { color: var(--zacht); font-size: .95rem; margin: 0; }

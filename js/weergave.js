@@ -102,11 +102,12 @@ export function inTePlannen(s) {
 }
 
 // Taken van een vroegere dag die nog niet klaar zijn. De voorbereiding van een les die
-// al voorbij is, telt niet mee: die les is gegeven.
+// al voorbij is, telt niet mee: die les is gegeven. Een Classroom-taak van meer dan een
+// maand geleden ook niet: die staat in haar eigen bakje.
 export function blijvenLiggen(s, v = M.vandaag()) {
   return M.lijst(s, 'taken').filter((t) => {
     const wd = !t.klaar && M.werkdagVan(s, t);
-    if (!wd || wd >= v) return false;
+    if (!wd || wd >= v || M.isOudeClassroomTaak(t, v)) return false;
     const les = !M.isVerbeteren(t) && lesVan(s, t);
     return !(les && les.datum && les.datum < v);
   });
@@ -396,6 +397,14 @@ export function blokkenHtml(s, t) {
   return `<p class="hint">Blok ${t.deelNr} van ${t.deelVan}. Alle blokken:</p>${takenLijst(s, blokken, '', t.id)}`;
 }
 
+// Wie al verbeterd is: "12/18 verbeterd · nog: Anna, Bram" (meer dan 5 open: enkel het aantal).
+export function verbeterTekst(s, t) {
+  const st = M.verbeterStand(s, t);
+  if (!st.totaal) return '';
+  if (!st.nog.length) return `<b>iedereen verbeterd</b>`;
+  return `${st.klaar}/${st.totaal} verbeterd · ${st.nog.length > 5 ? `nog ${st.nog.length}` : `nog: ${esc(st.nog.join(', '))}`}`;
+}
+
 // Lijstje taken in een les- of opdrachtdialoog, met afvinken en openen.
 export function takenLijst(s, taken, terugAttr, huidigId = null) {
   return taken.length ? `<ul class="les-taken">${taken.map((t) => taakRij(s, t, terugAttr, huidigId)).join('')}</ul>` : '';
@@ -407,6 +416,7 @@ export function taakRij(s, t, terugAttr = '', huidigId = null) {
   const wd = M.werkdagVan(s, t);
   const info = [
     M.isLeerlingTaak(t) ? `indienen ${M.kortDatum(t.indien)}` : '',
+    !t.klaar && verbeterTekst(s, t),
     wd ? `${M.isLeerlingTaak(t) ? 'verbeteren' : 'gepland'}: ${M.kortDatum(wd)}${(t.hoofd || t.indien) && !t.werkdag ? ' (standaard)' : ''}` : 'in bakje',
     dl && !t.deadline?.eind && !t.lesId ? `⚑ ${M.kortDatum(dl)}` : '',
     tijdLabel(t),

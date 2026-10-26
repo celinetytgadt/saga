@@ -12,7 +12,7 @@ function agendaStatus(info) {
   if (info.fout) return `<p class="sync-tekst sync-fout">Agenda: ${esc(info.fout)} (${tijd}).</p>`;
   const afspraken = (n) => `${n} ${n === 1 ? 'afspraak' : 'afspraken'}`;
   const extra = (info.extra || []).length ? `, en ${afspraken(info.aantalExtra || 0)} uit ${esc(info.extra.join(', '))}` : '';
-  return `<p class="sync-tekst">📅 Ingelezen op ${tijd}: ${afspraken(info.aantal)} met #s of #sw uit ${esc(info.agendas.join(', '))}${extra}.</p>`;
+  return `<p class="sync-tekst">📅 Ingelezen op ${tijd}: ${afspraken(info.aantal)} met #s of #sw uit ${esc(info.agendas.join(', '))}${extra}${info.tot ? `, tot ${M.kortDatum(info.tot)} ${info.tot.slice(0, 4)}` : ''}.</p>`;
 }
 
 // Extra agenda's aanvinken: daaruit komen alle afspraken (zonder #s). Het script (versie 10) geeft de lijst door.

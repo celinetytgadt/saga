@@ -30,7 +30,7 @@ const BESTAND_NAAM = 'saga-data.json';
 const BACKUPS_HOUDEN = 14;
 
 // Verhogen bij elke wijziging die de app moet kennen; de app waarschuwt bij een oudere versie.
-const SCRIPT_VERSIE = 10;
+const SCRIPT_VERSIE = 11;
 
 // Welke agenda('s) gelezen worden, op naam (hoofdletters maken niet uit).
 // Leeg laten ([]) = alle agenda's die je in Google Agenda ziet.
@@ -40,7 +40,8 @@ const AGENDA_NAMEN = ['De Zottekes'];
 const APP_URL = 'https://celinetytgadt.github.io/saga/#/vandaag';
 
 const AGENDA_DAGEN_TERUG = 7;
-const AGENDA_DAGEN_VOORUIT = 75;
+// Een jaar vooruit: een opleiding plant haar lesdagen vaak maanden op voorhand.
+const AGENDA_DAGEN_VOORUIT = 365;
 // De code moet als los woord staan: #school of #sport tellen niet mee.
 const CODE_S = /(^|\s)#s(?=$|\s|[.,;:!?)\]])/i;
 const CODE_SW = /(^|\s)#sw(?=$|\s|[.,;:!?)\]])/i;
@@ -310,6 +311,7 @@ function leesAgenda_(oud, extra) {
   const extraAgendas = anderen.filter(function (c) { return extra.indexOf(c.getId()) !== -1; });
   const info = {
     tijd: stempel,
+    tot: Utilities.formatDate(tot, scriptTz, 'yyyy-MM-dd'),
     agendas: agendas.map(function (a) { return a.getName(); }),
     aantal: 0,
     fout: null,

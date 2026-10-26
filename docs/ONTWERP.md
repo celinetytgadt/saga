@@ -112,7 +112,7 @@ In het overzicht: "BKH3-K2 + K3" met de kleuren van beide klassen.
 - Rustiger lettertype (Open Sans voor tekst, Quicksand voor titels) en een instelbare **tekstgrootte** per toestel.
 - ~~Kalender per maand~~ → vervangen door **doorlopende weken** (zie "Na de review").
 - Deadlines van de opleiding: groen vlaggetje (school/losse taken: roze-rood).
-- Agenda: enkel de agenda **De Zottekes** (instelbaar in `AGENDA_NAMEN` in Code.gs).
+- Agenda: de agenda **De Zottekes** met codes (instelbaar in `AGENDA_NAMEN` in Code.gs), plus **extra agenda's** die je in Instellingen → Agenda's aanvinkt (zie §5).
 
 ### Vereenvoudiging (na gebruik)
 - **Eén taak per les**, met de naam van de les (id `h-<les>`), getint in de klaskleur. Standaard staat ze op de dag vóór de les (verder terug als dat een werkdag is) en schuift ze mee met de les; eens verplaatst blijft ze staan. "Standaard" zet ze terug. Geen standaardtaken meer; oude (lesvoorbereiding, CR-taak, prints) zijn opgegaan in die ene taak.
@@ -231,7 +231,8 @@ Afwezigheden beheren, standaardtaken beheren, vaste werkdagen instellen.
 - De code moet als los woord staan: `#school` of `#sport` tellen niet mee.
 - De code wordt in Saga niet getoond ("Tandarts", niet "Tandarts #s").
 - Een **achterliggende sync** draait **1 keer per dag** ('s nachts, rond 5u) en leest de agenda voor de komende 60 dagen. Enkel afspraken met de code worden overgenomen, al de rest wordt genegeerd.
-- Wie niet wil wachten: knop **"agenda nu vernieuwen"** in de instellingen.
+- **Extra agenda's** (bv. de agenda van de opleiding): in Instellingen → *Agenda's* staat een lijst van de andere agenda's die het script ziet. Wat je aanvinkt, komt **volledig** in Saga, zonder codes; de naam van de agenda staat klein naast de afspraak op Vandaag. Ze tellen niet als werkdag (tenzij met `#sw`). De keuze (`instellingen.extraAgendas`, ids) gaat mee met de synchronisatie, zodat het nachtelijke script ze kent. Aan- of uitvinken leest de agenda meteen opnieuw in. Staat een afspraak in de hoofdagenda én een extra agenda, dan maar één keer. Vereist script versie 10.
+- Wie niet wil wachten: knop **"agenda nu vernieuwen"** in de instellingen (kaart *Agenda's*).
 - Alleen lezen: de planner schrijft nooit in de agenda.
 
 ## 6. Techniek (voorstel)

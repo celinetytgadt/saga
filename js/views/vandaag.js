@@ -36,7 +36,7 @@ export function afspraakUur(a, v) {
 
 function afspraakRij(a, v) {
   return `<div class="magje afspraak-rij"><span class="afspraak-uur">${afspraakUur(a, v)}</span>
-    <span class="moetje-tekst"><span class="magje-titel">${esc(a.titel)}</span></span>
+    <span class="moetje-tekst"><span class="magje-titel">${esc(a.titel)}</span>${a.agenda ? ` <small class="afspraak-agenda">${esc(a.agenda)}</small>` : ''}</span>
   </div>`;
 }
 

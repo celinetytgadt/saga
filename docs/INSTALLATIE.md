@@ -79,8 +79,9 @@ Doe dit op je laptop én op je gsm.
 ## Het script bijwerken
 
 Als er een nieuwe versie van `Code.gs` is (Saga meldt dan "het Google-script is verouderd").
-Dat is nu het geval: de nieuwste is **versie 9**. Versie 8 is nodig voor de **ochtendmail**, versie 9 leest ook het **einduur**
-van een afspraak (op Vandaag zie je dan "14:00–15:30" in plaats van "14:00"). Versie 7 volstaat voor de rest.
+Dat is nu het geval: de nieuwste is **versie 10**. Versie 8 is nodig voor de **ochtendmail**, versie 9 leest ook het **einduur**
+van een afspraak (op Vandaag zie je dan "14:00–15:30" in plaats van "14:00"), versie 10 is nodig voor **extra agenda's**
+(bv. die van je opleiding, zie "Agenda" hieronder). Versie 7 volstaat voor de rest.
 Bij **installeer** vraagt Google dan ook toestemming om *e-mail te versturen als jou* (enkel naar jezelf, voor de ochtendmail)
 en om *je e-mailadres te zien* (om te weten naar waar).
 
@@ -118,8 +119,11 @@ de volgende synchronisatie opnieuw bewaard. De oude map Saga mag je daarna weggo
 
 - Zet **#s** in de titel of beschrijving van een afspraak in je Google Agenda, en ze verschijnt in Saga.
 - Zet **#sw** als het een extra werkdag is (studiedag, evaluatiedag). Lesvoorbereiding valt dan niet op die dag.
-- Saga leest de agenda **De Zottekes**. Een andere of extra agenda? Pas bovenaan in `Code.gs` de regel
-  `const AGENDA_NAMEN = ['De Zottekes'];` aan (bv. `['De Zottekes', 'Werk']`, of `[]` voor alle agenda's), bewaar en maak een nieuwe versie.
+- Saga leest de agenda **De Zottekes** (enkel afspraken met #s of #sw). Wil je met de codes in een andere agenda werken, pas dan bovenaan in `Code.gs` de regel
+  `const AGENDA_NAMEN = ['De Zottekes'];` aan (bv. `['De Zottekes', 'Werk']`), bewaar en maak een nieuwe versie.
+- **Extra agenda's** (bv. van je opleiding) toon je volledig, zonder codes: vink ze aan in Saga bij **Instellingen → Agenda's**.
+  Saga leest ze meteen in; uitvinken haalt hun afspraken weer weg. Een nieuwe agenda die je net toevoegde in Google Agenda?
+  Tik daar eerst op **Agenda nu vernieuwen**, dan verschijnt ze in de lijst. Afspraken uit zo'n agenda tellen niet als werkdag (tenzij met #sw).
 - Enkel afspraken met de code worden overgenomen, van een week terug tot ongeveer 2,5 maand vooruit.
 - In Saga zie je bij Instellingen wanneer de agenda laatst ingelezen is en hoeveel afspraken er gevonden zijn.
 - Verschijnt er niets? Kies in de script-editor de functie **testAgenda** en klik **Uitvoeren**. Het logboek toont welke

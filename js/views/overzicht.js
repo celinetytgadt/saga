@@ -77,7 +77,7 @@ function dagBlok(s, idx, datum, v, raster) {
       <button class="dag-plus" data-actie="dag" data-datum="${datum}" aria-label="Acties voor ${M.kortDatum(datum)}">+</button>
     </header>
     ${afw.map((a) => `<div class="afwezig ${M.isVakantie(a) ? 'vak' : ''}" role="button" tabindex="0" data-actie="afwezigheid" data-id="${a.id}" title="${esc(afwezigLabel(s, a))}">${esc(afwezigLabel(s, a))}</div>`).join('')}
-    ${afspraken.map((a) => `<div class="afspraak" title="${esc(a.titel)}">${esc(a.titel)}</div>`).join('')}
+    ${afspraken.map((a) => `<div class="afspraak" title="${esc(a.agenda ? `${a.titel} (${a.agenda})` : a.titel)}">${esc(a.titel)}</div>`).join('')}
     ${lessen.map((l) => lesKaart(s, l, false, ui.filter.lessen)).join('')}
     ${groepen(s, taken).map((g) => groepKaart(s, g)).join('')}
     ${vlaggen(s, eindes, indienen, dls)}

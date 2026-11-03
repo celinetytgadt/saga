@@ -965,6 +965,26 @@ test('vergeten timer: eerst vragen, na 5 minuten stoppen op het moment van de vr
   assert.equal(M.timerCheck(t(), start + 999 * 60000), null);
 });
 
+test('verdergewerkt tot nu: de gestopte timer telt verder alsof hij bleef lopen', () => {
+  const s = basis();
+  const start = 1_000_000_000;
+  s.taken.t = taak({ id: 't', lesId: null });
+  s.taken.u = taak({ id: 'u', lesId: null });
+  M.startTimer(s, 't', start);
+  const stop = M.timerCheck(s.taken.t, start + 200 * 60000);
+  M.stopTimer(s, 't', stop.tot);
+  M.startTimer(s, 'u', start + 190 * 60000);
+  const nu = start + 200 * 60000;
+  M.hervatTimer(s, 't', stop.tot, nu);
+  assert.equal(M.bestedeTijd(s.taken.t, nu), 200 * 60000);
+  assert.equal(M.lopendeTaak(s).id, 't'); // de andere timer pauzeert
+  assert.equal(s.taken.u.gestart, null);
+  assert.equal(M.timerCheck(s.taken.t, nu + 89 * 60000), null); // pas 90 minuten later weer vragen
+  // een afgevinkte of al lopende taak verandert niet
+  M.hervatTimer(s, 't', start, nu);
+  assert.equal(M.bestedeTijd(s.taken.t, nu), 200 * 60000);
+});
+
 test('afvinken onthoudt wanneer, voor "vandaag gedaan"', () => {
   const s = basis();
   s.taken.t = taak({ id: 't', lesId: null });

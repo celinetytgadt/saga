@@ -189,7 +189,7 @@ In het overzicht: "BKH3-K2 + K3" met de kleuren van beide klassen.
 
 **Daglast**: bij elke dag (vanaf vandaag) de geschatte tijd die nog gepland staat (± 2u30). De schatting komt uit de timer: het gemiddelde van gelijkaardige afgewerkte taken (deze klas → alle voorbereidingen; deze opdracht → dit onderdeel → alle stukken; verbeteren per klas; to do's), zonder gegevens 30 minuten. Oranje als een dag vol zit: boven de grens bij Instellingen → Planning (standaard 4 uur), op een werkdag vanaf 1 uur. Er hoeft niets ingeschat te worden.
 
-**Vergeten timer**: na 90 minuten vraagt de balk bovenaan (en de titel van het tabblad) "Loopt … nog?". *Ja* = weer 90 minuten verder; komt er binnen 5 minuten geen antwoord (ook als Saga dicht was), dan stopt de timer op het moment van de vraag, met een melding om de tijd na te kijken.
+**Vergeten timer**: na 90 minuten vraagt de balk bovenaan (en de titel van het tabblad) "Loopt … nog?". *Ja* = weer 90 minuten verder; komt er binnen 5 minuten geen antwoord (ook als Saga dicht was), dan stopt de timer op het moment van de vraag, met een melding: *Verdergewerkt tot nu* laat de timer verder lopen alsof hij nooit stopte (de tussenliggende tijd telt mee, met *Ongedaan maken*), *Tijd nakijken* opent de taak, het kruisje sluit de melding. Meldingen die blijven staan hebben altijd een kruisje.
 
 **Afvinken beloont**: een klein vinkje-animatie, "al 3 vandaag" in de melding, en bovenaan Vandaag wat je vandaag al afvinkte (`klaarOp`).
 

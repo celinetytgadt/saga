@@ -990,6 +990,16 @@ export function timerCheck(taak, nu = Date.now()) {
   return null;
 }
 
+// "Verdergewerkt tot nu": de gestopte timer loopt weer, alsof hij nooit stopte.
+// De tijd vanaf `van` (het moment waarop hij stopte) telt mee; een andere lopende
+// timer pauzeert. De volgende vraag komt pas 90 minuten na nu.
+export function hervatTimer(state, taakId, van, nu = Date.now()) {
+  const t = state.taken[taakId];
+  if (!t || t.del || t.klaar || t.gestart || !(van <= nu)) return;
+  for (const andere of lijst(state, 'taken')) if (andere.gestart) stopTimer(state, andere.id, nu);
+  zet(state, 'taken', { ...t, gestart: van, bevestigd: nu });
+}
+
 export function bevestigTimer(state, taakId, nu = Date.now()) {
   const t = state.taken[taakId];
   if (t && !t.del && t.gestart) zet(state, 'taken', { ...t, bevestigd: nu });

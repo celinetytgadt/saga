@@ -906,9 +906,14 @@ a.knop.primair { color: var(--accent-tekst); }
   font-weight: 600;
 }
 .toast-knop { flex: none; border: none; background: transparent; color: var(--groen); font-weight: 700; cursor: pointer; padding: 6px 8px; border-radius: 8px; }
-.toast-knop:hover { background: rgb(255 255 255 / 10%); }
+.toast-knop:hover, .toast-sluit:hover { background: rgb(255 255 255 / 10%); }
+.toast-knop + .toast-knop { margin-left: -10px; }
+.toast-sluit { flex: none; border: none; background: transparent; color: inherit; opacity: 0.75; font-size: 22px; line-height: 1; cursor: pointer; width: 36px; height: 36px; border-radius: 8px; margin-left: -6px; }
 @media (max-width: 760px) {
-  .toast { bottom: calc(76px + env(safe-area-inset-bottom)); width: calc(100vw - 32px); }
+  .toast { bottom: calc(76px + env(safe-area-inset-bottom)); width: calc(100vw - 32px); flex-wrap: wrap; gap: 6px 14px; }
+  .toast > span { flex: 1 1 100%; }
+  .toast-sluit { position: absolute; top: 4px; right: 4px; }
+  .toast:has(.toast-sluit) > span { padding-right: 32px; }
 }
 .instellingen .lesregel-datum { width: 170px; }
 @media (max-width: 760px) {

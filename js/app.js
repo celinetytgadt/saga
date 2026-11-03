@@ -4,7 +4,7 @@
 // dialogen.js (vensters), model.js (rekenregels), store.js (bewaren en synchroniseren).
 
 import * as M from './model.js';
-import { getState, abonneer, wijzig, getSync, zetSyncCfg, sync, syncAlsNodig, vernieuwAgenda, voegSamen, haalAlles } from './store.js';
+import { getState, abonneer, wijzig, wijzigOngedaan, getSync, zetSyncCfg, sync, syncAlsNodig, vernieuwAgenda, voegSamen, haalAlles } from './store.js';
 import { $, esc, ui, mobiel, bewaarLokaal, zetFilter, melding } from './ui.js';
 import { snelInvoerHtml, taakTitel, tijdFormHtml, timerHtml } from './weergave.js';
 import { viewRaster, viewLijst, viewBakje, bakjeVoorFilter } from './views/overzicht.js';
@@ -105,13 +105,27 @@ function controleerTimer() {
   if (check?.stand === 'stop') {
     const uur = new Date(check.tot).toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' });
     wijzig((st) => M.stopTimer(st, t.id, check.tot));
-    melding(`Timer van "${taakTitel(s, t)}" gestopt om ${uur}: geen antwoord op "Loopt dit nog?".`, { actie: { label: 'Tijd nakijken', doe: () => openTaak(t.id) }, duur: 0 });
+    melding(`Timer van "${taakTitel(s, t)}" gestopt om ${uur}: geen antwoord op "Loopt dit nog?".`, {
+      acties: [
+        { label: 'Verdergewerkt tot nu', doe: () => verdergewerkt(t.id, check.tot) },
+        { label: 'Tijd nakijken', doe: () => openTaak(t.id) },
+      ],
+      duur: 0,
+    });
     return;
   }
   if ((check?.stand || '') !== ($('#timer-balk').dataset.check || '')) {
     tekenTimer(s);
     if (check?.stand === 'vraag') navigator.vibrate?.(200);
   }
+}
+
+// De gestopte timer telt verder alsof hij was blijven lopen (met ongedaan maken).
+function verdergewerkt(id, van) {
+  const { ongedaan } = wijzigOngedaan((st) => M.hervatTimer(st, id, van));
+  const t = getState().taken[id];
+  if (!t?.gestart) return;
+  melding(`${M.duurKort(Date.now() - van)} bijgeteld, de timer loopt verder.`, { ongedaan });
 }
 
 // Een klein feestje bij het afvinken, op de plaats van het vinkje.

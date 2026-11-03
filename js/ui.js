@@ -84,17 +84,24 @@ export function toonOpdracht(o) {
 
 let toastTimer = null;
 
-export function melding(tekst, { ongedaan = null, actie = null, duur = 6000 } = {}) {
+// `acties`: knoppen [{ label, doe }]. Een melding die blijft staan (`duur: 0`)
+// krijgt een kruisje om ze weg te klikken.
+export function melding(tekst, { ongedaan = null, actie = null, acties = [], duur = 6000 } = {}) {
   const el = $('#toast');
   if (!el) return;
   clearTimeout(toastTimer);
-  const knop = ongedaan ? 'Ongedaan maken' : actie?.label;
-  el.innerHTML = `<span>${esc(tekst)}</span>${knop ? `<button type="button" class="toast-knop">${esc(knop)}</button>` : ''}`;
+  const knoppen = ongedaan ? [{ label: 'Ongedaan maken', doe: ongedaan }] : [...(actie ? [actie] : []), ...acties];
+  el.innerHTML =
+    `<span>${esc(tekst)}</span>` +
+    knoppen.map((k, i) => `<button type="button" class="toast-knop" data-i="${i}">${esc(k.label)}</button>`).join('') +
+    (duur ? '' : '<button type="button" class="toast-sluit" aria-label="Melding sluiten" title="Sluiten">×</button>');
   el.hidden = false;
-  el.querySelector('.toast-knop')?.addEventListener('click', () => {
-    el.hidden = true;
-    if (ongedaan) ongedaan();
-    else actie?.doe();
-  });
+  for (const b of el.querySelectorAll('.toast-knop')) {
+    b.addEventListener('click', () => {
+      el.hidden = true;
+      knoppen[b.dataset.i].doe();
+    });
+  }
+  el.querySelector('.toast-sluit')?.addEventListener('click', () => (el.hidden = true));
   if (duur) toastTimer = setTimeout(() => (el.hidden = true), duur);
 }

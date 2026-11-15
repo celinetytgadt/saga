@@ -276,6 +276,14 @@ const acties = {
     const n = M.gedaanOp(getState(), M.vandaag()).length + 1;
     metOngedaan(`✓ "${taakTitel(getState(), t)}" afgevinkt${n > 1 ? ` · al ${n} vandaag` : ''}`, (s) => M.zetKlaar(s, id, true));
   },
+  // Vandaag aan gewerkt (aan/uit): de taak blijft open en staat bij Gedaan als "aan gewerkt".
+  gewerkt(el) {
+    const t = getState().taken[el.dataset.id];
+    if (!t) return;
+    const aan = !M.gewerktOpDag(t, M.vandaag());
+    if (!aan) return wijzig((s) => M.zetGewerkt(s, t.id, false));
+    metOngedaan(`½ "${taakTitel(getState(), t)}" staat bij Gedaan als aan gewerkt`, (s) => M.zetGewerkt(s, t.id, true));
+  },
   'timer-ja'(el) {
     wijzig((s) => M.bevestigTimer(s, el.dataset.id));
   },

@@ -577,7 +577,7 @@ export function zetLeerlingVerbeterd(state, taakId, sleutel, aan) {
   const t = state.taken[taakId];
   if (!t || t.del) return;
   const rest = (t.verbeterd || []).filter((x) => x !== sleutel);
-  zet(state, 'taken', { ...t, verbeterd: aan ? [...rest, sleutel] : rest });
+  zet(state, 'taken', { ...t, verbeterd: aan ? [...rest, sleutel] : rest, ...(aan && { gewerkt: metDag(t.gewerkt, vandaag()) }) });
 }
 
 export const OUD_CLASSROOM_DAGEN = 30;
@@ -943,13 +943,13 @@ export function startTimer(state, taakId, nu = Date.now()) {
   const t = state.taken[taakId];
   if (!t || t.del || t.gestart) return;
   for (const andere of lijst(state, 'taken')) if (andere.gestart) stopTimer(state, andere.id, nu);
-  zet(state, 'taken', { ...t, gestart: nu });
+  zet(state, 'taken', { ...t, gestart: nu, gewerkt: metDag(t.gewerkt, isoDatum(new Date(nu))) });
 }
 
 export function stopTimer(state, taakId, nu = Date.now()) {
   const t = state.taken[taakId];
   if (!t || t.del || !t.gestart) return;
-  zet(state, 'taken', { ...t, tijd: bestedeTijd(t, nu), gestart: null });
+  zet(state, 'taken', { ...t, tijd: bestedeTijd(t, nu), gestart: null, gewerkt: metDag(t.gewerkt, isoDatum(new Date(nu))) });
 }
 
 // Bestede tijd zelf aanpassen (bv. timer vergeten stoppen). Een lopende timer loopt verder.
@@ -976,6 +976,30 @@ export function gedaanOp(state, datum) {
   return lijst(state, 'taken').filter((t) => t.klaar && t.klaarOp && isoDatum(new Date(t.klaarOp)) === datum);
 }
 
+// "Aan gewerkt": een taak waaraan je op een dag werkte zonder ze af te ronden (bv. de helft
+// verbeterd omdat nog niet iedereen indiende). `taak.gewerkt`: de dagen (ISO), de laatste
+// GEWERKT_MAX. Komt er vanzelf bij als de timer loopt of je een leerling als verbeterd
+// aanvinkt; anders met de knop "Vandaag aan gewerkt" in het taakvenster.
+export const GEWERKT_MAX = 14;
+
+function metDag(dagen, datum) {
+  const rest = (dagen || []).filter((d) => d !== datum);
+  return [...rest, datum].sort().slice(-GEWERKT_MAX);
+}
+
+export function zetGewerkt(state, taakId, aan, datum = vandaag()) {
+  const t = state.taken[taakId];
+  if (!t || t.del) return;
+  zet(state, 'taken', { ...t, gewerkt: aan ? metDag(t.gewerkt, datum) : (t.gewerkt || []).filter((d) => d !== datum) });
+}
+
+export const gewerktOpDag = (t, datum) => (t.gewerkt || []).includes(datum);
+
+// Open taken waaraan je die dag werkte (wat je afvinkte, staat al bij gedaanOp).
+export function gewerktOp(state, datum) {
+  return lijst(state, 'taken').filter((t) => !t.klaar && gewerktOpDag(t, datum));
+}
+
 // Vergeten timer: na TIMER_VRAAG_MS vraagt Saga "Loopt dit nog?". Komt er binnen
 // TIMER_WACHT_MS geen antwoord, dan stopt de timer op het moment van de vraag.
 // "Ja" (`bevestigd`) start de teller opnieuw.
@@ -997,7 +1021,7 @@ export function hervatTimer(state, taakId, van, nu = Date.now()) {
   const t = state.taken[taakId];
   if (!t || t.del || t.klaar || t.gestart || !(van <= nu)) return;
   for (const andere of lijst(state, 'taken')) if (andere.gestart) stopTimer(state, andere.id, nu);
-  zet(state, 'taken', { ...t, gestart: van, bevestigd: nu });
+  zet(state, 'taken', { ...t, gestart: van, bevestigd: nu, gewerkt: metDag(t.gewerkt, isoDatum(new Date(nu))) });
 }
 
 export function bevestigTimer(state, taakId, nu = Date.now()) {

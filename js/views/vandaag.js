@@ -7,7 +7,8 @@
 //    gepland vandaag);
 // 2. Magjes: wat bleef liggen en wat in het bakje zit, per klas of onderwerp; onderaan
 //    de Classroom-taken van meer dan een maand geleden die nog niet afgewerkt zijn;
-// 3. Gedaan: wat je vandaag afvinkte.
+// 3. Gedaan: wat je vandaag afvinkte, en daaronder waaraan je vandaag werkte zonder het
+//    af te ronden ("aan gewerkt": timer, leerlingen verbeterd, of de knop in het taakvenster).
 // Een taak staat in maar één kolom: wat bij Belangrijk staat, staat niet bij de magjes.
 
 import * as M from '../model.js';
@@ -76,6 +77,17 @@ function magje(s, t, v, { zonderLabel = false } = {}) {
       sub.length && !t.klaar ? `<small>${sub.join(' · ')}</small>` : ''
     }</span>
     ${knop}
+  </div>`;
+}
+
+// Aan gewerkt maar nog open: rustig, zonder knoppen. Afvinken kan nog; tik opent de taak.
+function gewerktRij(s, t) {
+  const a = anker(s, t);
+  const sub = [a.label && esc(a.label), M.isLeerlingTaak(t) && verbeterTekst(s, t), tijdLabel(t)].filter(Boolean);
+  return `<div class="magje gewerkt ${M.domeinVan(t) === 'opleiding' ? 'opl' : ''}" style="--klas:${a.kleur}">${vink(t)}
+    <span class="moetje-tekst" role="button" tabindex="0" data-actie="taak" data-id="${t.id}"><span class="magje-titel">${esc(taakTitel(s, t))}</span><small><span class="gewerkt-label">½ aan gewerkt</span>${
+      sub.length ? ' · ' + sub.join(' · ') : ''
+    }</small></span>
   </div>`;
 }
 
@@ -154,6 +166,7 @@ export function viewVandaag(s) {
   );
 
   const gedaan = M.gedaanOp(s, v).sort((a, b) => (b.klaarOp || 0) - (a.klaarOp || 0));
+  const gewerkt = M.gewerktOp(s, v).sort(sorteerTaken(s));
   const alleOpen = M.lijst(s, 'taken').filter((t) => !t.klaar);
   // Classroom-taken van meer dan een maand geleden: enkel in hun bakje onderaan de magjes
   const oud = alleOpen.filter((t) => M.isOudeClassroomTaak(t, v)).sort((a, b) => a.indien.localeCompare(b.indien));
@@ -266,8 +279,14 @@ export function viewVandaag(s) {
       </section>
 
       <section class="kaart compact gedaan-kaart">
-        <h2 class="kop-groen">✓ Gedaan${gedaan.length ? ` (${gedaan.length})` : ''}</h2>
-        ${gedaan.length ? rijen(gedaan) : '<p class="leeg">Nog niets afgevinkt vandaag.</p>'}
+        <h2 class="kop-groen">✓ Gedaan${gedaan.length + gewerkt.length ? ` (${gedaan.length + gewerkt.length})` : ''}</h2>
+        ${rijen(gedaan)}
+        ${gewerkt.length ? `<h3 class="kop-gewerkt">½ Aan gewerkt, nog niet af (${gewerkt.length})</h3>${gewerkt.map((t) => gewerktRij(s, t)).join('')}` : ''}
+        ${
+          gedaan.length + gewerkt.length
+            ? ''
+            : '<p class="leeg">Nog niets gedaan vandaag.</p><p class="hint">Werk je aan iets zonder het af te ronden? Start de timer, of tik in de taak op <b>½ Vandaag aan gewerkt</b>.</p>'
+        }
       </section>
     </div>
   </div>`;

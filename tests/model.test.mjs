@@ -1031,3 +1031,29 @@ test('Classroom-taak is oud als het indienen meer dan een maand geleden is', () 
   assert.equal(M.isOudeClassroomTaak({ ...t, klaar: true }, '2026-10-26'), false);
   assert.equal(M.isOudeClassroomTaak({ ...t, indien: undefined }, '2026-10-26'), false);
 });
+
+test('aan gewerkt: timer, leerling verbeterd of knop; afgevinkt telt bij gedaan', () => {
+  const s = basis();
+  s.taken.t = taak({ id: 't', lesId: null });
+  const nu = new Date(2026, 9, 20, 14).getTime();
+  M.startTimer(s, 't', nu);
+  M.stopTimer(s, 't', nu + 60000);
+  assert.deepEqual(s.taken.t.gewerkt, ['2026-10-20']);
+  assert.deepEqual(M.gewerktOp(s, '2026-10-20').map((t) => t.id), ['t']);
+  M.zetGewerkt(s, 't', false, '2026-10-20');
+  assert.deepEqual(M.gewerktOp(s, '2026-10-20'), []);
+  M.zetGewerkt(s, 't', true, '2026-10-21');
+  M.zetGewerkt(s, 't', true, '2026-10-21');
+  assert.deepEqual(s.taken.t.gewerkt, ['2026-10-21']);
+  M.zetKlaar(s, 't', true);
+  assert.deepEqual(M.gewerktOp(s, '2026-10-21'), []);
+  // houdt enkel de laatste dagen bij
+  s.taken.u = taak({ id: 'u', lesId: null });
+  for (let d = 1; d <= 20; d++) M.zetGewerkt(s, 'u', true, `2026-10-${String(d).padStart(2, '0')}`);
+  assert.equal(s.taken.u.gewerkt.length, M.GEWERKT_MAX);
+  assert.equal(s.taken.u.gewerkt.at(-1), '2026-10-20');
+  // een leerling als verbeterd aanvinken telt als vandaag aan gewerkt
+  s.taken.v = taak({ id: 'v', lesId: null });
+  M.zetLeerlingVerbeterd(s, 'v', 'k1|Anna', true);
+  assert.ok(M.gewerktOpDag(s.taken.v, M.vandaag()));
+});

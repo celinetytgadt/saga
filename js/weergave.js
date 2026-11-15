@@ -216,7 +216,16 @@ export function timerHtml(t) {
     <span class="timer-klok" data-klok="${t.id}" aria-label="Bestede tijd">${M.klokTekst(ms)}</span>
     <button type="button" class="knop ${t.gestart ? '' : 'primair'}" data-actie="timer" data-id="${t.id}">${knop}</button>
     ${ms ? `<button type="button" class="chip" data-actie="tijd-aanpassen" data-id="${t.id}">Aanpassen</button>` : ''}
+    ${gewerktKnop(t)}
   </div>`;
+}
+
+// Eraan gewerkt zonder het af te ronden: staat dan vandaag bij Gedaan als "aan gewerkt".
+// Een lopende timer telt al als gewerkt, dus dan geen knop.
+export function gewerktKnop(t) {
+  if (t.klaar || t.gestart) return '';
+  const aan = M.gewerktOpDag(t, M.vandaag());
+  return `<button type="button" class="chip gewerkt-chip ${aan ? 'aan' : ''}" data-actie="gewerkt" data-id="${t.id}" aria-pressed="${aan}">½ ${aan ? 'Vandaag aan gewerkt ✓' : 'Vandaag aan gewerkt'}</button>`;
 }
 
 // Bestede tijd zelf invullen (bv. timer vergeten stoppen), in het venster zelf.

@@ -1150,3 +1150,9 @@ a.knop.primair { color: var(--accent-tekst); }
 /* Bakje onderaan de magjes: Classroom-taken van meer dan een maand geleden */
 .oud-classroom { margin-top: 18px; padding-top: 10px; border-top: 1px dashed var(--rand-sterk); }
 .oud-classroom > h3 { color: var(--zacht); font-size: .95rem; margin: 0; }
+
+/* Gedaan: aan gewerkt maar nog niet af (½, gestippelde groene rand) */
+.kop-gewerkt { color: var(--groen); font-size: .92rem; margin: 12px 0 4px; }
+.magje.gewerkt { border-left: 3px dashed var(--groen); }
+.gewerkt-label { color: var(--groen); font-weight: 600; }
+.chip.gewerkt-chip.aan { border-style: solid; border-color: var(--groen); color: var(--groen); background: color-mix(in srgb, var(--groen) 10%, transparent); }

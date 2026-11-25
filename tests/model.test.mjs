@@ -543,16 +543,60 @@ test('losse taken per onderwerp; onderwerp verwijderen houdt de taken', () => {
   assert.deepEqual(M.takenVanOnderwerp(s, null).map((t) => t.id).sort(), ['a', 'b']);
 });
 
-test('to do bij een klas zonder onderwerp staat niet bij "Zonder onderwerp"', () => {
+test('to do bij een klas zonder onderwerp staat bij "Zonder onderwerp" (klassen staan niet meer op School)', () => {
   const s = basis();
   s.onderwerpen.o1 = { id: 'o1', naam: 'Stage', kleur: '#5bbba4', upd: 1 };
   s.taken.a = taak({ id: 'a', lesId: null, klasIds: ['k1'] }); // bv. cursus schrijven
   s.taken.b = taak({ id: 'b', lesId: null, klasIds: ['k1'], onderwerpId: 'o1' });
-  s.taken.c = taak({ id: 'c', lesId: null, klasIds: ['weg'] }); // klas bestaat niet (meer)
+  s.taken.c = taak({ id: 'c', lesId: null, klasIds: ['weg'] });
+  s.taken.d = taak({ id: 'd', lesId: 'l1' }); // vroeger werk bij een les: niet meer op School
   s.opdrachten.g = { id: 'g', titel: 'Cursus', domein: 'school', klasIds: ['k1'], upd: 1 };
-  assert.deepEqual(M.takenVanOnderwerp(s, null).map((t) => t.id), ['c']);
+  assert.deepEqual(M.takenVanOnderwerp(s, null).map((t) => t.id).sort(), ['a', 'c']);
   assert.deepEqual(M.takenVanOnderwerp(s, 'o1').map((t) => t.id), ['b']);
-  assert.equal(M.opdrachtenVanOnderwerp(s, null).length, 0);
+  assert.equal(M.opdrachtenVanOnderwerp(s, null).length, 1);
+});
+
+test('weekblokken: standaardgroepen, elke week nieuwe blokjes, oude weken van het toestel', () => {
+  const s = M.leegeState();
+  assert.equal(M.weekblokkenNodig(s, '2026-11-25'), true);
+  assert.equal(M.zorgWeekblokken(s, '2026-11-25'), true);
+  assert.deepEqual(M.weekgroepen(s).map((g) => g.naam), ['BKH3', 'BKH4', 'BKH56 theorie', 'BKH56 exact']);
+  const t = s.taken[M.weekblokId('verbeteren', 'bkh3', '2026-11-23')];
+  assert.equal(t.week, '2026-11-23');
+  assert.equal(t.upd, 0); // een echte wijziging op een ander toestel wint altijd
+  assert.equal(M.weekblokNaam(s, t), 'Verbeteren BKH3');
+  assert.equal(Object.keys(s.taken).length, 8);
+  // dezelfde week: niets te doen; maandag erna: 8 nieuwe blokjes
+  assert.equal(M.zorgWeekblokken(s, '2026-11-29'), false);
+  assert.equal(M.zorgWeekblokken(s, '2026-11-30'), true);
+  assert.equal(Object.keys(s.taken).length, 16);
+  // alle groepen verwijderd: niet opnieuw de standaardgroepen
+  for (const g of M.weekgroepen(s)) M.verwijderWeekgroep(s, g.id);
+  M.zorgWeekblokken(s, '2026-12-07');
+  assert.equal(M.weekgroepen(s).length, 0);
+  // weekblokken staan niet in de daglast en niet bij de onderwerpen
+  assert.equal(M.takenVanOnderwerp(s, null).length, 0);
+  // een oud blokje (ook niet afgevinkt) verdwijnt na een maand van het toestel
+  const r = M.actief(s, '2027-01-15', Date.now(), Date.now());
+  assert.equal(Object.values(r.taken).filter((x) => x.week && !x.del).length, 0);
+});
+
+test('weekblokken: tijd per week en per groep, ook in het tijdsoverzicht', () => {
+  const s = M.leegeState();
+  M.zorgWeekblokken(s, '2026-11-11');
+  M.zorgWeekblokken(s, '2026-11-25');
+  const id1 = M.weekblokId('voorbereiding', 'bkh4', '2026-11-09');
+  const id2 = M.weekblokId('verbeteren', 'bkh4', '2026-11-23');
+  M.zetTijd(s, id1, 90 * 60000);
+  M.zetTijd(s, id2, 30 * 60000);
+  const r = M.weekRapport(s, '2026-09-01', '2027-08-31', '2026-11-25');
+  assert.deepEqual(r.weken.map((w) => w.week), ['2026-11-23', '2026-11-16', '2026-11-09']);
+  assert.equal(r.weken[0].groepen.bkh4.verbeteren, 30 * 60000);
+  assert.equal(r.weken[1].voorbereiding, 0); // week zonder blokjes (bv. vakantie) staat er ook
+  assert.equal(r.weken[2].voorbereiding, 90 * 60000);
+  const t = M.tijdRapport(s, '2026-09-01', '2027-08-31');
+  const bkh4 = t.groepen.find((g) => g.naam === 'BKH4');
+  assert.deepEqual([bkh4.soorten.les, bkh4.soorten.verbeteren, bkh4.aantalLessen], [90 * 60000, 30 * 60000, 0]);
 });
 
 test('vroeger opgesplitste losse taak wordt een opdracht met stukken', () => {

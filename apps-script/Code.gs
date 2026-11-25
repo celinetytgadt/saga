@@ -306,7 +306,7 @@ function actief(state, vandaagDatum, nu, bewaardTot) {
   const eigenOud = (k, o) => {
     if (!o || typeof o !== 'object') return false;
     if (o.del) return !recent(o);
-    if (k === 'taken') return !recent(o) && !!o.klaar && (o.werkdag || '') < grens;
+    if (k === 'taken') return !recent(o) && (!!o.klaar || !!o.week) && (o.week || o.werkdag || '') < grens;
     if (k === 'lessen') return !recent(o) && !!o.datum && o.datum < grens;
     if (k === 'opdrachten') return !recent(o) && (o.deadline ? o.deadline < grens : !!metStukken[o.id]);
     if (k === 'afspraken') return (o.eindDatum || o.datum || '') < grens;

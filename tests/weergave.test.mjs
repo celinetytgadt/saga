@@ -30,14 +30,15 @@ test('bakje: to do\'s met een deadline binnen 2 weken of zonder deadline', () =>
   assert.equal(b.aantal, 2);
 });
 
-test('bakje: bij een les enkel voor lessen in de komende 2 weken', () => {
+test('bakje: vroeger werk bij een les en weekblokken staan er niet in', () => {
   const s = basis();
   s.lessen.l1 = { id: 'l1', klasIds: ['k1'], titel: 'Les', datum: plus(5), upd: 1 };
-  s.lessen.l2 = { id: 'l2', klasIds: ['k1'], titel: 'Later', datum: plus(30), upd: 1 };
   s.taken.x = todo('x', { lesId: 'l1', deadline: { rel: -1 } });
-  s.taken.y = todo('y', { lesId: 'l2', deadline: { rel: -1 } });
+  s.taken.cr = todo('cr', { soort: 'verbeteren', indien: plus(-3), klasIds: ['k1'] });
+  M.zorgWeekblokken(s, V);
+  s.taken.a = todo('a');
   const b = W.bakje(s, undefined, V);
-  assert.deepEqual(b.school.map((t) => t.id), ['x']);
+  assert.deepEqual(b.school.map((t) => t.id), ['a']);
 });
 
 test('bakje: opleiding toont per onderdeel de volgende 5', () => {
@@ -70,13 +71,21 @@ test('elk bestand van de app zit in de cache van de service worker', () => {
   for (const f of [...lijst('js'), ...lijst('js/views'), 'css/saga.css', 'index.html']) assert.ok(sw.includes(`'${f}'`), `${f} ontbreekt in sw.js`);
 });
 
-test('blijven liggen: niet de voorbereiding van een les die al voorbij is', () => {
+test('blijven liggen: geen vroeger werk bij een les', () => {
   const s = basis();
-  s.lessen.oud = { id: 'oud', klasIds: ['k1'], titel: 'Oud', datum: plus(-2), upd: 1 };
   s.lessen.nu = { id: 'nu', klasIds: ['k1'], titel: 'Nu', datum: plus(2), upd: 1 };
-  s.taken.h1 = todo('h1', { lesId: 'oud', hoofd: true, werkdag: plus(-3) });
   s.taken.h2 = todo('h2', { lesId: 'nu', hoofd: true, werkdag: plus(-1) });
-  assert.deepEqual(W.blijvenLiggen(s, V).map((t) => t.id), ['h2']);
+  s.taken.cr = todo('cr', { soort: 'verbeteren', klasIds: ['k1'], indien: plus(-10) });
+  s.taken.t = todo('t', { werkdag: plus(-1) });
+  assert.deepEqual(W.blijvenLiggen(s, V).map((t) => t.id), ['t']);
+});
+
+test('weekblok heet "Lesvoorbereiding BKH3" en krijgt de kleur van zijn groep', () => {
+  const s = basis();
+  M.zorgWeekblokken(s, V);
+  const t = M.weekblok(s, 'bkh3', 'voorbereiding', V);
+  assert.equal(W.taakTitel(s, t), 'Lesvoorbereiding BKH3');
+  assert.equal(W.anker(s, t).kleur, s.weekgroepen.bkh3.kleur);
 });
 
 test('bakje: opleiding in de volgorde van de pagina Opleiding', () => {
@@ -105,56 +114,87 @@ test('afspraak op Vandaag: met het uur als dat er is', async () => {
   assert.equal(afspraakUur({ datum: plus(-1), eindDatum: plus(1), tijd: '18:00', eindTijd: '10:00' }, V), 'hele dag');
 });
 
-test('Vandaag: deadline vandaag of morgen bovenaan, blok per klas en per onderwerp, geen dubbels met de magjes', async () => {
+test('Vandaag: deadline bovenaan, weekblokken, blok per onderwerp, geen lessen en geen dubbels met de magjes', async () => {
   const { viewVandaag } = await import('../js/views/vandaag.js');
   const v = M.vandaag();
   const s = basis();
-  s.instellingen.werkdagen = [0, 1, 2, 3, 4, 5, 6];
+  M.zorgWeekblokken(s, v);
+  M.zorgWeekblokken(s, M.plusDagen(v, -7));
+  M.zetTijd(s, M.weekblokId('verbeteren', 'bkh4', M.maandagVan(M.plusDagen(v, -7))), 45 * 60000);
   s.lessen.l1 = { id: 'l1', klasIds: ['k1'], titel: 'Les morgen', datum: M.plusDagen(v, 1), upd: 1 };
-  // voorbereiding die gisteren gepland stond: enkel bij Belangrijk, niet bij "Bleef liggen"
   s.taken['h-l1'] = todo('h-l1', { titel: '', lesId: 'l1', hoofd: true, werkdag: M.plusDagen(v, -1), deadline: { rel: -1, nietOpWerkdag: true } });
   s.taken.cr = todo('cr', { titel: 'Balans', soort: 'verbeteren', indien: M.plusDagen(v, -3), klasIds: ['k1'], werkdag: M.plusDagen(v, -2) });
-  s.taken.later = todo('later', { titel: 'Nog niet', soort: 'verbeteren', indien: v, klasIds: ['k1'] });
-  s.taken.cursus = todo('cursus', { titel: 'Cursus schrijven', klasIds: ['k1'], deadline: { datum: M.plusDagen(v, 5) } });
-  s.taken.verre = todo('verre', { titel: 'Toets maken', klasIds: ['k1'], deadline: { datum: M.plusDagen(v, 10) } });
   s.onderwerpen.o1 = { id: 'o1', naam: 'Stage', kleur: '#5bbba4', upd: 1 };
   s.taken.st = todo('st', { titel: 'Stagebrief', onderwerpId: 'o1', deadline: { datum: v } });
   s.taken.st2 = todo('st2', { titel: 'Bedrijven bellen', onderwerpId: 'o1', deadline: { datum: M.plusDagen(v, 3) } });
   s.taken.los = todo('los', { titel: 'Los' });
-  s.taken.mg = todo('mg', { titel: 'Kopies', klasIds: ['k1'], deadline: { datum: M.plusDagen(v, 1) } });
+  s.taken.verre = todo('verre', { titel: 'Toets maken', deadline: { datum: M.plusDagen(v, 10) } });
   const html = viewVandaag(s);
   const [belangrijk, rest] = html.split('<h2>Magjes</h2>');
   const telt = (deel, id) => deel.split(`data-actie="vink" data-id="${id}"`).length - 1;
-  for (const id of ['h-l1', 'cr', 'cursus', 'st', 'st2']) {
+  for (const id of ['h-l1', 'cr']) assert.equal(telt(html, id), 0, id); // lessen staan niet meer in Saga
+  for (const id of ['st', 'st2']) {
     assert.equal(telt(belangrijk, id), 1, id);
     assert.equal(telt(rest, id), 0, id);
   }
-  assert.equal(telt(html, 'later'), 0); // pas vanaf morgen (dag na het indienen)
   for (const id of ['verre', 'los']) {
     assert.equal(telt(belangrijk, id), 0, id);
     assert.equal(telt(rest, id), 1, id);
   }
-  // deadline vandaag staat boven de blokken; blok BKH4 met voorbereiding, verbeteren en to do
+  // weekblokken: elke groep twee keer (voorbereiding, verbeteren), enkel bij Belangrijk, met een timer
+  const deze = M.maandagVan(v);
+  for (const g of ['bkh3', 'bkh4', 'bkh56t', 'bkh56e'])
+    for (const soort of ['voorbereiding', 'verbeteren']) {
+      const id = M.weekblokId(soort, g, deze);
+      assert.equal(telt(belangrijk, id), 1, id);
+      assert.equal(telt(rest, id), 0, id);
+      assert.match(belangrijk, new RegExp(`data-actie="timer" data-id="${id}"`));
+    }
+  assert.equal(telt(html, M.weekblokId('verbeteren', 'bkh4', M.maandagVan(M.plusDagen(v, -7)))), 0); // vorige week: afgesloten
+  assert.match(belangrijk, /vorige week 45 min/);
+  // deadline vandaag bovenaan, dan de weekblokken, dan het blok Stage
   const dl = belangrijk.indexOf('Deadline vandaag of morgen');
-  const klas = belangrijk.indexOf('kop-blok" style="--klas:#123b78">BKH4<');
+  const week = belangrijk.indexOf('Lesvoorbereiding');
   const stage = belangrijk.indexOf('>Stage</h3>');
-  assert.ok(dl > 0 && dl < belangrijk.indexOf('data-id="st"') && belangrijk.indexOf('data-id="st"') < klas, 'deadline bovenaan');
-  assert.ok(dl < belangrijk.indexOf('data-id="h-l1"') && belangrijk.indexOf('data-id="h-l1"') < klas, 'voorbereiding van de les van morgen in het rode vlak');
-  assert.ok(klas < belangrijk.indexOf('data-id="cr"') && belangrijk.indexOf('data-id="cursus"') < stage, 'blok per klas, dan onderwerp');
-  assert.ok(dl < belangrijk.indexOf('data-id="mg"') && belangrijk.indexOf('data-id="mg"') < klas, 'deadline morgen in het rode vlak');
+  assert.ok(dl > 0 && dl < belangrijk.indexOf('data-id="st"') && belangrijk.indexOf('data-id="st"') < week && week < stage);
   assert.ok(belangrijk.indexOf('data-id="st2"') > stage, 'deadline over 3 dagen: in het blok, niet in het rode vlak');
-  // magjes per klas of onderwerp, met een startknop
-  assert.match(rest, /kop-blok[^>]*>BKH4</);
   assert.match(rest, /kop-blok[^>]*>Zonder onderwerp</);
   assert.match(rest.slice(rest.indexOf('data-id="los"')), /data-actie="timer" data-id="los"/);
 });
 
-test('oude Classroom-taak telt niet als "bleef liggen" en toont wie nog moet', () => {
+test('wie nog verbeterd moet worden (oude taken voor leerlingen)', () => {
   const s = basis();
   s.klassen.k1.leerlingen = ['Amira', 'Bram'];
   s.taken.oud = todo('oud', { soort: 'verbeteren', klasIds: ['k1'], indien: plus(-40), verbeterd: ['k1|Bram'] });
-  s.taken.recent = todo('recent', { soort: 'verbeteren', klasIds: ['k1'], indien: plus(-10) });
-  assert.deepEqual(W.blijvenLiggen(s, V).map((t) => t.id), ['recent']);
   assert.equal(W.verbeterTekst(s, s.taken.oud), '1/2 verbeterd · nog: Amira');
-  assert.equal(W.verbeterTekst(s, s.taken.recent), '0/2 verbeterd · nog: Amira, Bram');
+});
+
+test('School: enkel onderwerpen, geen klassen of lessen meer', async () => {
+  const { viewKlassen } = await import('../js/views/school.js');
+  const s = basis();
+  s.lessen.l1 = { id: 'l1', klasIds: ['k1'], titel: 'Oude les', datum: plus(2), upd: 1 };
+  s.onderwerpen.o1 = { id: 'o1', naam: 'Stage', kleur: '#5bbba4', upd: 1 };
+  s.taken.st = todo('st', { titel: 'Stagebrief', onderwerpId: 'o1' });
+  s.taken.cursus = todo('cursus', { titel: 'Cursus schrijven', klasIds: ['k1'] });
+  const html = viewKlassen(s);
+  assert.match(html, />Stage</);
+  assert.match(html, /Cursus schrijven/); // vroeger enkel bij de klas, nu bij "Zonder onderwerp"
+  assert.doesNotMatch(html, /Oude les|BKH4|\+ les/);
+});
+
+test('Tijd: per week een tabel voor lesvoorbereiding en voor verbeteren', async () => {
+  globalThis.localStorage ??= { getItem: () => null, setItem() {} };
+  const { viewTijd } = await import('../js/views/tijd.js');
+  const { ui } = await import('../js/ui.js');
+  const v = M.vandaag();
+  const s = basis();
+  M.zorgWeekblokken(s, M.plusDagen(v, -7));
+  M.zorgWeekblokken(s, v);
+  M.zetTijd(s, M.weekblokId('voorbereiding', 'bkh56e', M.maandagVan(M.plusDagen(v, -7))), 75 * 60000);
+  Object.assign(ui.tijd, { periode: 'jaar', data: s, volledig: true, bezig: false, fout: '' });
+  const html = viewTijd(s);
+  assert.match(html, /Lesvoorbereiding per week/);
+  assert.match(html, /Verbeteren per week/);
+  assert.match(html, /BKH56 exact/);
+  assert.match(html, /1u 15m/);
 });

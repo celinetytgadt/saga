@@ -58,6 +58,10 @@ export function opdrachtVan(s, taak) {
 
 // Waar hoort een taak bij: kleur en een korte omschrijving.
 export function anker(s, taak) {
+  if (taak.week) {
+    const g = s.weekgroepen?.[taak.weekGroep];
+    return { kleur: g?.kleur || GRIJS, label: g?.naam || '', titel: '' };
+  }
   const les = lesVan(s, taak);
   if (les) return { kleur: klassenVan(s, les)[0]?.kleur || GRIJS, label: klasLabel(s, les), titel: les.titel };
   const opd = opdrachtVan(s, taak);
@@ -90,26 +94,20 @@ export const sorteerLessen = (s) => (a, b) => klasLabel(s, a).localeCompare(klas
 
 export const opNaam = (a, b) => a.naam.localeCompare(b.naam);
 
-// Taken die in het bakje horen: geen werkdag, en (als ze bij een les horen) de les heeft een datum.
+// Taken die in het bakje horen: geen werkdag. Weekblokken en vroeger werk bij een les niet.
 export function inTePlannen(s) {
   return M.lijst(s, 'taken').filter((t) => {
-    if (t.klaar || M.werkdagVan(s, t)) return false;
-    if (t.opdrachtId) return !!opdrachtVan(s, t);
-    if (!t.lesId) return true;
-    const l = lesVan(s, t);
-    return l && l.datum;
+    if (t.klaar || M.isWeekblok(t) || M.isLesWerk(t) || M.werkdagVan(s, t)) return false;
+    return !t.opdrachtId || !!opdrachtVan(s, t);
   });
 }
 
-// Taken van een vroegere dag die nog niet klaar zijn. De voorbereiding van een les die
-// al voorbij is, telt niet mee: die les is gegeven. Een Classroom-taak van meer dan een
-// maand geleden ook niet: die staat in haar eigen bakje.
+// Taken van een vroegere dag die nog niet klaar zijn (vroeger werk bij een les niet).
 export function blijvenLiggen(s, v = M.vandaag()) {
   return M.lijst(s, 'taken').filter((t) => {
-    const wd = !t.klaar && M.werkdagVan(s, t);
-    if (!wd || wd >= v || M.isOudeClassroomTaak(t, v)) return false;
-    const les = !M.isVerbeteren(t) && lesVan(s, t);
-    return !(les && les.datum && les.datum < v);
+    if (t.klaar || M.isLesWerk(t)) return false;
+    const wd = M.werkdagVan(s, t);
+    return !!wd && wd < v;
   });
 }
 
@@ -242,6 +240,7 @@ export function tijdFormHtml(t) {
 // Naam van een taak: de taak van een les heet zoals de les; blokken krijgen (2/3);
 // een taak voor leerlingen staat op de planning als "Verbeteren CR: …".
 export function taakTitel(s, t) {
+  if (t.week) return M.weekblokNaam(s, t);
   if (M.isLeerlingTaak(t)) return `Verbeteren CR: ${t.titel || '(zonder titel)'}`;
   const basis = t.titel || lesVan(s, t)?.titel || '(zonder titel)';
   return t.deelVan ? `${basis} (${t.deelNr}/${t.deelVan})` : basis;

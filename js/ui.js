@@ -26,14 +26,11 @@ export function bewaarLokaal(sleutel, waarde) {
   }
 }
 
-// Filter van het overzicht en het bakje: domein (alles | school | opleiding),
-// eventueel één klas, en eventueel enkel de lessen.
-// (Vroeger één woord: 'alles' | 'school' | 'opleiding' | 'lessen'.)
+// Filter van het overzicht en het bakje: domein (alles | school | opleiding).
+// (Vroeger ook een klas en "enkel lessen"; lessen staan niet meer in Saga.)
 export function leesFilter(f) {
-  if (f && typeof f === 'object')
-    return { domein: ['school', 'opleiding'].includes(f.domein) ? f.domein : 'alles', lessen: !!f.lessen, klasId: f.klasId || null };
-  if (f === 'lessen') return { domein: 'alles', lessen: true, klasId: null };
-  return { domein: ['school', 'opleiding'].includes(f) ? f : 'alles', lessen: false, klasId: null };
+  const d = f && typeof f === 'object' ? f.domein : f;
+  return { domein: ['school', 'opleiding'].includes(d) ? d : 'alles', lessen: false, klasId: null };
 }
 
 export const ui = {
@@ -59,24 +56,15 @@ export function zetFilter(wijziging) {
   bewaarLokaal('saga.filter', ui.filter);
 }
 
-// Wat het filter toont. Een klas kiezen toont enkel wat bij die klas hoort.
+// Wat het filter toont. Vroeger werk bij een les en de weekblokken staan niet op de planning.
 export function toonTaak(s, t) {
+  if (M.isLesWerk(t) || M.isWeekblok(t)) return false;
   const f = ui.filter;
-  if (f.lessen) return false;
-  if (f.klasId) return M.klassenVanTaak(s, t).includes(f.klasId);
   return f.domein === 'alles' || M.domeinVan(t) === f.domein;
-}
-
-export function toonLes(l) {
-  const f = ui.filter;
-  if (f.domein === 'opleiding' && !f.klasId) return false;
-  return !f.klasId || M.klassenVanLes(l).includes(f.klasId);
 }
 
 export function toonOpdracht(o) {
   const f = ui.filter;
-  if (f.lessen) return false;
-  if (f.klasId) return (o.klasIds || []).includes(f.klasId);
   return f.domein === 'alles' || M.opdrachtDomein(o) === f.domein;
 }
 

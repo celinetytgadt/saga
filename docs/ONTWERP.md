@@ -2,7 +2,7 @@
 
 > **Saga** is mijn persoonlijke takenplanner (naast Freya voor financiën). Los van De MET, in eigen huisstijl.
 >
-> Status: **fase 1 gebouwd** (zie README en docs/INSTALLATIE.md). Fase 2 en 3 volgen.
+> Status: in gebruik. Sinds november 2026 zonder lessen: lesvoorbereiding en verbeteren als weekblokken (zie "Vereenvoudiging (november 2026)").
 
 ## 1. Doel
 
@@ -194,6 +194,19 @@ In het overzicht: "BKH3-K2 + K3" met de kleuren van beide klassen.
 **Afvinken beloont**: een klein vinkje-animatie, "al 3 vandaag" in de melding, en bovenaan Vandaag wat je vandaag al afvinkte (`klaarOp`).
 
 ~~**Ochtendmail**~~: weggehaald in script versie 12 (te veel mails). Vandaag is het overzicht van de dag.
+
+### Vereenvoudiging (november 2026)
+
+De lesopvolging van boekhouden (jaarplanning, overzicht per leerling) gebeurt nu in een andere app. Die houdt geen tijd bij, dus Saga blijft daarvoor dienen, maar zonder lessen.
+
+- **Weekblokken** (`weekgroepen`: `naam`, `kleur`, `volg`): standaard *BKH3*, *BKH4*, *BKH56 theorie* en *BKH56 exact*, te beheren bij Instellingen → *Weekblokken*. Per groep staan er elke week twee blokjes: **Lesvoorbereiding** en **Verbeteren**. Geen opsplitsing per les of taak meer.
+- Een weekblok is een taak met `week` (de maandag), `weekGroep` en `weekSoort` (`voorbereiding` | `verbeteren`); id `w-<soort>-<groep>-<maandag>`, zodat twee toestellen hetzelfde blokje maken. Een nieuw blokje krijgt `upd: 0`, zodat een versie waarin echt iets gebeurde (timer, afvinken) altijd wint bij het samenvoegen.
+- **Elke maandag nieuwe blokjes** (bij het opstarten, na een synchronisatie en als de dag verandert terwijl Saga openstaat). Die van vorige week **sluiten vanzelf af**: ze staan niet meer op Vandaag; er wordt niets in de gegevens veranderd (geen automatisch afvinken), zodat een toestel dat nog niet gesynchroniseerd was, geen bijgehouden tijd kan overschrijven. Zelf afvinken kan ("klaar voor deze week").
+- Op **Vandaag** (Belangrijk, onder de deadlines): per soort een rij per groep met de tijd van deze week, de tijd van vorige week en een timerknop. Weekblokken staan niet in het overzicht, het bakje of de daglast.
+- **Tijd**: een tabel *Lesvoorbereiding per week* en *Verbeteren per week*, met een kolom per groep en het gemiddelde per week; nieuwste week bovenaan, weken zonder tijd (vakantie) staan er ook. De weekblokken tellen ook mee in "per groep" (als voorbereiding of verbeteren).
+- **Lessen, taken voor leerlingen en klassen** staan niet meer in Saga: geen lessen in het overzicht, geen lesvoorbereiding of verbeteren per les op Vandaag, geen klassenkaarten op School, geen pagina per klas, geen klasfilter of *Enkel lessen*. De gegevens blijven bewaard (`isLesWerk`) en de tijd die erin kroop, telt nog mee in het tijdsoverzicht.
+- **School** = to do's per onderwerp (stage, opleiding, andere). To do's die vroeger aan een klas hingen zonder onderwerp, staan nu bij *Zonder onderwerp*. Afwezigheden van klassen tonen niet meer, vakanties wel.
+- Oude weekblokken verdwijnen na een maand van het toestel (niet van Drive), zoals afgewerkte taken.
 
 ## 3. Regels
 

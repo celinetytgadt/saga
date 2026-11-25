@@ -4,7 +4,7 @@
 // Elk object heeft een `upd` (tijdstempel van laatste wijziging) zodat twee
 // toestellen hun gegevens kunnen samenvoegen. Verwijderen = `del: true`.
 
-export const COLLECTIES = ['klassen', 'lessen', 'taken', 'sjablonen', 'dagen', 'vakken', 'opdrachten', 'afspraken', 'onderwerpen', 'afwezigheden'];
+export const COLLECTIES = ['klassen', 'lessen', 'taken', 'sjablonen', 'dagen', 'vakken', 'opdrachten', 'afspraken', 'onderwerpen', 'afwezigheden', 'weekgroepen'];
 
 export const DAGNAMEN = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'];
 export const MAANDNAMEN = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
@@ -118,6 +118,7 @@ export function leegeState() {
     onderwerpen: {}, // groepeert losse schooltaken (bv. Stage, Vergaderingen)
     afspraken: {}, // komt uit Google Agenda (alleen-lezen, geschreven door het script)
     afwezigheden: {}, // vakanties (alle klassen) en afwezigheden van één of meer klassen
+    weekgroepen: {}, // groepen voor de weekblokken (BKH3, BKH4, …), zie zorgWeekblokken
     instellingen: { werkdagen: [2, 5], toonKlaar: false, upd: 0 },
   };
 }
@@ -844,26 +845,19 @@ export function onderwerpVan(state, taak) {
   return o && !o.del && !taak.lesId && !taak.opdrachtId ? o : null;
 }
 
-// Een klas die (nog) bestaat in een lijst klas-id's.
-const metKlas = (state, ids) => (ids || []).some((id) => state.klassen[id] && !state.klassen[id].del);
-
 // Losse schooltaken van een onderwerp; `null` = zonder (of met een verwijderd) onderwerp.
-// Zonder onderwerp maar bij een klas: die staat al bij de klas, niet bij "Zonder onderwerp".
+// Weekblokken en vroeger werk bij een les horen er niet bij.
 export function takenVanOnderwerp(state, onderwerpId) {
-  return losseTaken(state, 'school').filter((t) => {
-    const id = onderwerpVan(state, t)?.id || null;
-    return id === (onderwerpId || null) && (id || !metKlas(state, t.klasIds));
-  });
+  return losseTaken(state, 'school').filter((t) => !t.week && !isLesWerk(t) && (onderwerpVan(state, t)?.id || null) === (onderwerpId || null));
 }
 
-// Schoolopdrachten (met stukken) van een onderwerp; `null` = zonder onderwerp (en zonder klas).
+// Schoolopdrachten (met stukken) van een onderwerp; `null` = zonder onderwerp.
 export function opdrachtenVanOnderwerp(state, onderwerpId) {
   return lijst(state, 'opdrachten')
     .filter((o) => opdrachtDomein(o) === 'school')
     .filter((o) => {
       const ond = o.onderwerpId && state.onderwerpen?.[o.onderwerpId];
-      const id = (ond && !ond.del ? ond.id : null) || null;
-      return id === (onderwerpId || null) && (id || !metKlas(state, o.klasIds));
+      return ((ond && !ond.del ? ond.id : null) || null) === (onderwerpId || null);
     })
     .sort(volgordeOpdracht);
 }
@@ -923,6 +917,138 @@ export function losseBlokkenNaarStukken(state) {
     });
   }
   return Object.keys(groepen).length > 0;
+}
+
+// ---------- weekblokken ----------
+// Lesvoorbereiding en verbeteren volg ik niet meer per les (dat gebeurt in een andere
+// app), maar als één blokje per week per groep: "Lesvoorbereiding BKH3", "Verbeteren
+// BKH56 exact", … Elk blokje is een taak met een timer (`week`: de maandag, `weekGroep`,
+// `weekSoort`). Op maandag komen er vanzelf nieuwe blokjes; die van vorige week zijn dan
+// afgesloten (ze verdwijnen van Vandaag, hun tijd blijft voor het tijdsoverzicht).
+// Het id ligt vast, zodat twee toestellen hetzelfde blokje maken. Een nieuw blokje krijgt
+// `upd: 0`: een versie waarin je echt iets deed (timer, afvinken) wint altijd.
+// Lessen en taken voor leerlingen van vroeger blijven bewaard (en tellen mee in het
+// tijdsoverzicht), maar staan niet meer op de planning (zie isLesWerk).
+
+export const WEEKSOORTEN = [
+  { sleutel: 'voorbereiding', label: 'Lesvoorbereiding' },
+  { sleutel: 'verbeteren', label: 'Verbeteren' },
+];
+
+export const STANDAARD_WEEKGROEPEN = [
+  { id: 'bkh3', naam: 'BKH3', kleur: '#2f8fcf' },
+  { id: 'bkh4', naam: 'BKH4', kleur: '#5bbba4' },
+  { id: 'bkh56t', naam: 'BKH56 theorie', kleur: '#8a5bb5' },
+  { id: 'bkh56e', naam: 'BKH56 exact', kleur: '#e0962a' },
+];
+
+// Vroeger werk bij een les (voorbereiding, taak voor leerlingen, to do bij een les):
+// blijft bewaard, maar staat niet meer op de planning.
+export const isLesWerk = (t) => !!t.lesId || t.soort === 'verbeteren';
+export const isWeekblok = (t) => !!t.week;
+
+export const weekblokId = (soort, groepId, maandag) => `w-${soort}-${groepId}-${maandag}`;
+
+export function weekgroepen(state) {
+  return lijst(state, 'weekgroepen').sort((a, b) => (a.volg || 0) - (b.volg || 0) || a.naam.localeCompare(b.naam));
+}
+
+export function weekblokNaam(state, t) {
+  const soort = WEEKSOORTEN.find((w) => w.sleutel === t.weekSoort)?.label || '';
+  const g = state.weekgroepen?.[t.weekGroep];
+  return `${soort} ${g?.naam || t.titel || ''}`.trim();
+}
+
+// Is er iets te doen: nog geen groepen, of een blokje van deze week ontbreekt?
+export function weekblokkenNodig(state, vandaagDatum = vandaag()) {
+  if (!Object.keys(state.weekgroepen || {}).length) return true;
+  const maandag = maandagVan(vandaagDatum);
+  return weekgroepen(state).some((g) => WEEKSOORTEN.some((w) => !state.taken[weekblokId(w.sleutel, g.id, maandag)]));
+}
+
+// De standaardgroepen (enkel als er nog nooit groepen waren) en de blokjes van deze week.
+// Geeft true als er iets bijkwam.
+export function zorgWeekblokken(state, vandaagDatum = vandaag()) {
+  if (!weekblokkenNodig(state, vandaagDatum)) return false;
+  state.weekgroepen ||= {};
+  if (!Object.keys(state.weekgroepen).length)
+    STANDAARD_WEEKGROEPEN.forEach((g, i) => (state.weekgroepen[g.id] = { ...g, volg: i, upd: 0 }));
+  const maandag = maandagVan(vandaagDatum);
+  for (const g of weekgroepen(state))
+    for (const w of WEEKSOORTEN) {
+      const id = weekblokId(w.sleutel, g.id, maandag);
+      if (state.taken[id]) continue;
+      state.taken[id] = {
+        id,
+        titel: g.naam,
+        week: maandag,
+        weekGroep: g.id,
+        weekSoort: w.sleutel,
+        domein: 'school',
+        werkdag: null,
+        deadline: null,
+        vanaf: null,
+        klaar: false,
+        notitie: '',
+        upd: 0,
+      };
+    }
+  return true;
+}
+
+// Het blokje van een groep en soort in de week van `datum` (of null).
+export function weekblok(state, groepId, soort, datum = vandaag()) {
+  const t = state.taken[weekblokId(soort, groepId, maandagVan(datum))];
+  return t && !t.del ? t : null;
+}
+
+// Een nieuwe groep krijgt meteen haar blokjes voor deze week (zie zorgWeekblokken).
+export function bewaarWeekgroep(state, id, { naam, kleur }) {
+  const huidig = id ? state.weekgroepen[id] : null;
+  const volg = huidig?.volg ?? Math.max(-1, ...lijst(state, 'weekgroepen').map((g) => g.volg || 0)) + 1;
+  const g = zet(state, 'weekgroepen', { ...(huidig || {}), id: id || nieuwId(), naam, kleur, volg });
+  zorgWeekblokken(state);
+  return g;
+}
+
+// Een groep verwijderen: de blokjes van deze week (zonder bestede tijd) verdwijnen mee,
+// de tijd van vroeger blijft.
+export function verwijderWeekgroep(state, id) {
+  const maandag = maandagVan(vandaag());
+  for (const w of WEEKSOORTEN) {
+    const t = state.taken[weekblokId(w.sleutel, id, maandag)];
+    if (t && !t.del && !bestedeTijd(t)) wis(state, 'taken', t.id);
+  }
+  wis(state, 'weekgroepen', id);
+}
+
+// Bestede tijd per week en per groep, voor de weken van `van` tot `tot` (de weken
+// waarvan de maandag erin valt). Weken zonder tijd (vakantie) staan er ook in,
+// vanaf de eerste week met een weekblokje. Nieuwste week eerst.
+export function weekRapport(state, van, tot, vandaagDatum = vandaag(), nu = Date.now()) {
+  const blokjes = lijst(state, 'taken').filter((t) => t.week && t.week >= maandagVan(van) && t.week <= tot);
+  const groepen = new Map(weekgroepen(state).map((g) => [g.id, g]));
+  const perWeek = {};
+  for (const t of blokjes) {
+    const ms = bestedeTijd(t, nu);
+    if (!groepen.has(t.weekGroep)) {
+      const g = state.weekgroepen?.[t.weekGroep];
+      if (!ms) continue;
+      groepen.set(t.weekGroep, { id: t.weekGroep, naam: g?.naam || '(verwijderd)', kleur: g?.kleur || null, weg: true });
+    }
+    const w = (perWeek[t.week] ||= { week: t.week, voorbereiding: 0, verbeteren: 0, groepen: {} });
+    const soort = t.weekSoort === 'verbeteren' ? 'verbeteren' : 'voorbereiding';
+    const g = (w.groepen[t.weekGroep] ||= { voorbereiding: 0, verbeteren: 0 });
+    g[soort] += ms;
+    w[soort] += ms;
+  }
+  const eerste = Object.keys(perWeek).sort()[0];
+  const weken = [];
+  if (eerste) {
+    const laatste = maandagVan(tot < vandaagDatum ? tot : vandaagDatum);
+    for (let d = eerste; d <= laatste; d = plusDagen(d, 7)) weken.unshift(perWeek[d] || { week: d, voorbereiding: 0, verbeteren: 0, groepen: {} });
+  }
+  return { groepen: [...groepen.values()], weken };
 }
 
 // ---------- tijd bijhouden ----------
@@ -1038,6 +1164,7 @@ export const DAGGRENS_STANDAARD = 240; // minuten op een dag die geen werkdag is
 export const DAGGRENS_WERKDAG = 60;
 
 function schatSleutels(state, t) {
+  if (t.week) return ['week:' + t.weekSoort + ':' + t.weekGroep];
   const klas = klassenVanTaak(state, t)[0] || '';
   if (isVerbeteren(t)) return ['verb:' + klas, 'verb'];
   if (t.lesId) return ['les:' + klas, 'les'];
@@ -1074,7 +1201,7 @@ export function schatting(state, t) {
 }
 
 function takenPerDag(state) {
-  return onthoud('takenPerDag', state.taken, () => groepeer(lijst(state, 'taken').filter((t) => !t.klaar), (t) => werkdagVan(state, t)));
+  return onthoud('takenPerDag', state.taken, () => groepeer(lijst(state, 'taken').filter((t) => !t.klaar && !isLesWerk(t)), (t) => werkdagVan(state, t)));
 }
 
 // Geschatte tijd die nog gepland staat op een dag, en of dat te veel is.
@@ -1307,7 +1434,7 @@ export function actief(state, vandaagDatum, nu, bewaardTot) {
   const eigenOud = (k, o) => {
     if (!o || typeof o !== 'object') return false;
     if (o.del) return !recent(o);
-    if (k === 'taken') return !recent(o) && !!o.klaar && (o.werkdag || '') < grens;
+    if (k === 'taken') return !recent(o) && (!!o.klaar || !!o.week) && (o.week || o.werkdag || '') < grens;
     if (k === 'lessen') return !recent(o) && !!o.datum && o.datum < grens;
     if (k === 'opdrachten') return !recent(o) && (o.deadline ? o.deadline < grens : !!metStukken[o.id]);
     if (k === 'afspraken') return (o.eindDatum || o.datum || '') < grens;
@@ -1362,7 +1489,7 @@ export function schooljaarStart(datum) {
 
 // Dag waaraan de bestede tijd van een taak toegeschreven wordt.
 export function tijdDatum(state, t) {
-  return t.werkdag || deadlineVan(state, t) || (t.upd ? isoDatum(new Date(t.upd)) : null);
+  return t.week || t.werkdag || deadlineVan(state, t) || (t.upd ? isoDatum(new Date(t.upd)) : null);
 }
 
 // Bestede tijd tussen `van` en `tot` (inbegrepen), opgeteld per groep (klas, onderwerp,
@@ -1378,12 +1505,15 @@ export function tijdRapport(state, van, tot, nu = Date.now()) {
       const domein = domeinVan(t);
       const les = t.lesId && state.lessen[t.lesId];
       const opd = t.opdrachtId && state.opdrachten[t.opdrachtId];
-      const soort = isVerbeteren(t) ? 'verbeteren' : t.lesId ? 'les' : t.opdrachtId ? 'opdracht' : 'los';
+      const wg = t.week && state.weekgroepen?.[t.weekGroep];
+      const soort = t.week ? (t.weekSoort === 'verbeteren' ? 'verbeteren' : 'les') : isVerbeteren(t) ? 'verbeteren' : t.lesId ? 'les' : t.opdrachtId ? 'opdracht' : 'los';
       const klassen = klassenVanTaak(state, t)
         .map((id) => state.klassen[id])
         .filter(Boolean);
       let g;
-      if (klassen.length) {
+      if (t.week) {
+        g = { sleutel: 'wk:' + t.weekGroep, naam: wg?.naam || '(weekblok)', kleur: wg?.kleur || null };
+      } else if (klassen.length) {
         g = { sleutel: 'klas:' + klassen.map((k) => k.id).sort().join('+'), naam: groepNaam(klassen.map((k) => k.naam)), kleur: klassen[0].kleur, klasIds: klassen.map((k) => k.id) };
       } else {
         const ond = (opd && opd.onderwerpId && state.onderwerpen[opd.onderwerpId]) || (!opd && !les && t.onderwerpId && state.onderwerpen[t.onderwerpId]);
@@ -1395,13 +1525,13 @@ export function tijdRapport(state, van, tot, nu = Date.now()) {
       const groep = (r.groepen[g.sleutel] ||= { ...g, domein, totaal: 0, soorten: {}, lessen: {} });
       groep.totaal += ms;
       groep.soorten[soort] = (groep.soorten[soort] || 0) + ms;
-      if (soort === 'les') groep.lessen[t.lesId] = true;
+      if (soort === 'les' && t.lesId) groep.lessen[t.lesId] = true;
       const maand = (r.maanden[datum.slice(0, 7)] ||= { maand: datum.slice(0, 7), school: 0, opleiding: 0 });
       maand[domein] += ms;
       r.totaal += ms;
       r[domein] += ms;
       const ik = les ? 'les:' + t.lesId : opd ? 'opd:' + t.opdrachtId : 'taak:' + t.id;
-      const titel = les ? les.titel : opd ? opd.titel : t.titel;
+      const titel = les ? les.titel : opd ? opd.titel : t.week ? weekblokNaam(state, t) : t.titel;
       const item = (r.items[ik] ||= { sleutel: ik, titel: titel || '(zonder titel)', groep: g.naam, kleur: g.kleur, ms: 0, datum });
       item.ms += ms;
       if (datum > item.datum) item.datum = datum;

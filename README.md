@@ -1,6 +1,6 @@
 # Saga
 
-Persoonlijke takenplanner van Céline: lessen en taken in schuifbare blokken over 30 dagen, op gsm en computer, met een overzicht van waar de tijd naartoe gaat.
+Persoonlijke takenplanner van Céline: to do's in schuifbare blokken, weekblokken voor lesvoorbereiding en verbeteren met een timer, op gsm en computer, met een overzicht van waar de tijd naartoe gaat.
 
 - **Ontwerp:** [docs/ONTWERP.md](docs/ONTWERP.md)
 - **Installatie:** [docs/INSTALLATIE.md](docs/INSTALLATIE.md)
@@ -15,7 +15,7 @@ Persoonlijke takenplanner van Céline: lessen en taken in schuifbare blokken ove
 | `js/app.js` | opstart, navigatie en acties |
 | `js/ui.js` | gedeelde toestand van de schermen, filter, melding met "Ongedaan maken" |
 | `js/weergave.js` | bouwstenen van de schermen (kaarten, lijstjes) |
-| `js/views/` | de schermen: vandaag, overzicht, school, klas, opleiding, tijd, instellingen |
+| `js/views/` | de schermen: vandaag, overzicht, school, opleiding, tijd, instellingen |
 | `js/dialogen.js` | vensters om taken, lessen, opdrachten, … te bewerken |
 | `sw.js`, `manifest.webmanifest`, `icons/` | installeerbaar als app, werkt offline |
 | `apps-script/Code.gs` | opslag op Google Drive via Google Apps Script |

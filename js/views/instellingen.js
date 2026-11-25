@@ -41,8 +41,24 @@ export function viewInstellingen(s) {
     <h1>Instellingen</h1>
 
     <section class="kaart">
+      <h2>Weekblokken</h2>
+      <p class="hint">Voor elke groep staan er elke week twee blokjes op Vandaag: <b>Lesvoorbereiding</b> en <b>Verbeteren</b>, elk met een timer. Op maandag komen er nieuwe; die van vorige week sluiten vanzelf af. Het verloop per week staat bij <a href="#/tijd">Tijd</a>.</p>
+      ${
+        M.weekgroepen(s).length
+          ? `<ol class="lessen-lijst">${M.weekgroepen(s)
+              .map(
+                (g) => `<li><div class="lesregel" role="button" tabindex="0" data-actie="weekgroep-bewerk" data-id="${g.id}">
+                  <span class="lesregel-titel"><span class="bol" style="--klas:${g.kleur}"></span> ${esc(g.naam)}</span></div></li>`
+              )
+              .join('')}</ol>`
+          : '<p class="leeg">Geen weekblokken.</p>'
+      }
+      <div class="knoppen"><button class="knop primair klein" data-actie="weekgroep-bewerk">+ weekblok</button></div>
+    </section>
+
+    <section class="kaart">
       <h2>Vaste werkdagen</h2>
-      <p class="hint">Afspraken met <b>#sw</b> in je agenda tellen altijd als werkdag. Staan al je werkdagen in de agenda, dan mag je hier alles uitvinken. Een lestaak komt standaard op de dag vóór de les die geen werkdag is; als je werkdagen later veranderen, blijven je taken staan waar ze staan.</p>
+      <p class="hint">Afspraken met <b>#sw</b> in je agenda tellen altijd als werkdag. Staan al je werkdagen in de agenda, dan mag je hier alles uitvinken. Een dag waarop je werkt, is sneller vol (zie Planning) en "Verdelen" slaat hem over.</p>
       <div class="dagknoppen">${WEEK.map(
         (d) =>
           `<button class="dagknop ${s.instellingen.werkdagen.includes(d) ? 'aan' : ''}" data-actie="werkdag" data-dag="${d}" aria-pressed="${s.instellingen.werkdagen.includes(d)}">${M.DAGNAMEN[d]}</button>`
@@ -59,17 +75,17 @@ export function viewInstellingen(s) {
     </section>
 
     <section class="kaart" id="vakanties">
-      <h2>Vakanties en afwezigheden</h2>
-      <p class="hint">Een vakantie geldt voor alle klassen. Een afwezigheid (uitstap, stage, examens) duid je aan voor één of meer klassen. Lessen op zo'n dag krijgen een waarschuwing, en "Inplannen volgens rooster" slaat die dagen over.</p>
+      <h2>Vakanties</h2>
+      <p class="hint">Een vakantie staat als balkje in het overzicht.</p>
       ${afwezighedenLijst(s)}
       <div class="knoppen">
-        <button class="knop primair klein" data-actie="afwezigheid">+ vakantie of afwezigheid</button>
+        <button class="knop primair klein" data-actie="afwezigheid">+ vakantie</button>
       </div>
     </section>
 
     <section class="kaart">
       <h2>Tijd</h2>
-      <p class="hint">Waar gaat je tijd naartoe? Per klas, onderwerp en soort werk, over het hele schooljaar.</p>
+      <p class="hint">Waar gaat je tijd naartoe? Per week (lesvoorbereiding en verbeteren), per onderwerp en soort werk, over het hele schooljaar.</p>
       <div class="knoppen"><a class="knop klein" href="#/tijd">Tijdsoverzicht →</a></div>
     </section>
 

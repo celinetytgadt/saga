@@ -2,7 +2,7 @@
 
 import * as M from './model.js';
 import { getState, wijzig, wijzigOngedaan } from './store.js';
-import { $, esc, ui, mobiel, WEEK, bewaarLokaal, melding } from './ui.js';
+import { $, esc, ui, mobiel, bewaarLokaal, melding } from './ui.js';
 import {
   blokkenHtml, klasLabel, lesVan, opNaam, sorteerLessen, sorteerTaken, taakTitel, takenLijst, timerHtml, totaalTijd, vergelijkDatum, voortgang,
 } from './weergave.js';
@@ -83,7 +83,7 @@ function hoortBijOpties(s, gekozen, klasIds = []) {
     onderwerpen.length
       ? `<optgroup label="School · onderwerpen">${onderwerpen.map((o) => optie('ond:' + o.id, esc(o.naam))).join('')}</optgroup>`
       : '',
-    lessen.length
+    lessen.length && gekozen.startsWith('les:')
       ? `<optgroup label="School · lessen">${lessen
           .map((l) => optie('les:' + l.id, `${esc(klasLabel(s, l))} · ${esc(l.titel)}${l.datum ? ` (${M.kortDatum(l.datum)})` : ''}`))
           .join('')}</optgroup>`
@@ -99,8 +99,9 @@ function hoortBijOpties(s, gekozen, klasIds = []) {
   ].join('');
 }
 
-// Enkel een losse schooltaak (eventueel met onderwerp) krijgt zelf klassen.
-const voorKlas = (bij) => !bij.lesId && !bij.opdrachtId && bij.domein === 'school';
+// Klassen bij een to do: niet meer (lessen en klassen volg ik in een andere app).
+// Een to do die vroeger een klas kreeg, houdt die (zie bewaren).
+const voorKlas = () => false;
 
 function leesHoortBij(waarde) {
   const [soort, id] = waarde.split(':');
@@ -119,6 +120,7 @@ export function openTaak(id, voorinvulling = {}, terug = null) {
     : { titel: '', lesId: null, opdrachtId: null, werkdag: null, deadline: null, vanaf: null, klaar: false, notitie: '', ...voorinvulling };
   if (!t || t.del) return;
   if (M.isLeerlingTaak(t)) return openLeerlingTaak(id, {}, terug);
+  if (t.week) return openWeekblok(id);
   if (!id && !voorinvulling.deadline) {
     if (t.lesId) t.deadline = { rel: -1 };
     if (t.opdrachtId) t.deadline = { eind: true };
@@ -151,7 +153,7 @@ export function openTaak(id, voorinvulling = {}, terug = null) {
              <p class="hint">Voorbereiding van de les ${esc(klasLabel(s, les))} · ${esc(les.titel)}${les.datum ? ` (${M.kortDatum(les.datum)})` : ''}.</p>`
           : `<label>Wat<input name="titel" required value="${esc(t.titel)}" ${id ? '' : 'autofocus'}></label>
              <label>Hoort bij<select name="hoort">${hoortBijOpties(s, hoort, voorinvulling.klasIds || [])}</select></label>
-             <div class="voor-klas">${klasChips(s, t.klasIds || [], 'Voor klas(sen) <small>(optioneel; verschijnt dan ook bij de klas)</small>')}</div>`
+`
       }
       <label>Werkdag <small>(wanneer ik eraan werk; leeg = ${t.hoofd ? 'standaard, vóór de les' : 'bakje'})</small><input type="date" name="werkdag" value="${t.werkdag || ''}"></label>
       <div class="rij">
@@ -219,7 +221,6 @@ export function openTaak(id, voorinvulling = {}, terug = null) {
         bewaar({
           titel: w.titel.trim(),
           ...bij,
-          klasIds: voorKlas(bij) ? new FormData(f).getAll('klas') : undefined,
           werkdag: w.werkdag || null,
           deadline: M.deadlineUitSleutel(w.deadlineSoort, w.deadlineDatum),
           vanaf: nieuweVanaf,
@@ -248,6 +249,43 @@ export function openTaak(id, voorinvulling = {}, terug = null) {
             if (blokken && huidig.deelGroep) blokken.innerHTML = blokkenHtml(st, huidig);
           }
         : null,
+    }
+  );
+}
+
+// Een weekblok: enkel de timer, een notitie en afvinken (klaar voor deze week).
+function openWeekblok(id) {
+  const s = getState();
+  const t = s.taken[id];
+  const tot = M.plusDagen(t.week, 6);
+  dialoog(
+    `<h2>${esc(taakTitel(s, t))}</h2>
+    <p class="hint">Week van ${M.kortDatum(t.week)} tot ${M.kortDatum(tot)}${t.week < M.maandagVan(M.vandaag()) ? ' (afgesloten)' : ''}.</p>
+    <div class="timer-wrap">${timerHtml(t)}</div>
+    <form id="f-wb" class="formulier">
+      <label>Notitie<textarea name="notitie" rows="2">${esc(t.notitie)}</textarea></label>
+      <label class="check"><input type="checkbox" name="klaar" ${t.klaar ? 'checked' : ''}> Klaar voor deze week</label>
+      <div class="knoppen">
+        <span class="vul"></span>
+        <button type="button" class="knop" data-sluit>Annuleren</button>
+        <button class="knop primair">Opslaan</button>
+      </div>
+    </form>`,
+    (d) => {
+      const f = $('#f-wb', d);
+      f.addEventListener('submit', (e) => {
+        e.preventDefault();
+        wijzig((st) => M.bewaarTaak(st, id, { notitie: f.notitie.value.trim(), klaar: f.klaar.checked }));
+        sluit();
+      });
+      $('[data-sluit]', d).addEventListener('click', sluit);
+    },
+    {
+      herteken: () => {
+        const huidig = getState().taken[id];
+        const wrap = dlg.querySelector('.timer-wrap');
+        if (huidig && !huidig.del && wrap && !wrap.querySelector('.tijd-form')) wrap.innerHTML = timerHtml(huidig);
+      },
     }
   );
 }
@@ -598,7 +636,6 @@ export function openOpdracht(id, voorinvulling = {}) {
       <label class="nieuw-vak">Naam nieuw ${school ? 'onderwerp' : 'onderdeel'}<input name="nieuweGroep" placeholder="${school ? 'bv. Stage' : 'bv. Didactiek 2'}"></label>
       <label>${school ? 'To do' : 'Opdracht'}<input name="titel" required value="${esc(o.titel)}" placeholder="${school ? 'bv. Stageverslag' : 'bv. Portfolio stage'}" ${id ? '' : 'autofocus'}></label>
       <label>Einddeadline${school ? ' <small>(optioneel)</small>' : ''}<input type="date" name="deadline" ${school ? '' : 'required'} value="${o.deadline || ''}"></label>
-      ${school ? klasChips(s, o.klasIds || [], 'Voor klas(sen) <small>(optioneel)</small>') : ''}
       ${
         id
           ? ''
@@ -641,7 +678,7 @@ export function openOpdracht(id, voorinvulling = {}) {
           const opd = M.zet(st, 'opdrachten', {
             ...(id ? st.opdrachten[id] : {}),
             id: id || M.nieuwId(),
-            ...(school ? { domein: 'school', onderwerpId: groep, vakId: null, klasIds: new FormData(f).getAll('klas') } : { vakId: groep }),
+            ...(school ? { domein: 'school', onderwerpId: groep, vakId: null } : { vakId: groep }),
             titel: w.titel.trim(),
             deadline: w.deadline || null,
             volg: id ? st.opdrachten[id].volg : M.volgendeOpdrachtVolg(st),
@@ -735,6 +772,42 @@ export function openVak(id) {
   );
 }
 
+// Groep voor de weekblokken (bv. BKH56 exact): elke week een blokje lesvoorbereiding en
+// een blokje verbeteren.
+export function openWeekgroep(id) {
+  const s = getState();
+  const g = id ? s.weekgroepen[id] : { naam: '', kleur: M.KLASKLEUREN[M.lijst(s, 'weekgroepen').length % M.KLASKLEUREN.length] };
+  const kleuren = M.KLASKLEUREN.includes(g.kleur) ? M.KLASKLEUREN : [g.kleur, ...M.KLASKLEUREN];
+  dialoog(
+    `<h2>${id ? 'Weekblok bewerken' : 'Nieuw weekblok'}</h2>
+    <form id="f-wg" class="formulier">
+      <label>Naam<input name="naam" required value="${esc(g.naam)}" placeholder="bv. BKH56 exact" autofocus></label>
+      ${kleurKeuze(kleuren, g.kleur)}
+      <p class="hint">Elke week komen er twee blokjes: "Lesvoorbereiding ${esc(g.naam || '…')}" en "Verbeteren ${esc(g.naam || '…')}".${id ? ' Een nieuwe naam geldt ook voor de vorige weken.' : ''}</p>
+      <div class="knoppen">
+        ${id ? `<button type="button" class="knop gevaar" data-weg>Verwijderen</button>` : ''}
+        <span class="vul"></span>
+        <button type="button" class="knop" data-sluit>Annuleren</button>
+        <button class="knop primair">Opslaan</button>
+      </div>
+    </form>`,
+    (d) => {
+      const f = $('#f-wg', d);
+      f.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const fd = new FormData(f);
+        wijzig((st) => M.bewaarWeekgroep(st, id, { naam: fd.get('naam').trim(), kleur: fd.get('kleur') || g.kleur }));
+        sluit();
+      });
+      $('[data-sluit]', d).addEventListener('click', sluit);
+      $('[data-weg]', d)?.addEventListener('click', () => {
+        metOngedaan(`${g.naam} verwijderd (de tijd van vorige weken blijft)`, (st) => M.verwijderWeekgroep(st, id));
+        sluit();
+      });
+    }
+  );
+}
+
 export function openOnderwerp(id) {
   const s = getState();
   const o = id ? s.onderwerpen[id] : { naam: '', kleur: M.KLASKLEUREN[M.lijst(s, 'onderwerpen').length % M.KLASKLEUREN.length] };
@@ -779,8 +852,7 @@ export function openDag(datum) {
     `<h2>${M.kortDatum(datum)}</h2>
     <div class="menu">
       <button class="knop" data-actie="nieuwe-taak" data-datum="${datum}">+ to do op deze dag</button>
-      <button class="knop" data-actie="nieuwe-les" data-datum="${datum}">+ les op deze dag</button>
-      <button class="knop" data-actie="afwezigheid" data-datum="${datum}">+ vakantie of afwezigheid vanaf deze dag</button>
+      <button class="knop" data-actie="afwezigheid" data-datum="${datum}">+ vakantie vanaf deze dag</button>
       <button class="knop" data-werk>${werk ? 'Geen werkdag maken' : 'Extra werkdag maken'}</button>
     </div>
     <p class="hint">${uitleg}</p>`,
@@ -798,11 +870,9 @@ export function openNieuw() {
     `<h2>Nieuw</h2>
     <div class="menu">
       <button class="knop" data-actie="nieuwe-taak">✏️ To do <small>iets dat je moet regelen</small></button>
-      <button class="knop" data-actie="nieuwe-leerlingtaak">📝 Taak voor leerlingen <small>verbeteren komt vanzelf op je planning</small></button>
-      <button class="knop" data-actie="nieuwe-les">🏫 Les</button>
       <button class="knop" data-actie="nieuwe-opdracht" data-domein="school">📋 To do met stukken <small>school</small></button>
       <button class="knop" data-actie="nieuwe-opdracht" data-domein="opleiding">🎓 Opdracht <small>opleiding, met stukken</small></button>
-      <button class="knop" data-actie="afwezigheid">🏖 Vakantie of afwezigheid</button>
+      <button class="knop" data-actie="afwezigheid">🏖 Vakantie</button>
     </div>`
   );
 }
@@ -875,85 +945,6 @@ export function openAfwezigheid(id, voorinvulling = {}) {
     }
   );
 }
-
-export function openKlas(id) {
-  const s = getState();
-  const k = id ? s.klassen[id] : { naam: '', kleur: M.KLASKLEUREN[M.lijst(s, 'klassen').length % M.KLASKLEUREN.length], rooster: [] };
-  const kleuren = M.KLASKLEUREN.includes(k.kleur) ? M.KLASKLEUREN : [k.kleur, ...M.KLASKLEUREN];
-  dialoog(
-    `<h2>${id ? 'Klas bewerken' : 'Nieuwe klas'}</h2>
-    <form id="f-klas" class="formulier">
-      <label>Naam<input name="naam" required value="${esc(k.naam)}" placeholder="bv. BKH4" autofocus></label>
-      ${kleurKeuze(kleuren, k.kleur)}
-      <fieldset><legend>Lesdagen <small>(max. 1 les per dag)</small></legend><div class="dagknoppen">${WEEK.map(
-        (d) => `<label class="dagknop-check"><input type="checkbox" name="rooster" value="${d}" ${(k.rooster || []).includes(d) ? 'checked' : ''}><span>${M.DAGNAMEN[d]}</span></label>`
-      ).join('')}</div></fieldset>
-      <label>Leerlingen <small>(voornamen, één per regel of met komma's)</small><textarea name="leerlingen" rows="4" placeholder="Amira&#10;Bram&#10;Lotte">${esc((k.leerlingen || []).join('\n'))}</textarea></label>
-      <p class="hint">Bij een taak voor leerlingen vink je zo aan wie verbeterd is. Enkel voornamen, geen feedback.</p>
-      <div class="knoppen">
-        ${id ? `<button type="button" class="knop gevaar" data-weg>Verwijderen</button>` : ''}
-        <span class="vul"></span>
-        <button type="button" class="knop" data-sluit>Annuleren</button>
-        <button class="knop primair">Opslaan</button>
-      </div>
-    </form>`,
-    (d) => {
-      const f = $('#f-klas', d);
-      f.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const fd = new FormData(f);
-        wijzig((st) =>
-          M.zet(st, 'klassen', {
-            ...(id ? st.klassen[id] : {}),
-            id: id || M.nieuwId(),
-            naam: fd.get('naam').trim(),
-            kleur: fd.get('kleur') || k.kleur,
-            rooster: fd.getAll('rooster').map(Number),
-            leerlingen: M.leesLeerlingen(fd.get('leerlingen')),
-          })
-        );
-        sluit();
-      });
-      $('[data-sluit]', d).addEventListener('click', sluit);
-      $('[data-weg]', d)?.addEventListener('click', () => {
-        metOngedaan('Klas verwijderd', (st) => M.verwijderKlas(st, id));
-        sluit();
-      });
-    }
-  );
-}
-
-export function openPlakken(klasId) {
-  const s = getState();
-  const k = s.klassen[klasId];
-  dialoog(
-    `<h2>Lessen plakken · ${esc(k.naam)}</h2>
-    <form id="f-plak" class="formulier">
-      <label>Eén les per regel, in volgorde<textarea name="lijst" rows="8" placeholder="Documentenstroom&#10;Aankoopfactuur basis&#10;Aankoopfactuur met korting" autofocus></textarea></label>
-      <p class="hint">De lessen krijgen nog geen datum en komen bij "Lessen zonder datum". Hun taak verschijnt zodra de les een datum heeft. Krijgt een les samen met een andere klas, dan vink je die klas daarna aan bij de les.</p>
-      <div class="knoppen"><span class="vul"></span>
-        <button type="button" class="knop" data-sluit>Annuleren</button>
-        <button class="knop primair">Toevoegen</button>
-      </div>
-    </form>`,
-    (d) => {
-      const f = $('#f-plak', d);
-      f.addEventListener('submit', (e) => {
-        e.preventDefault();
-        wijzig((st) => {
-          let volg = M.volgendeVolg(st, klasId);
-          for (const titel of regels(f.lijst.value)) {
-            M.zet(st, 'lessen', { id: M.nieuwId(), klasIds: [klasId], titel, datum: null, volg: volg++ });
-          }
-          M.zorgHoofdtaken(st);
-        });
-        sluit();
-      });
-      $('[data-sluit]', d).addEventListener('click', sluit);
-    }
-  );
-}
-
 
 function deadlineOpties(gekozen, { les = true, datum = true, eind = false } = {}) {
   const opties = [`<option value="geen" ${gekozen === 'geen' ? 'selected' : ''}>geen deadline</option>`];

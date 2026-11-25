@@ -1,17 +1,14 @@
 // Saga – overzicht (raster op de computer, lijst op de gsm) en het bakje.
 
 import * as M from '../model.js';
-import { esc, ui, mobiel, WEEK, toonTaak, toonLes, toonOpdracht } from '../ui.js';
-import { anker, bakje, dagKort, snelInvoerHtml, groepen, groepKaart, klasLabel, lesKaart, lesVan, opNaam, sorteerLessen, voortgang, klassenNaam } from '../weergave.js';
+import { esc, ui, mobiel, WEEK, toonTaak, toonOpdracht } from '../ui.js';
+import { anker, bakje, dagKort, snelInvoerHtml, groepen, groepKaart, voortgang, klassenNaam } from '../weergave.js';
 
 // Alles per dag opzoeken, één keer per keer tekenen.
 function indexeer(s) {
-  const lessen = {};
   const taken = {};
   const deadlines = {};
   const eindes = {};
-  const indienen = {};
-  for (const l of M.lijst(s, 'lessen')) if (l.datum && toonLes(l)) (lessen[l.datum] ||= []).push(l);
   for (const o of M.lijst(s, 'opdrachten')) {
     if (!o.deadline || !toonOpdracht(o)) continue;
     const v = voortgang(M.takenVanOpdracht(s, o.id));
@@ -21,15 +18,14 @@ function indexeer(s) {
     if (!toonTaak(s, t)) continue;
     const wd = M.werkdagVan(s, t);
     if (wd) (taken[wd] ||= []).push(t);
-    if (!t.klaar && M.isLeerlingTaak(t)) (indienen[t.indien] ||= []).push(t);
-    else if (!t.klaar && !t.lesId && !t.deadline?.eind) {
+    if (!t.klaar && !t.deadline?.eind) {
       const dl = M.deadlineVan(s, t);
       // blokken van één opgesplitste taak: maar één vlaggetje
       const dubbel = t.deelGroep && (deadlines[dl] || []).some((x) => x.deelGroep === t.deelGroep);
       if (dl && dl !== wd && !dubbel) (deadlines[dl] ||= []).push(t);
     }
   }
-  return { lessen, taken, deadlines, eindes, indienen };
+  return { taken, deadlines, eindes };
 }
 
 function afwezigLabel(s, a) {
@@ -45,16 +41,14 @@ function eersteVanMaand(datum) {
 function dagBlok(s, idx, datum, v, raster) {
   const werk = M.isWerkdag(s, datum);
   const weekend = [0, 6].includes(M.weekdag(datum));
-  const lessen = (idx.lessen[datum] || []).sort(sorteerLessen(s));
   const taken = (idx.taken[datum] || []).filter((t) => s.instellingen.toonKlaar || !t.klaar);
   const dls = idx.deadlines[datum] || [];
   const eindes = idx.eindes[datum] || [];
-  const indienen = idx.indienen[datum] || [];
   // #sw: enkel de werkdag-rand, geen blokje. Verborgen afspraken tellen wel nog als werkdag.
   const afspraken = ui.verbergAfspraken ? [] : M.afsprakenOp(s, datum).filter((a) => !a.werk);
   // geschatte tijd van wat er nog gepland staat (vanaf vandaag, los van het filter)
   const last = datum >= v ? M.dagLast(s, datum) : null;
-  const afw = M.afwezighedenOp(s, datum).filter((a) => !ui.filter.klasId || M.isVakantie(a) || a.klasIds.includes(ui.filter.klasId));
+  const afw = M.afwezighedenOp(s, datum).filter(M.isVakantie);
   const vakantie = afw.some(M.isVakantie);
   const klassen = [
     'dag',
@@ -78,27 +72,18 @@ function dagBlok(s, idx, datum, v, raster) {
     </header>
     ${afw.map((a) => `<div class="afwezig ${M.isVakantie(a) ? 'vak' : ''}" role="button" tabindex="0" data-actie="afwezigheid" data-id="${a.id}" title="${esc(afwezigLabel(s, a))}">${esc(afwezigLabel(s, a))}</div>`).join('')}
     ${afspraken.map((a) => `<div class="afspraak" title="${esc(a.agenda ? `${a.titel} (${a.agenda})` : a.titel)}">${esc(a.titel)}</div>`).join('')}
-    ${lessen.map((l) => lesKaart(s, l, false, ui.filter.lessen)).join('')}
     ${groepen(s, taken).map((g) => groepKaart(s, g)).join('')}
-    ${vlaggen(s, eindes, indienen, dls)}
+    ${vlaggen(s, eindes, dls)}
   </section>`;
 }
 
-// Deadlines staan altijd onderaan de dag: einddeadlines van opdrachten, indiendagen
-// van taken voor leerlingen, en deadlines van to do's en stukken.
-function vlaggen(s, eindes, indienen, dls) {
-  if (!eindes.length && !indienen.length && !dls.length) return '';
+// Deadlines staan altijd onderaan de dag: einddeadlines van opdrachten en deadlines van to do's en stukken.
+function vlaggen(s, eindes, dls) {
+  if (!eindes.length && !dls.length) return '';
   const regel = (klas, actie, id, tekst, tip = tekst) =>
     `<div class="deadline ${klas}" role="button" tabindex="0" data-actie="${actie}" data-id="${id}" title="${esc(tip)}">${tekst}</div>`;
   return `<div class="deadlines">
     ${eindes.map((o) => regel(`einde ${M.opdrachtDomein(o)}`, 'opdracht', o.id, `⚑ ${esc(o.titel)}`)).join('')}
-    ${indienen
-      .map((t) => {
-        const les = lesVan(s, t);
-        const wie = les ? klasLabel(s, les) : klassenNaam(s, t.klasIds);
-        return regel('indien', 'taak', t.id, `⚑ Indienen: ${esc(t.titel)}${wie ? ` · ${esc(wie)}` : ''}`);
-      })
-      .join('')}
     ${dls
       .map((t) => {
         const a = anker(s, t);
@@ -108,7 +93,7 @@ function vlaggen(s, eindes, indienen, dls) {
   </div>`;
 }
 
-// Filter: domein (alles, school, opleiding), één klas, en "enkel lessen".
+// Filter: domein (alles, school, opleiding), en afspraken verbergen.
 export function filterKnoppen(s) {
   const f = ui.filter;
   const opties = [
@@ -116,26 +101,16 @@ export function filterKnoppen(s) {
     ['school', 'School'],
     ['opleiding', '🎓 Opleiding'],
   ];
-  const klassen = M.lijst(s, 'klassen').sort(opNaam);
   return `<div class="filters">
     <div class="filter" role="group" aria-label="Toon">${opties
       .map(([d, label]) => {
-        const aan = f.domein === d && !f.klasId;
+        const aan = f.domein === d;
         return `<button class="${aan ? 'aan' : ''}" data-actie="filter" data-domein="${d}" aria-pressed="${aan}">${label}</button>`;
       })
       .join('')}</div>
-    ${
-      klassen.length
-        ? `<select class="filter-klas ${f.klasId ? 'aan' : ''}" data-filter-klas aria-label="Klas">
-            <option value="">Alle klassen</option>
-            ${klassen.map((k) => `<option value="${k.id}" ${k.id === f.klasId ? 'selected' : ''}>${esc(k.naam)}</option>`).join('')}
-          </select>`
-        : ''
-    }
     <details class="weergave-menu" ${ui.weergaveOpen ? 'open' : ''}>
-      <summary class="filter-lessen ${f.lessen || ui.verbergAfspraken ? 'aan' : ''}">Weergave ▾</summary>
+      <summary class="filter-lessen ${ui.verbergAfspraken ? 'aan' : ''}">Weergave ▾</summary>
       <div class="weergave-pop">
-        <label class="check"><input type="checkbox" data-weergave="lessen" ${f.lessen ? 'checked' : ''}><span>Enkel lessen<small>met hun voorbereiding en taken</small></span></label>
         <label class="check"><input type="checkbox" data-lokaal="verbergAfspraken" ${ui.verbergAfspraken ? 'checked' : ''}><span>Afspraken verbergen<small>op dit toestel, bv. bij projecteren</small></span></label>
       </div>
     </details>
@@ -147,9 +122,7 @@ export function filterKnoppen(s) {
 function filterActief(s) {
   const f = ui.filter;
   const delen = [];
-  if (f.klasId) delen.push(esc(s.klassen[f.klasId]?.naam || 'klas'));
-  else if (f.domein !== 'alles') delen.push(f.domein === 'school' ? 'school' : 'opleiding');
-  if (f.lessen) delen.push('enkel lessen');
+  if (f.domein !== 'alles') delen.push(f.domein === 'school' ? 'school' : 'opleiding');
   if (ui.verbergAfspraken) delen.push('zonder afspraken');
   if (!delen.length) return '';
   return `<button class="filter-actief" data-actie="filter-wis" title="Alles weer tonen">Filter: ${delen.join(' · ')} ✕</button>`;
@@ -159,9 +132,6 @@ export const bakjeVoorFilter = (s) => bakje(s, (t) => toonTaak(s, t));
 
 export function bakjeInhoud(s) {
   const b = bakjeVoorFilter(s);
-  const lessen = M.lijst(s, 'lessen')
-    .filter((l) => !l.datum && toonLes(l))
-    .sort(sorteerLessen(s));
   const kaarten = (lijst) => groepen(s, lijst).map((g) => groepKaart(s, g)).join('');
   const opl = b.opleiding
     .map(
@@ -186,13 +156,12 @@ export function bakjeInhoud(s) {
     }
     ${b.school.length ? `<h3>School</h3>${kaarten(b.school)}` : ''}
     ${opl ? `<h3 class="kop-opl">🎓 Opleiding</h3>${opl}` : ''}
-    ${!b.aantal && !ui.filter.lessen ? '<p class="leeg">Alles staat ingepland. 🌿</p>' : ''}
+    ${!b.aantal ? '<p class="leeg">Alles staat ingepland. 🌿</p>' : ''}
     ${
       b.later
         ? `<p class="hint">Nog ${b.later} voor later (meer dan 2 weken weg): zie <a href="#/klassen">School</a> en <a href="#/opleiding">Opleiding</a>.</p>`
         : ''
     }
-    ${lessen.length ? `<details class="zonder-datum"><summary>Lessen zonder datum (${lessen.length})</summary>${lessen.map((l) => lesKaart(s, l)).join('')}</details>` : ''}
     <p class="hint">${mobiel.matches ? 'Tik op een blokje om het naar een dag te verplaatsen.' : 'Sleep blokjes naar een dag, of terug naar hier.'}</p>`;
 }
 

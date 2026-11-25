@@ -32,6 +32,36 @@ function balk(ms, max, kleur, titel) {
   return `<div class="t-balk" title="${esc(titel)}"><span style="width:${pct}%;--c:${kleur || 'var(--rand-sterk)'}"></span></div>`;
 }
 
+// Lesvoorbereiding en verbeteren per week (de weekblokken): een tabel per soort, met een
+// kolom per groep, zodat je het verloop overheen de weken ziet. Nieuwste week bovenaan.
+const kortWeek = (w) => `${Number(w.slice(8, 10))} ${M.MAANDNAMEN[Number(w.slice(5, 7)) - 1]}`;
+
+function weekTabellen(data, van, tot) {
+  const r = M.weekRapport(data, van, tot);
+  if (!r.weken.length) return '';
+  const max = (soort) => Math.max(0, ...r.weken.map((w) => w[soort]));
+  const cel = (ms) => (ms ? M.duurTekst(ms) : '–');
+  const tabel = ({ sleutel, label }) => {
+    const m = max(sleutel);
+    const kleur = sleutel === 'verbeteren' ? 'var(--fuchsia)' : 'var(--groen)';
+    const rijen = r.weken
+      .map(
+        (w) => `<tr><th scope="row">${kortWeek(w.week)}</th>${r.groepen.map((g) => `<td>${cel(w.groepen[g.id]?.[sleutel])}</td>`).join('')}
+          <td class="t-num"><b>${cel(w[sleutel])}</b></td><td class="t-balk-cel">${balk(w[sleutel], m, kleur, `week van ${kortWeek(w.week)}: ${cel(w[sleutel])}`)}</td></tr>`
+      )
+      .join('');
+    const weken = r.weken.filter((w) => w[sleutel]);
+    const gem = weken.length ? weken.reduce((n, w) => n + w[sleutel], 0) / weken.length : 0;
+    return `<section class="kaart"><h2>${label} per week</h2>
+      <div class="t-tabel-wrap"><table class="t-tabel"><thead><tr><th>Week van</th>${r.groepen
+        .map((g) => `<th><span class="bol" style="--klas:${g.kleur || 'var(--rand-sterk)'}"></span> ${esc(g.naam)}</th>`)
+        .join('')}<th class="t-num">Samen</th><th></th></tr></thead><tbody>${rijen}</tbody></table></div>
+      ${gem ? `<p class="hint">Gemiddeld ${M.duurTekst(gem)} per week (weken met tijd).</p>` : ''}
+    </section>`;
+  };
+  return M.WEEKSOORTEN.map(tabel).join('');
+}
+
 export function viewTijd(s) {
   const t = ui.tijd;
   const [van, tot] = periodeGrenzen(t.periode);
@@ -59,7 +89,7 @@ export function viewTijd(s) {
         .map(([k, l]) => `${l} ${M.duurTekst(g.soorten[k])}`)
         .join(' · ');
       const perLes = g.aantalLessen ? ` · gemiddeld ${M.duurTekst(g.perLes)} per les (${g.aantalLessen} ${g.aantalLessen === 1 ? 'les' : 'lessen'})` : '';
-      const link = g.klasIds?.length === 1 ? `<a href="#/klas/${g.klasIds[0]}">${esc(g.naam)}</a>` : esc(g.naam);
+      const link = esc(g.naam);
       return `<li class="t-rij">
         <div class="t-label"><span class="bol" style="--klas:${g.kleur || 'var(--rand-sterk)'}"></span><b>${link}</b><span class="t-waarde">${M.duurTekst(g.totaal)}</span></div>
         ${balk(g.totaal, maxGroep, g.kleur, `${g.naam}: ${M.duurTekst(g.totaal)}`)}
@@ -90,7 +120,8 @@ export function viewTijd(s) {
       <div class="t-tegel"><span class="t-groot">${duur(r.school)}</span><span class="zacht">school</span></div>
       <div class="t-tegel"><span class="t-groot">${duur(r.opleiding)}</span><span class="zacht">🎓 opleiding</span></div>
     </div>
-    <section class="kaart"><h2>Per klas, onderwerp en opleidingsonderdeel</h2><ol class="t-lijst">${groepen}</ol></section>
+    ${weekTabellen(data, van, tot)}
+    <section class="kaart"><h2>Per groep, onderwerp en opleidingsonderdeel</h2><ol class="t-lijst">${groepen}</ol></section>
     <section class="kaart"><h2>Waar ging de meeste tijd naartoe</h2><ol class="t-lijst">${top}</ol>
       <p class="hint">Per les (voorbereiding en verbeteren samen), opdracht of losse taak.</p></section>
     <section class="kaart"><h2>Per maand</h2>

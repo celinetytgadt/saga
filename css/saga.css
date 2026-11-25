@@ -1156,3 +1156,11 @@ a.knop.primair { color: var(--accent-tekst); }
 .magje.gewerkt { border-left: 3px dashed var(--groen); }
 .gewerkt-label { color: var(--groen); font-weight: 600; }
 .chip.gewerkt-chip.aan { border-style: solid; border-color: var(--groen); color: var(--groen); background: color-mix(in srgb, var(--groen) 10%, transparent); }
+
+/* Weekblokken: lesvoorbereiding en verbeteren per groep, deze week (Vandaag) */
+.deze-week { margin-top: 10px; }
+.vandaag-pagina h3.kop-week { display: flex; align-items: baseline; gap: 8px; margin-top: 12px; }
+.vandaag-pagina h3.kop-week small { font-weight: 500; color: var(--zacht); font-size: .8rem; }
+.magje.weekblok.klaar .magje-titel { text-decoration: none; }
+.magje.weekblok.klaar { opacity: .75; }
+.t-tabel th .bol, .lesregel-titel .bol { display: inline-block; width: 9px; height: 9px; vertical-align: middle; }

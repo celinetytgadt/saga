@@ -9,30 +9,35 @@ import { $, esc, ui, mobiel, bewaarLokaal, zetFilter, melding } from './ui.js';
 import { snelInvoerHtml, taakTitel, tijdFormHtml, timerHtml } from './weergave.js';
 import { viewRaster, viewLijst, viewBakje, bakjeVoorFilter } from './views/overzicht.js';
 import { viewKlassen } from './views/school.js';
-import { viewKlas } from './views/klas.js';
 import { viewOpleiding } from './views/opleiding.js';
 import { viewInstellingen } from './views/instellingen.js';
 import { viewTijd } from './views/tijd.js';
 import { viewVandaag } from './views/vandaag.js';
 import {
-  dlg, dialoog, metOngedaan, sluit, openTaak, openLes, openOpdracht, openDag, openNieuw, openLeerlingTaak, openStukkenPlakken, openKlas, openVak,
-  openOnderwerp, openPlakken, openAfwezigheid,
+  dlg, dialoog, metOngedaan, sluit, openTaak, openLes, openOpdracht, openDag, openNieuw, openStukkenPlakken, openVak,
+  openOnderwerp, openAfwezigheid, openWeekgroep,
 } from './dialogen.js';
 
-const VIEWS = ['vandaag', 'dagen', 'bakje', 'klassen', 'klas', 'opleiding', 'instellingen', 'tijd'];
+const VIEWS = ['vandaag', 'dagen', 'bakje', 'klassen', 'opleiding', 'instellingen', 'tijd'];
 // Welk menu-item oplicht bij een scherm.
-const NAV = { klas: 'klassen', bakje: 'vandaag' };
+const NAV = { bakje: 'vandaag' };
 
 // ---------- tekenen ----------
 
-// Elke les één taak, oude blokken omzetten, … Nodig bij het opstarten en wanneer er
-// gegevens binnenkomen (synchronisatie, back-up). Geeft true als er iets veranderde.
+// De weekblokken van deze week, oude blokken omzetten, … Nodig bij het opstarten, op een
+// nieuwe dag en wanneer er gegevens binnenkomen (synchronisatie, back-up).
+// Geeft true als er iets veranderde.
 function ruimOp() {
-  if (!M.heeftOpruimwerk(getState())) return false;
+  const s = getState();
+  const oud = M.heeftOpruimwerk(s);
+  if (!oud && !M.weekblokkenNodig(s)) return false;
   wijzig((st) => {
-    M.zorgHoofdtaken(st);
-    M.losseBlokkenNaarStukken(st);
-    M.herstelDeelDeadlines(st);
+    if (oud) {
+      M.zorgHoofdtaken(st);
+      M.losseBlokkenNaarStukken(st);
+      M.herstelDeelDeadlines(st);
+    }
+    M.zorgWeekblokken(st);
   });
   return true;
 }
@@ -158,7 +163,6 @@ function teken() {
     dagen: () => (mobiel.matches ? viewLijst(s) : viewRaster(s)),
     bakje: () => viewBakje(s),
     klassen: () => viewKlassen(s),
-    klas: () => viewKlas(s, ui.id),
     opleiding: () => viewOpleiding(s),
     instellingen: () => viewInstellingen(s),
     tijd: () => viewTijd(s),
@@ -202,7 +206,7 @@ function teken() {
   }
 }
 
-// #/dagen, #/klas/<id>, …
+// #/dagen, #/instellingen, …
 function route() {
   const [v, id] = location.hash.replace(/^#\/?/, '').split('/');
   // zonder adres: Vandaag
@@ -352,17 +356,9 @@ const acties = {
     if (el.dataset.klas) extra.klasIds = [el.dataset.klas];
     openTaak(null, { werkdag: el.dataset.datum || null, lesId, opdrachtId, ...extra }, terug);
   },
-  'nieuwe-les'(el) {
-    openLes(null, { datum: el.dataset.datum || null, klasId: el.dataset.klas || null });
-  },
   'nieuwe-opdracht'(el) {
     const domein = el.dataset.domein === 'school' ? 'school' : null;
     openOpdracht(null, { vakId: el.dataset.vak || null, domein, onderwerpId: el.dataset.onderwerp || null, klasId: el.dataset.klas || null });
-  },
-  // Taak voor leerlingen, bij een les of voor een klas.
-  'nieuwe-leerlingtaak'(el) {
-    const lesId = el.dataset.les || null;
-    openLeerlingTaak(null, { lesId, klasIds: el.dataset.klas ? [el.dataset.klas] : [] }, lesId ? () => openLes(lesId) : null);
   },
   'stukken-plakken'(el) {
     openStukkenPlakken(el.dataset.opdracht);
@@ -372,17 +368,6 @@ const acties = {
     if (!plan.length) return;
     const laatste = plan.map((p) => p.datum).sort().at(-1);
     metOngedaan(`${plan.length} ${plan.length === 1 ? 'stuk' : 'stukken'} verdeeld over je vrije dagen tot ${M.kortDatum(laatste)}`, (s) => M.pasVerdelingToe(s, plan));
-  },
-  'rooster-plannen'(el) {
-    const plan = M.planVolgensRooster(getState(), el.dataset.klas);
-    if (!plan.length) return;
-    metOngedaan(`${plan.length} ${plan.length === 1 ? 'les' : 'lessen'} ingepland tot ${M.kortDatum(plan.at(-1).datum)}`, (s) => M.pasLesplanToe(s, plan));
-  },
-  reeks(el) {
-    const r = Number(el.dataset.r);
-    const plan = M.reeksPlan(getState(), el.dataset.les, el.dataset.klas, r);
-    if (!plan) return melding('Dat kan niet: de plaats is al bezet of er is geen lesrooster.');
-    metOngedaan(`${plan.length} ${plan.length === 1 ? 'les' : 'lessen'} één lesmoment ${r > 0 ? 'later' : 'vroeger'}`, (s) => M.pasLesplanToe(s, plan));
   },
   tekst(el) {
     ui.tekst = el.dataset.k;
@@ -404,18 +389,13 @@ const acties = {
     render();
   },
   filter(el) {
-    zetFilter({ domein: el.dataset.domein, klasId: null });
+    zetFilter({ domein: el.dataset.domein });
     render();
   },
-  // Alles weer tonen: geen klas, alle domeinen, ook taken en afspraken.
+  // Alles weer tonen: alle domeinen, ook de afspraken.
   'filter-wis'() {
-    zetFilter({ domein: 'alles', klasId: null, lessen: false });
+    zetFilter({ domein: 'alles' });
     zetVerbergAfspraken(false);
-  },
-  // Vanop de pagina van een klas: het overzicht met enkel die klas.
-  'filter-klas'(el) {
-    zetFilter({ klasId: el.dataset.klas, lessen: false });
-    location.hash = '#/dagen';
   },
   'naar-vandaag'() {
     ui.wekenTerug = 1;
@@ -440,17 +420,14 @@ const acties = {
   'tijd-laden'() {
     laadTijd(true);
   },
-  'klas-bewerk'(el) {
-    openKlas(el.dataset.id || null);
+  'weekgroep-bewerk'(el) {
+    openWeekgroep(el.dataset.id || null);
   },
   'vak-bewerk'(el) {
     openVak(el.dataset.id || null);
   },
   'onderwerp-bewerk'(el) {
     openOnderwerp(el.dataset.id || null);
-  },
-  'lessen-plakken'(el) {
-    openPlakken(el.dataset.klas);
   },
   werkdag(el) {
     const d = Number(el.dataset.dag);
@@ -545,12 +522,6 @@ document.addEventListener('change', (e) => {
     vernieuwAgenda();
   } else if (el.dataset.lokaal === 'verbergAfspraken') {
     zetVerbergAfspraken(el.checked);
-  } else if (el.dataset.weergave === 'lessen') {
-    zetFilter({ lessen: el.checked });
-    render();
-  } else if (el.matches('[data-filter-klas]')) {
-    zetFilter({ klasId: el.value || null });
-    render();
   } else if ((el.id === 'backup-in' || el.id === 'backup-terug') && el.files[0]) {
     const terug = el.id === 'backup-terug';
     el.files[0]
@@ -654,7 +625,6 @@ document.addEventListener('drop', (e) => {
   const doel = z.dataset.drop === 'bakje' ? null : z.dataset.drop;
   wijzig((s) => {
     if (soort === 'taak') M.zetWerkdag(s, id, doel);
-    if (soort === 'les') M.verplaatsLes(s, id, doel);
   });
 });
 
@@ -698,7 +668,7 @@ window.addEventListener('pagehide', syncAlsNodig);
 mobiel.addEventListener('change', render);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
-    if (ui.dag !== M.vandaag()) render(); // de datum van vandaag is veranderd
+    if (ui.dag !== M.vandaag() && !ruimOp()) render(); // nieuwe dag (op maandag: nieuwe weekblokken)
     sync();
   } else {
     syncAlsNodig();
@@ -707,7 +677,9 @@ document.addEventListener('visibilitychange', () => {
 setInterval(() => document.visibilityState === 'visible' && sync(), 15 * 60 * 1000);
 setInterval(() => {
   controleerTimer(); // ook op de achtergrond, zodat de titel van het tabblad de vraag toont
-  if (document.visibilityState === 'visible') tik();
+  if (document.visibilityState !== 'visible') return;
+  if (ui.dag !== M.vandaag() && !ruimOp()) render(); // middernacht gepasseerd
+  else tik();
 }, 1000);
 
 ruimOp();
